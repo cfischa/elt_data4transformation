@@ -1,0 +1,204 @@
+-- Schema definitions for source tables
+version: 2
+
+sources:
+  - name: dawum
+    description: "DAWUM political polling data from API"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: raw
+    tables:
+      - name: raw_polls
+        description: "Raw polling data from DAWUM API"
+        columns:
+          - name: id
+            description: "Unique poll identifier"
+            tests:
+              - unique
+              - not_null
+          - name: parliament_id
+            description: "Parliament/election identifier"
+            tests:
+              - not_null
+          - name: institute_id
+            description: "Polling institute identifier"
+            tests:
+              - not_null
+          - name: poll_date
+            description: "Date when poll was conducted"
+            tests:
+              - not_null
+          - name: results
+            description: "JSON string containing poll results by party"
+            tests:
+              - not_null
+          - name: sample_size
+            description: "Number of respondents in poll"
+            tests:
+              - not_null
+              - dbt_utils.accepted_range:
+                  min_value: 1
+                  max_value: 50000
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+      - name: raw_institutes
+        description: "Polling institutes reference data"
+        columns:
+          - name: id
+            description: "Unique institute identifier"
+            tests:
+              - unique
+              - not_null
+          - name: name
+            description: "Institute name"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+      - name: raw_parties
+        description: "Political parties reference data"
+        columns:
+          - name: id
+            description: "Unique party identifier"
+            tests:
+              - unique
+              - not_null
+          - name: name
+            description: "Party name"
+            tests:
+              - not_null
+          - name: shortcut
+            description: "Party abbreviation"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+      - name: raw_parliaments
+        description: "Parliament/election reference data"
+        columns:
+          - name: id
+            description: "Unique parliament identifier"
+            tests:
+              - unique
+              - not_null
+          - name: name
+            description: "Parliament name"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+      - name: raw_methods
+        description: "Polling methods reference data"
+        columns:
+          - name: id
+            description: "Unique method identifier"
+            tests:
+              - unique
+              - not_null
+          - name: name
+            description: "Method name"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+  - name: destatis
+    description: "Destatis statistical data"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: raw
+    tables:
+      - name: raw_election_results
+        description: "Official election results from Destatis"
+        columns:
+          - name: id
+            description: "Unique result identifier"
+            tests:
+              - unique
+              - not_null
+          - name: election_date
+            description: "Date of election"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+  - name: eurostat
+    description: "Eurostat European statistical data"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: raw
+    tables:
+      - name: raw_european_elections
+        description: "European Parliament election data"
+        columns:
+          - name: id
+            description: "Unique record identifier"
+            tests:
+              - unique
+              - not_null
+          - name: country
+            description: "Country code"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+  - name: gesis
+    description: "GESIS social science data"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: raw
+    tables:
+      - name: raw_survey_data
+        description: "Survey data from GESIS"
+        columns:
+          - name: id
+            description: "Unique survey identifier"
+            tests:
+              - unique
+              - not_null
+          - name: survey_date
+            description: "Date of survey"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null
+
+  - name: soep
+    description: "SOEP socio-economic panel data"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: raw
+    tables:
+      - name: raw_panel_data
+        description: "Panel survey data from SOEP"
+        columns:
+          - name: id
+            description: "Unique panel record identifier"
+            tests:
+              - unique
+              - not_null
+          - name: survey_year
+            description: "Year of survey"
+            tests:
+              - not_null
+          - name: _extracted_at
+            description: "Timestamp when data was extracted"
+            tests:
+              - not_null

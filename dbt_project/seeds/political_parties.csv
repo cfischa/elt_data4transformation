@@ -1,0 +1,16 @@
+id,name,shortcut,color,spectrum,is_major_party,is_government_capable,description
+1,Christlich Demokratische Union Deutschlands,CDU,#000000,CONSERVATIVE,TRUE,TRUE,Major conservative party
+2,Sozialdemokratische Partei Deutschlands,SPD,#E3000F,SOCIAL_DEMOCRATIC,TRUE,TRUE,Major social democratic party
+3,Bündnis 90/Die Grünen,GRÜNE,#1AA037,GREEN,TRUE,TRUE,Environmental and progressive party
+4,Freie Demokratische Partei,FDP,#FFED00,LIBERAL,TRUE,TRUE,Liberal party
+5,Die Linke,DIE LINKE,#BE3075,LEFT,TRUE,FALSE,Left-wing party
+6,Alternative für Deutschland,AfD,#0489DB,RIGHT_POPULIST,TRUE,FALSE,Right-wing populist party
+7,Bündnis Sahra Wagenknecht,BSW,#722F73,LEFT_POPULIST,TRUE,FALSE,Left-wing populist party
+8,Christlich-Soziale Union in Bayern,CSU,#008AC5,CONSERVATIVE,TRUE,TRUE,Conservative party for Bavaria
+9,Freie Wähler,FREIE WÄHLER,#FE5000,REGIONAL,FALSE,FALSE,Regional party
+10,Piratenpartei Deutschland,PIRATEN,#FF6600,DIGITAL_RIGHTS,FALSE,FALSE,Digital rights party
+11,Tierschutzpartei,TIERSCHUTZ,#336633,SINGLE_ISSUE,FALSE,FALSE,Animal rights party
+12,Nationaldemokratische Partei Deutschlands,NPD,#654321,EXTREME_RIGHT,FALSE,FALSE,Extreme right party
+13,Volt Deutschland,VOLT,#502379,EUROPEAN,FALSE,FALSE,Pro-European party
+14,Die PARTEI,DIE PARTEI,#B7410E,SATIRICAL,FALSE,FALSE,Satirical party
+15,Ökologisch-Demokratische Partei,ÖDP,#FF7F00,GREEN,FALSE,FALSE,Ecological democratic party

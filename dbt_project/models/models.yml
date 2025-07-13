@@ -1,0 +1,224 @@
+-- Test configurations and custom tests
+version: 2
+
+models:
+  - name: raw_dawum_polls
+    description: "Raw polling data from DAWUM with basic cleaning"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - id
+            - _batch_id
+    columns:
+      - name: id
+        description: "Unique poll identifier"
+        tests:
+          - unique
+          - not_null
+      - name: poll_date
+        description: "Poll date"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: "'2020-01-01'"
+              max_value: "current_date() + interval 1 day"
+      - name: sample_size
+        description: "Poll sample size"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 50000
+
+  - name: stg_dawum_polls
+    description: "Staged polling data with parsed results"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - poll_id
+            - party_id
+            - _batch_id
+    columns:
+      - name: poll_id
+        description: "Poll identifier"
+        tests:
+          - not_null
+      - name: party_id
+        description: "Party identifier"
+        tests:
+          - not_null
+      - name: poll_value
+        description: "Poll percentage value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: stg_dawum_institutes
+    description: "Staged institute data with quality ratings"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - institute_id
+            - _batch_id
+    columns:
+      - name: institute_id
+        description: "Institute identifier"
+        tests:
+          - unique
+          - not_null
+      - name: institute_name
+        description: "Institute name"
+        tests:
+          - not_null
+      - name: institute_quality_rating
+        description: "Quality rating (0-100)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: stg_dawum_parties
+    description: "Staged party data with standardized names"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - party_id
+            - _batch_id
+    columns:
+      - name: party_id
+        description: "Party identifier"
+        tests:
+          - unique
+          - not_null
+      - name: party_name_clean
+        description: "Standardized party name"
+        tests:
+          - not_null
+      - name: party_shortcut_clean
+        description: "Standardized party abbreviation"
+        tests:
+          - not_null
+
+  - name: fact_polls
+    description: "Core fact table for polls with all dimensions"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - poll_id
+            - party_id
+    columns:
+      - name: poll_id
+        description: "Poll identifier"
+        tests:
+          - not_null
+      - name: party_id
+        description: "Party identifier"
+        tests:
+          - not_null
+      - name: poll_value
+        description: "Poll percentage value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: poll_quality_score
+        description: "Calculated poll quality score"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: trend_direction
+        description: "Trend direction vs previous poll"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['UP', 'DOWN', 'STABLE', 'NEW']
+
+  - name: daily_poll_averages
+    description: "Daily aggregated poll averages"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - poll_date
+            - party_id
+    columns:
+      - name: poll_date
+        description: "Poll date"
+        tests:
+          - not_null
+      - name: party_id
+        description: "Party identifier"
+        tests:
+          - not_null
+      - name: weighted_avg_poll_value
+        description: "Quality-weighted average poll value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: poll_count
+        description: "Number of polls for this date/party"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 50
+
+  - name: latest_poll_standings
+    description: "Latest poll standings for each party"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - party_id
+    columns:
+      - name: party_id
+        description: "Party identifier"
+        tests:
+          - unique
+          - not_null
+      - name: latest_poll_value
+        description: "Latest poll value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+      - name: current_rank
+        description: "Current ranking by poll value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 50
+      - name: trend_direction
+        description: "Trend vs previous poll"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['UP', 'DOWN', 'STABLE', 'NEW']
+      - name: parliament_likelihood
+        description: "Likelihood of entering parliament"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['LIKELY_IN_PARLIAMENT', 'MARGINAL', 'UNLIKELY']
+
+# Custom tests
+tests:
+  - name: test_poll_value_sum_reasonable
+    description: "Test that poll values for major parties sum to reasonable total"
+    # This would be implemented as a custom test
+    
+  - name: test_no_future_polls
+    description: "Test that no polls are dated in the future"
+    # This would be implemented as a custom test
+    
+  - name: test_consistent_party_mapping
+    description: "Test that party mappings are consistent across batches"
+    # This would be implemented as a custom test

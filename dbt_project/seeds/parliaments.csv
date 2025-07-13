@@ -1,0 +1,21 @@
+id,name,description,election_date,level,country
+1,Bundestag,German Federal Parliament,2021-09-26,FEDERAL,DE
+2,Landtag Baden-Württemberg,State Parliament of Baden-Württemberg,2021-03-14,STATE,DE
+3,Landtag Bayern,State Parliament of Bavaria,2018-10-14,STATE,DE
+4,Abgeordnetenhaus Berlin,Berlin House of Representatives,2021-09-26,STATE,DE
+5,Landtag Brandenburg,State Parliament of Brandenburg,2019-09-01,STATE,DE
+6,Bürgerschaft Bremen,Bremen Parliament,2019-05-26,STATE,DE
+7,Bürgerschaft Hamburg,Hamburg Parliament,2020-02-23,STATE,DE
+8,Landtag Hessen,State Parliament of Hesse,2018-10-28,STATE,DE
+9,Landtag Mecklenburg-Vorpommern,State Parliament of Mecklenburg-Vorpommern,2021-09-26,STATE,DE
+10,Landtag Niedersachsen,State Parliament of Lower Saxony,2022-10-09,STATE,DE
+11,Landtag Nordrhein-Westfalen,State Parliament of North Rhine-Westphalia,2022-05-15,STATE,DE
+12,Landtag Rheinland-Pfalz,State Parliament of Rhineland-Palatinate,2021-03-14,STATE,DE
+13,Landtag Saarland,State Parliament of Saarland,2022-03-27,STATE,DE
+14,Landtag Sachsen,State Parliament of Saxony,2019-09-01,STATE,DE
+15,Landtag Sachsen-Anhalt,State Parliament of Saxony-Anhalt,2021-06-06,STATE,DE
+16,Landtag Schleswig-Holstein,State Parliament of Schleswig-Holstein,2022-05-08,STATE,DE
+17,Landtag Thüringen,State Parliament of Thuringia,2019-10-27,STATE,DE
+18,Europaparlament,European Parliament,2019-05-26,EUROPEAN,EU
+19,Kommunalwahlen,Municipal Elections,2024-06-09,MUNICIPAL,DE
+20,Bundestagswahl 2025,Next Federal Election,2025-09-28,FEDERAL,DE

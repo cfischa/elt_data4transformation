@@ -1,0 +1,16 @@
+id,name,description,website,quality_rating,institute_type,country
+1,Forsa,Gesellschaft für Sozialforschung und statistische Analysen,https://www.forsa.de,85,TRADITIONAL,DE
+2,Infratest dimap,Infratest dimap,https://www.infratest-dimap.de,90,TRADITIONAL,DE
+3,Emnid,TNS Emnid,https://www.tns-emnid.com,85,TRADITIONAL,DE
+4,GMS,Gesellschaft für Markt- und Sozialforschung,https://www.gms-kiel.de,80,TRADITIONAL,DE
+5,INSA,Institut für Neue Soziale Antworten,https://www.insa-consulere.de,75,TRADITIONAL,DE
+6,Allensbach,Institut für Demoskopie Allensbach,https://www.ifd-allensbach.de,90,ACADEMIC,DE
+7,Ipsos,Ipsos Deutschland,https://www.ipsos.com/de-de,85,TRADITIONAL,DE
+8,YouGov,YouGov Deutschland,https://yougov.de,80,ONLINE,DE
+9,Kantar,Kantar Deutschland,https://www.kantar.com/de,85,TRADITIONAL,DE
+10,Civey,Civey,https://civey.com,70,ONLINE,DE
+11,Trend Research,Trend Research,https://www.trendresearch.de,75,TRADITIONAL,DE
+12,Politbarometer,Forschungsgruppe Wahlen,https://www.forschungsgruppe.de,85,TRADITIONAL,DE
+13,ARD-DeutschlandTrend,Infratest dimap für ARD,https://www.infratest-dimap.de,88,TRADITIONAL,DE
+14,ZDF-Politbarometer,Forschungsgruppe Wahlen für ZDF,https://www.forschungsgruppe.de,87,TRADITIONAL,DE
+15,RTL/ntv-Trendbarometer,Forsa für RTL/ntv,https://www.forsa.de,85,TRADITIONAL,DE

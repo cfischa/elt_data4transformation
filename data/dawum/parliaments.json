@@ -1,0 +1,92 @@
+{
+  "10": {
+    "Shortcut": "Nordrhein-Westfalen (NRW)",
+    "Name": "Landtag von Nordrhein-Westfalen",
+    "Election": "Landtagswahl in Nordrhein-Westfalen (NRW)"
+  },
+  "0": {
+    "Shortcut": "Bundestag",
+    "Name": "Bundestag",
+    "Election": "Bundestagswahl"
+  },
+  "4": {
+    "Shortcut": "Brandenburg",
+    "Name": "Brandenburgischer Landtag",
+    "Election": "Landtagswahl in Brandenburg"
+  },
+  "7": {
+    "Shortcut": "Hessen",
+    "Name": "Hessischer Landtag",
+    "Election": "Landtagswahl in Hessen"
+  },
+  "11": {
+    "Shortcut": "Rheinland-Pfalz",
+    "Name": "Landtag von Rheinland-Pfalz",
+    "Election": "Landtagswahl in Rheinland-Pfalz"
+  },
+  "14": {
+    "Shortcut": "Sachsen-Anhalt",
+    "Name": "Landtag von Sachsen-Anhalt",
+    "Election": "Landtagswahl in Sachsen-Anhalt"
+  },
+  "3": {
+    "Shortcut": "Berlin",
+    "Name": "Berliner Abgeordnetenhaus",
+    "Election": "Abgeordnetenhauswahl in Berlin"
+  },
+  "2": {
+    "Shortcut": "Bayern",
+    "Name": "Bayerischer Landtag",
+    "Election": "Landtagswahl in Bayern"
+  },
+  "13": {
+    "Shortcut": "Sachsen",
+    "Name": "S\u00e4chsischer Landtag",
+    "Election": "Landtagswahl in Sachsen"
+  },
+  "1": {
+    "Shortcut": "Baden-W\u00fcrttemberg",
+    "Name": "Landtag von Baden-W\u00fcrttemberg",
+    "Election": "Landtagswahl in Baden-W\u00fcrttemberg"
+  },
+  "16": {
+    "Shortcut": "Th\u00fcringen",
+    "Name": "Th\u00fcringischer Landtag",
+    "Election": "Landtagswahl in Th\u00fcringen"
+  },
+  "5": {
+    "Shortcut": "Bremen",
+    "Name": "Bremische B\u00fcrgerschaft",
+    "Election": "B\u00fcrgerschaftswahl in Bremen"
+  },
+  "8": {
+    "Shortcut": "Mecklenburg-Vorpommern",
+    "Name": "Landtag von Mecklenburg-Vorpommern",
+    "Election": "Landtagswahl in Mecklenburg-Vorpommern"
+  },
+  "12": {
+    "Shortcut": "Saarland",
+    "Name": "Saarl\u00e4ndischer Landtag",
+    "Election": "Landtagswahl im Saarland"
+  },
+  "6": {
+    "Shortcut": "Hamburg",
+    "Name": "Hamburgische B\u00fcrgerschaft",
+    "Election": "B\u00fcrgerschaftswahl in Hamburg"
+  },
+  "9": {
+    "Shortcut": "Niedersachsen",
+    "Name": "Nieders\u00e4chsischer Landtag",
+    "Election": "Landtagswahl in Niedersachsen"
+  },
+  "15": {
+    "Shortcut": "Schleswig-Holstein",
+    "Name": "Landtag von Schleswig-Holstein",
+    "Election": "Landtagswahl in Schleswig-Holstein"
+  },
+  "17": {
+    "Shortcut": "Europ\u00e4isches Parlament",
+    "Name": "Europ\u00e4isches Parlament",
+    "Election": "Europawahl"
+  }
+}

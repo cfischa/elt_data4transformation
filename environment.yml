@@ -1,0 +1,15 @@
+name: bnb_data4transformation
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - matplotlib
+  - scikit-learn
+  - jupyterlab
+  - ipykernel
+  - requests
+  - pip
+  - pip:
+      - pystatis
+# Add other pip dependencies here if needed

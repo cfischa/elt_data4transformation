@@ -1,0 +1,144 @@
+name: 'bnb_data4transformation'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'bnb_data4transformation'
+
+# These configurations specify where dbt should look for different types of files.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  bnb_data4transformation:
+    # Raw models - minimal transformation
+    raw:
+      +materialized: table
+      +schema: raw
+      +tags: ["raw"]
+      +docs:
+        node_color: "lightblue"
+    
+    # Staging models - cleaned and standardized
+    staging:
+      +materialized: table
+      +schema: staging
+      +tags: ["staging"]
+      +docs:
+        node_color: "lightgreen"
+    
+    # Marts models - business logic
+    marts:
+      +materialized: table
+      +schema: analytics
+      +tags: ["marts", "analytics"]
+      +docs:
+        node_color: "orange"
+      
+      # Core business entities
+      core:
+        +materialized: table
+        +tags: ["core"]
+      
+      # Aggregated views
+      aggregates:
+        +materialized: view
+        +tags: ["aggregates"]
+
+# Snapshot configurations
+snapshots:
+  bnb_data4transformation:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at
+
+# Seed configurations
+seeds:
+  bnb_data4transformation:
+    +schema: seeds
+    +tags: ["seeds"]
+    
+    # Political reference data
+    political_parties:
+      +column_types:
+        id: INT
+        name: STRING
+        shortcut: STRING
+        color: STRING
+    
+    institutes:
+      +column_types:
+        id: INT
+        name: STRING
+        description: STRING
+        website: STRING
+    
+    parliaments:
+      +column_types:
+        id: INT
+        name: STRING
+        election_date: DATE
+        description: STRING
+
+# Test configurations
+tests:
+  +store_failures: true
+  +schema: test_failures
+
+# Macro configurations
+macros:
+  bnb_data4transformation:
+    +docs:
+      node_color: "purple"
+
+# Variable definitions
+vars:
+  # Date ranges for incremental models
+  start_date: '2020-01-01'
+  end_date: '2024-12-31'
+  
+  # Data quality thresholds
+  min_poll_sample_size: 100
+  max_poll_age_days: 365
+  
+  # Timezone settings
+  default_timezone: 'Europe/Berlin'
+  
+  # Feature flags
+  enable_web_scraping: true
+  enable_social_media: false
+  enable_experimental_models: false
+
+# Documentation
+docs:
+  bnb_data4transformation:
+    +docs:
+      show: true
+
+# Hooks
+on-run-start:
+  - "{{ log('Starting dbt run at ' ~ run_started_at, info=True) }}"
+  - "CREATE SCHEMA IF NOT EXISTS {{ target.schema }}_raw"
+  - "CREATE SCHEMA IF NOT EXISTS {{ target.schema }}_staging"
+  - "CREATE SCHEMA IF NOT EXISTS {{ target.schema }}_analytics"
+
+on-run-end:
+  - "{{ log('Completed dbt run at ' ~ run_started_at, info=True) }}"
+  - "OPTIMIZE TABLE {{ target.schema }}_raw.dawum_polls FINAL"
+  - "OPTIMIZE TABLE {{ target.schema }}_staging.stg_polls FINAL"
+
+# Quoting settings for ClickHouse
+quoting:
+  database: false
+  schema: false
+  identifier: false

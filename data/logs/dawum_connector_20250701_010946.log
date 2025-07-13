@@ -1,0 +1,14 @@
+2025-07-01 01:09:46,206 | root | INFO | Logging to file: data\logs\dawum_connector_20250701_010946.log
+2025-07-01 01:09:46,207 | root | INFO | Starting data acquisition for dawum
+2025-07-01 01:09:46,209 | root | INFO | Loaded 3 known poll IDs
+2025-07-01 01:09:46,210 | root | INFO | Fetching polls from API...
+2025-07-01 01:09:46,210 | dawum_connector | INFO | Fetching from https://api.dawum.de/
+2025-07-01 01:09:46,417 | dawum_connector | INFO | Data fetch successful
+2025-07-01 01:09:46,417 | root | INFO | API response data type: <class 'dict'>
+2025-07-01 01:09:46,418 | root | INFO | API response keys: ['Database', 'Parliaments', 'Institutes', 'Taskers', 'Methods', 'Parties', 'Surveys']
+2025-07-01 01:09:46,418 | root | INFO | Fetched 3510 total polls
+2025-07-01 01:09:46,420 | root | INFO | Found 3510 new polls
+2025-07-01 01:09:46,425 | root | INFO | Updated known IDs list with 3513 total IDs
+2025-07-01 01:09:46,426 | root | INFO | Created polls dictionary with 3510 entries
+2025-07-01 01:09:46,426 | root | INFO | Sample poll ID: 3882, type: <class 'str'>
+2025-07-01 01:09:52,165 | root | INFO | Saved 3510 polls to data/dawum/polls/

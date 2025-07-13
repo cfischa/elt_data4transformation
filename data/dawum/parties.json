@@ -1,0 +1,106 @@
+{
+  "7": {
+    "Shortcut": "AfD",
+    "Name": "Alternative f\u00fcr Deutschland"
+  },
+  "11": {
+    "Shortcut": "Bayernpartei",
+    "Name": "Bayernpartei e.V."
+  },
+  "14": {
+    "Shortcut": "BVB/FW",
+    "Name": "Brandenburger Vereinigte B\u00fcrgerbewegungen/Freie W\u00e4hler"
+  },
+  "4": {
+    "Shortcut": "Gr\u00fcne",
+    "Name": "B\u00fcndnis 90/Die Gr\u00fcnen"
+  },
+  "16": {
+    "Shortcut": "BD",
+    "Name": "B\u00fcndnis Deutschland"
+  },
+  "23": {
+    "Shortcut": "BSW",
+    "Name": "B\u00fcndnis Sahra Wagenknecht"
+  },
+  "21": {
+    "Shortcut": "bunt.saar",
+    "Name": "bunt.saar \u2013 sozial-\u00f6kologische liste"
+  },
+  "22": {
+    "Shortcut": "BfTh",
+    "Name": "B\u00fcrger f\u00fcr Th\u00fcringen"
+  },
+  "1": {
+    "Shortcut": "CDU/CSU",
+    "Name": "Christlich Demokratische Union / Christlich-Soziale Union"
+  },
+  "101": {
+    "Shortcut": "CDU",
+    "Name": "Christlich Demokratische Union"
+  },
+  "102": {
+    "Shortcut": "CSU",
+    "Name": "Christlich-Soziale Union"
+  },
+  "5": {
+    "Shortcut": "Linke",
+    "Name": "Die Linke"
+  },
+  "17": {
+    "Shortcut": "Familie",
+    "Name": "Familienpartei Deutschlands"
+  },
+  "3": {
+    "Shortcut": "FDP",
+    "Name": "Freie Demokratische Partei"
+  },
+  "8": {
+    "Shortcut": "Freie W\u00e4hler",
+    "Name": "Freie W\u00e4hler"
+  },
+  "9": {
+    "Shortcut": "NPD",
+    "Name": "Nationaldemokratische Partei Deutschlands"
+  },
+  "12": {
+    "Shortcut": "\u00d6DP",
+    "Name": "\u00d6kologisch-Demokratische Partei"
+  },
+  "13": {
+    "Shortcut": "Die PARTEI",
+    "Name": "Partei f\u00fcr Arbeit, Rechtsstaat, Tierschutz, Elitenf\u00f6rderung und basisdemokratische Initiative"
+  },
+  "15": {
+    "Shortcut": "Tierschutzpartei",
+    "Name": "Partei Mensch Umwelt Tierschutz"
+  },
+  "6": {
+    "Shortcut": "Piraten",
+    "Name": "Piratenpartei"
+  },
+  "24": {
+    "Shortcut": "Plus Brandenburg",
+    "Name": "Plus Brandenburg (Listenvereinigung aus Piratenpartei, \u00d6DP und Volt)"
+  },
+  "2": {
+    "Shortcut": "SPD",
+    "Name": "Sozialdemokratische Partei Deutschlands"
+  },
+  "10": {
+    "Shortcut": "SSW",
+    "Name": "S\u00fcdschleswigscher W\u00e4hlerverband"
+  },
+  "18": {
+    "Shortcut": "Volt",
+    "Name": "Volt Deutschland"
+  },
+  "25": {
+    "Shortcut": "WerteUnion",
+    "Name": "WerteUnion"
+  },
+  "0": {
+    "Shortcut": "Sonstige",
+    "Name": "sonstige Parteien"
+  }
+}
