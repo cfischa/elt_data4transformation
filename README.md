@@ -69,6 +69,13 @@ make status
 
 # Initialize ClickHouse schemas
 make init-db
+
+# Access services:
+# - Airflow UI: http://localhost:8081 (airflow/airflow)
+# - ClickHouse: http://localhost:8124
+# - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)
+# - MinIO API: http://localhost:9002
+# - Jupyter: http://localhost:8888?token=admin
 ```
 
 ### 3. Run Sample Pipeline
@@ -80,9 +87,10 @@ make load-local
 make dbt-run
 
 # Access services:
-# - Airflow UI: http://localhost:8080 (airflow/airflow)
-# - ClickHouse: http://localhost:8123
-# - MinIO: http://localhost:9001 (minioadmin/minioadmin)
+# - Airflow UI: http://localhost:8081 (airflow/airflow)
+# - ClickHouse: http://localhost:8124
+# - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)
+# - MinIO API: http://localhost:9002
 # - Jupyter: http://localhost:8888?token=admin
 ```
 
@@ -99,7 +107,8 @@ make dbt-run
 │   ├── extract_api_dag.py    # API data extraction
 │   ├── extract_scrape_dag.py # Web scraping jobs
 │   ├── load_clickhouse_dag.py # Data loading
-│   └── dbt_transform_dag.py  # dbt transformations
+│   ├── dbt_transform_dag.py  # dbt transformations
+│   └── dbt_transformation_dag.py # dbt orchestration
 ├── 
 ├── connectors/               # Data source connectors
 │   ├── __init__.py
@@ -152,6 +161,8 @@ make dbt-run
 │   └── exports/             # Analysis outputs
 ├── 
 ├── scripts/                 # Utility scripts
+│   ├── check_stack.sh       # Bash smoke tests
+│   ├── check_stack.ps1      # PowerShell smoke tests
 │   ├── init_clickhouse.sql  # Database initialization
 │   └── setup_dev.py         # Development setup
 ├── 
@@ -179,7 +190,10 @@ make format              # Format code
 make extract             # Run data extraction
 make load                # Load data to ClickHouse
 make transform           # Run dbt transformations
+make dbt-run             # Run dbt models
+make dbt-version         # Check dbt version and connectivity
 make pipeline            # Run full ELT pipeline
+make smoke               # Run health checks
 
 # Infrastructure
 make up                  # Start all services

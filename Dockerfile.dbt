@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir \
     dbt-clickhouse==1.7.0
 
 # Copy dbt profiles
-COPY profiles /root/.dbt/
+COPY dbt_project/profiles.yml /root/.dbt/
 
 # Set environment variables
 ENV DBT_PROFILES_DIR=/root/.dbt

@@ -1,6 +1,6 @@
 # Common development tasks for BnB Data4Transformation
 
-.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run smoke
+.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke
 
 # Default target
 help:
@@ -29,6 +29,7 @@ help:
 	@echo "  load         Load data to ClickHouse"
 	@echo "  transform    Run dbt transformations"
 	@echo "  dbt-run      Run dbt models"
+	@echo "  dbt-version  Check dbt version and connectivity"
 	@echo "  pipeline     Run full ELT pipeline"
 	@echo "  load-local   Load sample DAWUM data"
 
@@ -43,9 +44,10 @@ init:
 dev: init up
 	@echo "🔧 Starting development environment..."
 	@echo "Access services at:"
-	@echo "  - Airflow UI: http://localhost:8080 (airflow/airflow)"
-	@echo "  - ClickHouse: http://localhost:8123"
-	@echo "  - MinIO: http://localhost:9001 (minioadmin/minioadmin)"
+	@echo "  - Airflow UI: http://localhost:8081 (airflow/airflow)"
+	@echo "  - ClickHouse: http://localhost:8124"
+	@echo "  - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)"
+	@echo "  - MinIO API: http://localhost:9002"
 	@echo "  - Jupyter: http://localhost:8888?token=admin"
 
 # Code Quality
@@ -124,20 +126,25 @@ load:
 
 transform:
 	@echo "🔄 Running dbt transformations..."
-	@docker-compose exec dbt dbt run --profiles-dir /root/.dbt
+	@docker-compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
 
 dbt-run:
 	@echo "🔄 Running dbt models..."
-	@docker-compose exec dbt dbt run --profiles-dir /root/.dbt
+	@docker-compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
 
 dbt-test:
 	@echo "🧪 Running dbt tests..."
-	@docker-compose exec dbt dbt test --profiles-dir /root/.dbt
+	@docker-compose exec dbt dbt test --profiles-dir /usr/app/dbt_project
 
 dbt-docs:
 	@echo "📖 Generating dbt documentation..."
-	@docker-compose exec dbt dbt docs generate --profiles-dir /root/.dbt
-	@docker-compose exec dbt dbt docs serve --profiles-dir /root/.dbt --port 8081
+	@docker-compose exec dbt dbt docs generate --profiles-dir /usr/app/dbt_project
+	@docker-compose exec dbt dbt docs serve --profiles-dir /usr/app/dbt_project --port 8081
+
+dbt-version:
+	@echo "🔍 Checking dbt version and connectivity..."
+	@docker-compose exec dbt dbt --version
+	@docker-compose exec dbt dbt debug --profiles-dir /usr/app/dbt_project
 
 pipeline: extract load transform
 	@echo "🎯 Full ELT pipeline completed"

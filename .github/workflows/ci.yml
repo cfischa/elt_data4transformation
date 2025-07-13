@@ -106,6 +106,9 @@ jobs:
     - name: Run smoke tests
       run: make smoke
 
+    - name: Check dbt setup
+      run: make dbt-version
+
     - name: Run integration tests
       run: |
         # Set up test environment

@@ -26,7 +26,8 @@ def http_session():
 @pytest.fixture
 def airflow_url():
     """Get Airflow URL from environment."""
-    return os.getenv("AIRFLOW_URL", "http://localhost:8080")
+    port = os.getenv("AIRFLOW_WEBSERVER_PORT", "8081")
+    return os.getenv("AIRFLOW_URL", f"http://localhost:{port}")
 
 
 @pytest.fixture
@@ -34,9 +35,9 @@ def clickhouse_config():
     """Get ClickHouse configuration from environment."""
     return {
         "host": os.getenv("CLICKHOUSE_HOST", "localhost"),
-        "port": int(os.getenv("CLICKHOUSE_PORT", "8123")),
-        "user": os.getenv("CLICKHOUSE_USER", "default"),
-        "password": os.getenv("CLICKHOUSE_PASSWORD", ""),
+        "port": int(os.getenv("CLICKHOUSE_PORT", "8124")),
+        "user": os.getenv("CLICKHOUSE_USER", "admin"),
+        "password": os.getenv("CLICKHOUSE_PASSWORD", "admin123"),
     }
 
 
