@@ -413,6 +413,125 @@ class ClickHouseLoader:
         except Exception as e:
             self.logger.error(f"Failed to log ingestion: {e}")
             # Don't raise - logging failure shouldn't stop the pipeline
+        
+    def load_dicts(self, data: List[Dict[str, Any]], table: str, batch_size: int = 10000) -> int:
+        """
+        Load list of dictionaries into ClickHouse table with batching.
+        
+        Args:
+            data: List of dictionaries to load
+            table: Target table name
+            batch_size: Number of rows per batch (default 10000)
+            
+        Returns:
+            Number of rows loaded
+        """
+        if self.client is None:
+            raise RuntimeError("Not connected to ClickHouse")
+        
+        if not data:
+            self.logger.warning(f"No data provided to load into {table}")
+            return 0
+        
+        try:
+            total_rows = len(data)
+            loaded_rows = 0
+            
+            # Process in batches
+            for i in range(0, total_rows, batch_size):
+                batch = data[i:i + batch_size]
+                
+                # Insert batch using JSONEachRow format for better performance
+                self.client.insert(table, batch)
+                loaded_rows += len(batch)
+                
+                self.logger.debug(f"Loaded batch {i//batch_size + 1}: {len(batch)} rows into {table}")
+            
+            self.logger.info(f"Successfully loaded {loaded_rows} rows into {table}")
+            return loaded_rows
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load data into {table}: {e}")
+            raise
+    
+    def create_raw_dawum_table(self) -> None:
+        """Create the raw.dawum_polls table with proper schema."""
+        ddl = """
+        CREATE TABLE IF NOT EXISTS raw.dawum_polls (
+            poll_id String,
+            institute_id Nullable(String),
+            institute_name Nullable(String),
+            tasker_id Nullable(String),
+            tasker_name Nullable(String),
+            parliament_id Nullable(String),
+            parliament_name Nullable(String),
+            method_id Nullable(String),
+            method_name Nullable(String),
+            survey_period_start Nullable(DateTime),
+            survey_period_end Nullable(DateTime),
+            publication_date Nullable(DateTime),
+            sample_size Nullable(Int32),
+            results String,
+            source_url Nullable(String),
+            source_loaded_at DateTime,
+            created_at DateTime,
+            updated_at DateTime,
+            event_date Date MATERIALIZED toDate(publication_date)
+        ) ENGINE = ReplacingMergeTree(updated_at)
+        PARTITION BY toYYYYMM(event_date)
+        ORDER BY (poll_id, publication_date)
+        """
+        
+        try:
+            # Create raw database if not exists
+            self.client.command("CREATE DATABASE IF NOT EXISTS raw")
+            
+            # Create table
+            self.client.command(ddl)
+            self.logger.info("Created raw.dawum_polls table")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create raw.dawum_polls table: {e}")
+            raise
+    
+    def upsert_dawum_polls(self, data: List[Dict[str, Any]]) -> int:
+        """
+        Upsert DAWUM polls data using ReplacingMergeTree strategy.
+        
+        Args:
+            data: List of poll dictionaries
+            
+        Returns:
+            Number of rows processed
+        """
+        if not data:
+            return 0
+        
+        try:
+            # Ensure table exists
+            self.create_raw_dawum_table()
+            
+            # Extract poll_ids for deletion
+            poll_ids = [poll['poll_id'] for poll in data if poll.get('poll_id')]
+            
+            if poll_ids:
+                # Delete existing records for these poll_ids
+                poll_ids_str = "', '".join(poll_ids)
+                delete_query = f"ALTER TABLE raw.dawum_polls DELETE WHERE poll_id IN ('{poll_ids_str}')"
+                self.client.command(delete_query)
+                self.logger.info(f"Deleted existing records for {len(poll_ids)} poll_ids")
+            
+            # Insert new data
+            rows_loaded = self.load_dicts(data, "raw.dawum_polls")
+            
+            # Optimize table to trigger merge
+            self.client.command("OPTIMIZE TABLE raw.dawum_polls FINAL")
+            
+            return rows_loaded
+            
+        except Exception as e:
+            self.logger.error(f"Failed to upsert DAWUM polls: {e}")
+            raise
 
 
 # Example usage and utility functions

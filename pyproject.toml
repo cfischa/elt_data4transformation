@@ -50,6 +50,9 @@ python-dotenv = "^1.0.0"
 invoke = "^2.2.0"
 rich = "^13.7.0"
 
+# Retry and resilience
+tenacity = "^8.2.0"
+
 [tool.poetry.group.dev.dependencies]
 # Testing
 pytest = "^7.4.0"

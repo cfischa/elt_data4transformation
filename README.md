@@ -266,6 +266,71 @@ Pre-commit hooks automatically run:
 - Email alerts for data quality issues
 - Prometheus alerts for system metrics
 
+## 📊 Real Data Loading
+
+### DAWUM Polling Data
+
+#### Using Airflow DAG
+```bash
+# Start the infrastructure
+make up
+
+# Trigger DAWUM ingestion DAG
+curl -X POST "http://localhost:8081/api/v1/dags/dawum_ingest/dagRuns" \
+  -H "Content-Type: application/json" \
+  -u "airflow:airflow" \
+  -d '{}'
+
+# Check DAG status
+# Navigate to http://localhost:8081 and view the dawum_ingest DAG
+```
+
+#### Using CLI (Local Development)
+```bash
+# Load DAWUM data directly
+make load-dawum
+
+# Test extraction without loading to database
+make load-dawum-dry
+
+# Test API and database connections
+make test-connections
+
+# Manual CLI usage
+python -m pipeline.dawum_local_load load --limit 100
+python -m pipeline.dawum_local_load load --dry-run --verbose
+python -m pipeline.dawum_local_load test-connection
+```
+
+#### Data Pipeline Features
+- **Async HTTP extraction** with pagination and retry logic
+- **Rate limiting** to respect API limits (60 requests/minute)
+- **Data transformation** with standardized schema
+- **Upsert strategy** using ClickHouse ReplacingMergeTree
+- **Batch processing** (10,000 rows per batch)
+- **Comprehensive logging** with progress tracking
+
+#### Monitoring & Verification
+```bash
+# Check loaded data
+clickhouse-client --query "SELECT COUNT(*) FROM raw.dawum_polls"
+clickhouse-client --query "SELECT * FROM raw.dawum_polls LIMIT 5"
+
+# View Airflow logs
+make logs airflow-scheduler
+make logs airflow-worker
+
+# Check data quality
+clickhouse-client --query "
+  SELECT 
+    COUNT(*) as total_polls,
+    COUNT(DISTINCT institute_name) as institutes,
+    MIN(publication_date) as earliest_poll,
+    MAX(publication_date) as latest_poll
+  FROM raw.dawum_polls
+"
+```
+
 ## 🔑 Configuration
 
 ### Environment Variables

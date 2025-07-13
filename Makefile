@@ -32,6 +32,7 @@ help:
 	@echo "  dbt-version  Check dbt version and connectivity"
 	@echo "  pipeline     Run full ELT pipeline"
 	@echo "  load-local   Load sample DAWUM data"
+	@echo "  load-dawum   Load DAWUM polling data"
 
 # Development Setup
 init:
@@ -153,6 +154,21 @@ load-local:
 	@echo "📥 Loading sample DAWUM data..."
 	@poetry run python -c "from data_acquisition.connectors.dawum_connector import DawumConnector; import asyncio; asyncio.run(DawumConnector().fetch_and_store_polls())"
 	@echo "✅ Sample data loaded"
+
+# Load DAWUM data locally
+load-dawum:
+	@echo "📊 Loading DAWUM polling data..."
+	@python -m pipeline.dawum_local_load load
+	@echo "✅ DAWUM data loaded successfully"
+
+load-dawum-dry:
+	@echo "🔍 Testing DAWUM data extraction (dry run)..."
+	@python -m pipeline.dawum_local_load load --dry-run
+	@echo "✅ DAWUM dry run completed"
+
+test-connections:
+	@echo "🔗 Testing API and database connections..."
+	@python -m pipeline.dawum_local_load test-connection
 
 # Jupyter
 jupyter:
