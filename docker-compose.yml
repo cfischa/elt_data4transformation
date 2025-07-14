@@ -131,6 +131,9 @@ services:
     command:
       - -c
       - |
+        if [ -f /requirements.txt ]; then
+          pip install -r /requirements.txt
+        fi
         mkdir -p /sources/logs /sources/dags /sources/plugins
         chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
         exec /entrypoint airflow version
@@ -140,7 +143,6 @@ services:
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: 'clickhouse-connect==0.7.0 aiohttp==3.9.0 tenacity==8.2.0 pydantic==2.5.0 python-dotenv==1.0.0'
     user: "0:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
