@@ -4,8 +4,6 @@ Tests data extraction, chunking, authentication, and error handling with mocked 
 """
 
 import pytest
-import asyncio
-import json
 import gzip
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime

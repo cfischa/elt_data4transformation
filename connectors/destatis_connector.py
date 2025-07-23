@@ -54,6 +54,26 @@ class DestatisConfig(ConnectorConfig):
     chunk_size_mb: int = 10
     max_cells_per_request: int = 1000000
 
+    def __init__(self, **kwargs):
+        import os
+        # Load from env if not provided
+        username = kwargs.get('username') or os.getenv('DESTATIS_USER')
+        password = kwargs.get('password') or os.getenv('DESTATIS_PASS')
+        api_token = kwargs.get('api_token') or os.getenv('DESTATIS_API_KEY') or os.getenv('DESTATIS_TOKEN')
+        # Pass all to parent
+        super().__init__(
+            base_url=kwargs.get('base_url', BASE_ENDPOINT),
+            username=username,
+            password=password,
+            api_token=api_token,
+            rate_limit_requests=kwargs.get('rate_limit_requests', 30),
+            rate_limit_period=kwargs.get('rate_limit_period', 60),
+            timeout=kwargs.get('timeout', 120),
+            max_retries=kwargs.get('max_retries', 3),
+            chunk_size_mb=kwargs.get('chunk_size_mb', 10),
+            max_cells_per_request=kwargs.get('max_cells_per_request', 1000000)
+        )
+
 
 class TableInfo(BaseModel):
     """Information about a statistical table."""
