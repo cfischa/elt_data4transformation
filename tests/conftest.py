@@ -33,10 +33,10 @@ def setup_test_environment():
     # Set default test environment variables
     test_env = {
         "CLICKHOUSE_HOST": "localhost",
-        "CLICKHOUSE_PORT": "9000",
-        "CLICKHOUSE_USER": "default",
-        "CLICKHOUSE_PASSWORD": "",
-        "CLICKHOUSE_DATABASE": "test_analytics",
+        "CLICKHOUSE_PORT": "8124",
+        "CLICKHOUSE_USER": "admin",
+        "CLICKHOUSE_PASSWORD": "asjrh25423sfa#+43qw56j",
+        "CLICKHOUSE_DATABASE": "analytics",
         "DAWUM_BASE_URL": "https://api.dawum.de",
         "LOG_LEVEL": "INFO"
     }

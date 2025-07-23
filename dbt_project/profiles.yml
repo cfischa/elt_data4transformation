@@ -42,8 +42,8 @@ outputs:
     host: '{{ env_var("CLICKHOUSE_HOST", "localhost") }}'
     port: '{{ env_var("CLICKHOUSE_PORT", 9000) | int }}'
     user: '{{ env_var("CLICKHOUSE_USER", "admin") }}'
-    password: '{{ env_var("CLICKHOUSE_PASSWORD", "admin123") }}'
-    database: '{{ env_var("CLICKHOUSE_DATABASE", "bnb_data") }}'
+    password: '{{ env_var("CLICKHOUSE_PASSWORD", "asjrh25423sfa#+43qw56j") }}'
+    database: '{{ env_var("CLICKHOUSE_DATABASE", "analytics") }}'
     schema: dev
     secure: false
     verify: false
@@ -58,8 +58,8 @@ outputs:
     host: '{{ env_var("CLICKHOUSE_HOST_PROD", "localhost") }}'
     port: '{{ env_var("CLICKHOUSE_PORT_PROD", 9000) | int }}'
     user: '{{ env_var("CLICKHOUSE_USER_PROD", "admin") }}'
-    password: '{{ env_var("CLICKHOUSE_PASSWORD_PROD", "admin123") }}'
-    database: '{{ env_var("CLICKHOUSE_DATABASE_PROD", "bnb_data") }}'
+    password: '{{ env_var("CLICKHOUSE_PASSWORD_PROD", "asjrh25423sfa#+43qw56j") }}'
+    database: '{{ env_var("CLICKHOUSE_DATABASE_PROD", "analytics") }}'
     schema: prod
     secure: true
     verify: true
@@ -74,8 +74,8 @@ outputs:
     host: '{{ env_var("CLICKHOUSE_HOST_CI", "localhost") }}'
     port: '{{ env_var("CLICKHOUSE_PORT_CI", 9000) | int }}'
     user: '{{ env_var("CLICKHOUSE_USER_CI", "admin") }}'
-    password: '{{ env_var("CLICKHOUSE_PASSWORD_CI", "admin123") }}'
-    database: '{{ env_var("CLICKHOUSE_DATABASE_CI", "bnb_data_ci") }}'
+    password: '{{ env_var("CLICKHOUSE_PASSWORD_CI", "asjrh25423sfa#+43qw56j") }}'
+    database: '{{ env_var("CLICKHOUSE_DATABASE_CI", "analytics_ci") }}'
     schema: ci
     secure: false
     verify: false

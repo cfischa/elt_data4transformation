@@ -25,8 +25,9 @@ help:
 	@echo "  init-db      Initialize ClickHouse schemas"
 	@echo ""
 	@echo "Data Pipeline:"
-	@echo "  extract      Run data extraction"
-	@echo "  load         Load data to ClickHouse"
+	@echo "  extract         Run data extraction"
+	@echo "  extract-destatis Extract GENESIS-Online statistical data"
+	@echo "  load           Load data to ClickHouse"
 	@echo "  transform    Run dbt transformations"
 	@echo "  dbt-run      Run dbt models"
 	@echo "  dbt-version  Check dbt version and connectivity"
@@ -120,6 +121,36 @@ init-db:
 extract:
 	@echo "📥 Running data extraction..."
 	@poetry run python -m connectors.dawum_connector
+
+extract-destatis:
+	@echo "📊 Extracting GENESIS-Online statistical data..."
+	@echo "Tables: $(or $(TABLES),12411-0001,12411-0002)"
+	@echo "Area: $(or $(AREA),de)"
+	@echo "Years: $(or $(START_YEAR),2020) - $(or $(END_YEAR),2023)"
+	@poetry run python -c "\
+import asyncio; \
+from connectors.destatis_connector import DestatisConnector, DestatisConfig; \
+import os; \
+config = DestatisConfig( \
+    username=os.getenv('DESTATIS_USER'), \
+    password=os.getenv('DESTATIS_PASS') \
+); \
+async def run(): \
+    tables = '$(or $(TABLES),12411-0001,12411-0002)'.split(','); \
+    async with DestatisConnector(config) as conn: \
+        for table in tables: \
+            try: \
+                path = await conn.fetch_table( \
+                    table_id=table.strip(), \
+                    area='$(or $(AREA),de)', \
+                    start_year=$(or $(START_YEAR),2020), \
+                    end_year=$(or $(END_YEAR),2023), \
+                    fmt='json' \
+                ); \
+                print(f'✅ Extracted {table.strip()} to {path}'); \
+            except Exception as e: \
+                print(f'❌ Failed to extract {table.strip()}: {e}'); \
+asyncio.run(run())"
 
 load:
 	@echo "📤 Loading data to ClickHouse..."

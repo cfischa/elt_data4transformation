@@ -10,11 +10,12 @@ from airflow import DAG
 from airflow.decorators import task, dag
 from airflow.sensors.filesystem import FileSensor
 from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 import sys
 import os
+import aiofiles
+import orjson
 sys.path.append('/opt/airflow')
 
 from connectors.dawum_connector import DawumConnector
@@ -66,9 +67,8 @@ def extract_dawum_data(**context) -> Dict[str, Any]:
             
             # Save to file
             output_file = f"/tmp/dawum_data_{context['ds']}.json"
-            with open(output_file, 'w') as f:
-                import json
-                json.dump(extracted_data, f, indent=2, default=str)
+            async with aiofiles.open(output_file, 'w') as f:
+                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
             
             return {
                 'source': 'dawum',
@@ -90,20 +90,19 @@ def extract_destatis_data(**context) -> Dict[str, Any]:
             data_count = 0
             extracted_data = []
             
-            # Fetch available datasets
-            datasets = await connector.get_available_datasets()
+            # Fetch available tables
+            tables = await connector.get_available_tables()
             
-            # Extract data for each dataset
-            for dataset in datasets[:5]:  # Limit to first 5 datasets
-                async for data in connector.fetch_data(datasets=[dataset['id']]):
+            # Extract data for each table
+            for table in tables[:5]:  # Limit to first 5 tables
+                async for data in connector.fetch_data(table_ids=[table.name]):
                     extracted_data.append(data)
                     data_count += 1
             
             # Save to file
             output_file = f"/tmp/destatis_data_{context['ds']}.json"
-            with open(output_file, 'w') as f:
-                import json
-                json.dump(extracted_data, f, indent=2, default=str)
+            async with aiofiles.open(output_file, 'w') as f:
+                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
             
             return {
                 'source': 'destatis',
@@ -136,9 +135,8 @@ def extract_eurostat_data(**context) -> Dict[str, Any]:
             
             # Save to file
             output_file = f"/tmp/eurostat_data_{context['ds']}.json"
-            with open(output_file, 'w') as f:
-                import json
-                json.dump(extracted_data, f, indent=2, default=str)
+            async with aiofiles.open(output_file, 'w') as f:
+                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
             
             return {
                 'source': 'eurostat',
@@ -171,9 +169,8 @@ def extract_gesis_data(**context) -> Dict[str, Any]:
             
             # Save to file
             output_file = f"/tmp/gesis_data_{context['ds']}.json"
-            with open(output_file, 'w') as f:
-                import json
-                json.dump(extracted_data, f, indent=2, default=str)
+            async with aiofiles.open(output_file, 'w') as f:
+                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
             
             return {
                 'source': 'gesis',
@@ -206,9 +203,8 @@ def extract_soep_data(**context) -> Dict[str, Any]:
             
             # Save to file
             output_file = f"/tmp/soep_data_{context['ds']}.json"
-            with open(output_file, 'w') as f:
-                import json
-                json.dump(extracted_data, f, indent=2, default=str)
+            async with aiofiles.open(output_file, 'w') as f:
+                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
             
             return {
                 'source': 'soep',
@@ -255,7 +251,7 @@ def send_notification(validation_result: Dict[str, Any], **context) -> None:
     """Send notification about extraction results."""
     from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
     
-    # TODO: Configure Slack webhook
+    # Slack webhook configuration - set SLACK_WEBHOOK_URL environment variable
     webhook_token = os.getenv('SLACK_WEBHOOK_URL')
     
     if webhook_token:
@@ -274,7 +270,7 @@ def send_notification(validation_result: Dict[str, Any], **context) -> None:
         *Sources Processed:* {validation_result['sources_processed']}
         *Status:* {validation_result['status']}
         
-        {f"*Errors:*\\n" + '\\n'.join(validation_result['validation_errors']) if validation_result['validation_errors'] else ''}
+        {("*Errors:*\\n" + '\\n'.join(validation_result['validation_errors'])) if validation_result['validation_errors'] else ''}
         """
         
         slack_hook.send_text(message)
@@ -344,7 +340,8 @@ def extract_api_data_traditional():
         dag=dag
     )
     
-    # TODO: Add more extraction tasks
+    # Additional extraction tasks can be added here as needed
+    # Example: eurostat_extraction = PythonOperator(...)
     
     # Set dependencies
     dawum_extraction >> destatis_extraction

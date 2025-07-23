@@ -5,8 +5,8 @@ Fetches polling data from DAWUM API with async HTTP, pagination, and retry logic
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional, AsyncGenerator
 import aiohttp
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -46,15 +46,16 @@ class DawumConnector(BaseConnector):
         """Fetch a single page of data with retry logic."""
         url = f"{self.config.base_url}/{endpoint}"
         
-        async with session.get(url, params=params) as response:
-            if response.status == 429:  # Rate limited
-                retry_after = int(response.headers.get('Retry-After', 60))
-                await asyncio.sleep(retry_after)
-                raise aiohttp.ClientError("Rate limited")
-            
-            response.raise_for_status()
-            return await response.json()
-    
+        response = await session.get(url, params=params)
+        if response.status == 429:  # Rate limited
+            retry_after = int(response.headers.get('Retry-After', 60))
+            self.logger.warning(f"Rate limited, sleeping for {retry_after} seconds.")
+            await asyncio.sleep(retry_after)
+            response.raise_for_status() # Will raise for 429, triggering retry
+        
+        response.raise_for_status()
+        return await response.json()
+
     async def fetch_polls(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Fetch all polling data from DAWUM API.
@@ -66,138 +67,165 @@ class DawumConnector(BaseConnector):
             List of poll dictionaries with transformed data
         """
         polls = []
-        page = 1
-        page_size = 100
-        source_loaded_at = datetime.utcnow().isoformat()
+        source_loaded_at = datetime.now(timezone.utc).isoformat()
         
         timeout = aiohttp.ClientTimeout(total=self.config.timeout)
-        connector = aiohttp.TCPConnector(limit=10)
         
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-            while True:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            params = {}
+            if self.config.api_key:
+                params['api_key'] = self.config.api_key
+            
+            try:
+                self.logger.info("Fetching DAWUM surveys data")
+                
                 await self.rate_limiter.wait_if_needed()
+                response_data = await self._fetch_page(session, "data.json", params)
                 
-                params = {
-                    'page': page,
-                    'limit': page_size
-                }
+                surveys = response_data.get('Surveys', {})
                 
-                if self.config.api_key:
-                    params['api_key'] = self.config.api_key
-                
-                try:
-                    self.logger.info(f"Fetching DAWUM polls page {page}")
-                    response_data = await self._fetch_page(session, 'polls', params)
+                for survey_id, survey_data in surveys.items():
+                    poll = self._transform_survey_to_poll(survey_id, survey_data, source_loaded_at)
+                    polls.append(poll)
                     
-                    page_polls = response_data.get('data', [])
-                    if not page_polls:
-                        break
-                    
-                    # Transform and enrich poll data
-                    for poll in page_polls:
-                        transformed_poll = self._transform_poll(poll, source_loaded_at)
-                        polls.append(transformed_poll)
-                        
-                        if limit and len(polls) >= limit:
-                            break
-                    
-                    self.logger.info(f"Fetched {len(page_polls)} polls from page {page}")
-                    
-                    # Check if we've reached the limit or last page
                     if limit and len(polls) >= limit:
                         break
-                    
-                    if len(page_polls) < page_size:  # Last page
-                        break
-                        
-                    page += 1
-                    
-                except Exception as e:
-                    self.logger.error(f"Error fetching page {page}: {e}")
-                    raise
+                
+                self.logger.info(f"Successfully fetched {len(polls)} polls from DAWUM")
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching DAWUM data: {e}")
+                raise
         
-        self.logger.info(f"Successfully fetched {len(polls)} total polls from DAWUM")
         return polls[:limit] if limit else polls
     
-    def _transform_poll(self, poll: Dict[str, Any], source_loaded_at: str) -> Dict[str, Any]:
-        """Transform raw poll data into standardized format."""
+    def _transform_survey_to_poll(self, survey_id: str, survey_data: Dict[str, Any], source_loaded_at: str) -> Dict[str, Any]:
+        """Transform DAWUM survey data into standardized poll format."""
+        # Convert sample_size to int if possible
+        sample_size = survey_data.get('Surveyed_Persons')
+        if sample_size is not None and sample_size != '':
+            try:
+                sample_size = int(sample_size)
+            except (ValueError, TypeError):
+                sample_size = None
+        else:
+            sample_size = None
+        
+        # Convert date strings to datetime objects
+        def parse_date(date_str):
+            if date_str:
+                try:
+                    return datetime.strptime(date_str, '%Y-%m-%d')
+                except (ValueError, TypeError):
+                    return None
+            return None
+        
         return {
-            'poll_id': poll.get('id'),
-            'institute_id': poll.get('institute', {}).get('id'),
-            'institute_name': poll.get('institute', {}).get('name'),
-            'tasker_id': poll.get('tasker', {}).get('id'),
-            'tasker_name': poll.get('tasker', {}).get('name'),
-            'parliament_id': poll.get('parliament', {}).get('id'),
-            'parliament_name': poll.get('parliament', {}).get('name'),
-            'method_id': poll.get('method', {}).get('id'),
-            'method_name': poll.get('method', {}).get('name'),
-            'survey_period_start': self._parse_date(poll.get('survey_period', {}).get('start')),
-            'survey_period_end': self._parse_date(poll.get('survey_period', {}).get('end')),
-            'publication_date': self._parse_date(poll.get('publication_date')),
-            'sample_size': poll.get('sample_size'),
-            'results': self._transform_results(poll.get('results', [])),
-            'source_url': poll.get('source_url'),
-            'source_loaded_at': source_loaded_at,
-            'created_at': datetime.utcnow().isoformat(),
-            'updated_at': datetime.utcnow().isoformat()
+            'poll_id': survey_id,
+            'institute_id': survey_data.get('Institute_ID'),
+            'institute_name': self._get_institute_name(survey_data.get('Institute_ID')),
+            'tasker_id': survey_data.get('Tasker_ID'),
+            'tasker_name': self._get_tasker_name(survey_data.get('Tasker_ID')),
+            'parliament_id': survey_data.get('Parliament_ID'),
+            'parliament_name': self._get_parliament_name(survey_data.get('Parliament_ID')),
+            'method_id': survey_data.get('Method_ID'),
+            'method_name': self._get_method_name(survey_data.get('Method_ID')),
+            'survey_period_start': parse_date(survey_data.get('Survey_Period', {}).get('Date_Start')),
+            'survey_period_end': parse_date(survey_data.get('Survey_Period', {}).get('Date_End')),
+            'publication_date': parse_date(survey_data.get('Date')),
+            'sample_size': sample_size,
+            'results': self._transform_survey_results(survey_data.get('Results', {})),
+            'source_url': f"https://dawum.de/Bundestag/{survey_id}",
+            'source_loaded_at': datetime.fromisoformat(source_loaded_at.replace('Z', '+00:00')) if 'Z' in source_loaded_at else datetime.fromisoformat(source_loaded_at),
+            'created_at': datetime.now(timezone.utc),
+            'updated_at': datetime.now(timezone.utc)
         }
     
-    def _transform_results(self, results: List[Dict[str, Any]]) -> str:
-        """Transform poll results into JSON string format."""
+    def _get_institute_name(self, institute_id: str) -> Optional[str]:
+        """Get institute name from ID (placeholder for metadata lookup)."""
+        # This should be populated from the metadata
+        return f"Institute_{institute_id}" if institute_id else None
+    
+    def _get_tasker_name(self, tasker_id: str) -> Optional[str]:
+        """Get tasker name from ID (placeholder for metadata lookup)."""
+        # This should be populated from the metadata
+        return f"Tasker_{tasker_id}" if tasker_id else None
+    
+    def _get_parliament_name(self, parliament_id: str) -> Optional[str]:
+        """Get parliament name from ID (placeholder for metadata lookup)."""
+        # This should be populated from the metadata
+        return f"Parliament_{parliament_id}" if parliament_id else None
+    
+    def _get_method_name(self, method_id: str) -> Optional[str]:
+        """Get method name from ID (placeholder for metadata lookup)."""
+        # This should be populated from the metadata
+        return f"Method_{method_id}" if method_id else None
+    
+    def _transform_survey_results(self, results: Dict[str, Any]) -> str:
+        """Transform survey results into JSON string format."""
         import json
         transformed_results = []
         
-        for result in results:
+        for party_id, percentage in results.items():
             transformed_results.append({
-                'party_id': result.get('party', {}).get('id'),
-                'party_name': result.get('party', {}).get('name'),
-                'party_short': result.get('party', {}).get('short'),
-                'percentage': result.get('percentage'),
-                'seats': result.get('seats'),
-                'change': result.get('change')
+                'party_id': party_id,
+                'party_name': f"Party_{party_id}",  # This should be populated from metadata
+                'percentage': percentage,
+                'seats': None,  # Not available in this format
+                'change': None  # Not available in this format
             })
         
         return json.dumps(transformed_results)
-    
-    def _parse_date(self, date_str: Optional[str]) -> Optional[str]:
-        """Parse and validate date strings."""
-        if not date_str:
-            return None
+
+    async def fetch_data(self, **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Fetch data from the API.
+        Implementation of abstract method from BaseConnector.
         
-        try:
-            # Try different date formats
-            for fmt in ['%Y-%m-%d', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f']:
-                try:
-                    dt = datetime.strptime(date_str, fmt)
-                    return dt.isoformat()
-                except ValueError:
-                    continue
+        Yields:
+            Dict containing fetched poll data
+        """
+        limit = kwargs.get('limit')
+        polls = await self.fetch_polls(limit)
+        
+        for poll in polls:
+            yield poll
+    
+    async def get_incremental_data(
+        self, 
+        since: datetime, 
+        **kwargs
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Fetch incremental data since a specific timestamp.
+        Implementation of abstract method from BaseConnector.
+        
+        Args:
+            since: Timestamp to fetch data from
             
-            # If no format matches, return as-is but log warning
-            self.logger.warning(f"Could not parse date: {date_str}")
-            return date_str
-            
-        except Exception as e:
-            self.logger.error(f"Error parsing date {date_str}: {e}")
-            return None
-    
-    async def fetch_metadata(self) -> Dict[str, Any]:
-        """Fetch metadata about parties, institutes, methods etc."""
-        metadata = {}
+        Yields:
+            Dict containing fetched data
+        """
+        # For DAWUM, we'll fetch all data and filter by date
+        # This is a simplified implementation - in production you'd want
+        # to use query parameters if the API supports them
+        limit = kwargs.get('limit')
+        polls = await self.fetch_polls(limit)
         
-        timeout = aiohttp.ClientTimeout(total=self.config.timeout)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            for endpoint in ['parties', 'institutes', 'methods', 'parliaments', 'taskers']:
+        for poll in polls:
+            # Check if poll is newer than 'since' timestamp
+            if poll.get('created_at'):
                 try:
-                    self.logger.info(f"Fetching DAWUM {endpoint}")
-                    response_data = await self._fetch_page(session, endpoint, {})
-                    metadata[endpoint] = response_data.get('data', [])
-                except Exception as e:
-                    self.logger.error(f"Error fetching {endpoint}: {e}")
-                    metadata[endpoint] = []
-        
-        return metadata
-    
+                    poll_date = poll['created_at']
+                    if poll_date > since:
+                        yield poll
+                except (ValueError, TypeError):
+                    # If date parsing fails, include the poll
+                    yield poll
+            else:
+                # If no created_at date, include the poll
+                yield poll
+
     def run_sync(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Synchronous wrapper for async fetch_polls method."""
         return asyncio.run(self.fetch_polls(limit))

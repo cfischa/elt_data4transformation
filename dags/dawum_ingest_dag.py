@@ -3,8 +3,9 @@ Airflow DAG for DAWUM polling data ingestion.
 Extracts polling data from DAWUM API and loads into ClickHouse raw table.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
+import os
 
 from airflow.decorators import dag, task
 from airflow.utils.trigger_rule import TriggerRule
@@ -89,8 +90,8 @@ def dawum_ingest_dag():
             # Initialize ClickHouse loader
             config = ClickHouseConfig(
                 host=os.getenv("CLICKHOUSE_HOST", "clickhouse"),
-                port=int(os.getenv("CLICKHOUSE_PORT", "9000")),
-                username=os.getenv("CLICKHOUSE_USER", "default"),
+                port=int(os.getenv("CLICKHOUSE_PORT", "8124")),
+                username=os.getenv("CLICKHOUSE_USER", "admin"),
                 password=os.getenv("CLICKHOUSE_PASSWORD", ""),
                 database=os.getenv("CLICKHOUSE_DATABASE", "analytics")
             )
@@ -113,7 +114,7 @@ def dawum_ingest_dag():
             raise
     
     @task(task_id="log_success", trigger_rule=TriggerRule.ALL_SUCCESS)
-    def log_ingestion_success(load_result: Dict[str, Any]) -> None:
+    def log_ingestion_success(load_result: Dict[str, Any]) -> Dict[str, Any]:
         """Log successful ingestion with summary statistics."""
         logger.info("=== DAWUM Ingestion Summary ===")
         logger.info(f"Status: {load_result['status']}")
@@ -124,18 +125,18 @@ def dawum_ingest_dag():
         
         # Push summary to XCom for monitoring
         return {
-            "ingestion_date": datetime.utcnow().isoformat(),
+            "ingestion_date": datetime.now(timezone.utc).isoformat(),
             "source": "dawum",
             "rows_loaded": load_result["rows_loaded"],
             "status": "success"
         }
     
     @task(task_id="log_failure", trigger_rule=TriggerRule.ONE_FAILED)
-    def log_ingestion_failure() -> None:
+    def log_ingestion_failure() -> Dict[str, Any]:
         """Log failed ingestion for monitoring."""
         logger.error("DAWUM ingestion pipeline failed")
         return {
-            "ingestion_date": datetime.utcnow().isoformat(),
+            "ingestion_date": datetime.now(timezone.utc).isoformat(),
             "source": "dawum",
             "rows_loaded": 0,
             "status": "failed"

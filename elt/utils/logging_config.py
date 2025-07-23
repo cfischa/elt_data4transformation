@@ -6,7 +6,7 @@ Provides consistent logging across all components with different output formats.
 import logging
 import logging.config
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
 import json
@@ -21,7 +21,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         
         # Add timestamp
-        log_record['timestamp'] = datetime.utcnow().isoformat()
+        log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
         
         # Add application context
         log_record['app'] = 'bnb-data4transformation'

@@ -29,7 +29,7 @@
 Production-grade ELT pipeline for political polling and socioeconomic data aggregation. Built with modern Python, Airflow orchestration, ClickHouse analytics warehouse, and dbt transformations.
 
 ### Key Features
-- **Async API Connectors**: DAWUM, Destatis, Eurostat, GESIS, SOEP
+- **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS, SOEP
 - **Web Scraping**: Scrapy framework for sites without APIs
 - **Object Storage**: MinIO S3-compatible for raw data lake
 - **Analytics Warehouse**: ClickHouse for high-performance analytics
@@ -38,6 +38,8 @@ Production-grade ELT pipeline for political polling and socioeconomic data aggre
 - **Monitoring**: Prometheus metrics + data quality tests
 - **Development**: Poetry, pre-commit, pytest, type hints
 
+> 📋 **Connector Status**: See [Destatis Development Status](docs/DESTATIS_STATUS_TODOS.md) for detailed TODO list and implementation progress.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -45,7 +47,16 @@ Production-grade ELT pipeline for political polling and socioeconomic data aggre
 - Python 3.11+
 - Poetry (or use provided Makefile)
 
-### 1. Initialize Project
+### 1. Start Docker Desktop
+```powershell
+# Start Docker Desktop on Windows
+Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+# Wait for Docker to be ready (30-60 seconds)
+# You can verify with: docker info
+```
+
+### 2. Initialize Project
 ```bash
 # Clone and setup
 git clone <repository>
@@ -59,7 +70,7 @@ cp .env.example .env
 # Edit .env with your API keys and credentials
 ```
 
-### 2. Start Infrastructure
+### 3. Start Infrastructure
 ```bash
 # Start all services (ClickHouse, Airflow, MinIO, etc.)
 make up && make smoke   # start stack and verify health
@@ -78,10 +89,16 @@ make init-db
 # - Jupyter: http://localhost:8888?token=admin
 ```
 
-### 3. Run Sample Pipeline
+### 4. Run Sample Pipeline
 ```bash
 # Load sample DAWUM data
 make load-local
+
+# Extract Destatis statistical data (using new POST API since July 2025)
+make extract-destatis TABLES="12411-0001,12411-0002" AREA="de" START_YEAR="2020" END_YEAR="2023"
+
+# Test with specific credentials for large datasets
+DESTATIS_USER=your.email@domain.org DESTATIS_PASS=yourpassword make extract-destatis
 
 # Run dbt models
 make dbt-run
@@ -93,6 +110,41 @@ make dbt-run
 # - MinIO API: http://localhost:9002
 # - Jupyter: http://localhost:8888?token=admin
 ```
+
+## 📊 Data Sources
+
+### GENESIS-Online (Destatis) API
+The German Federal Statistical Office provides comprehensive statistical data through their GENESIS-Online REST API.
+
+**API Configuration:**
+```bash
+# Environment variables for .env file
+DESTATIS_USER=your.email@domain.com
+DESTATIS_PASS=your_password
+```
+
+**Example API Usage:**
+```bash
+# Test table extraction
+curl -X GET "https://www-genesis.destatis.de/genesisWS/rest/2020/data/table" \
+  -H "Authorization: Basic $(echo -n 'user:pass' | base64)" \
+  -G -d "name=12411-0001" \
+  -d "area=de" \
+  -d "format=json" \
+  -d "compress=true"
+
+# Extract population statistics
+make extract-destatis TABLES="12411-0001,12411-0002" AREA="de" START_YEAR="2020" END_YEAR="2023"
+```
+
+**Supported Features:**
+- Anonymous access for small tables (<50MB)
+- Authenticated access for large datasets
+- Auto-chunking for tables >10MB or >1M cells
+- Multiple formats: JSON-stat, SDMX-JSON, CSV
+- Transparent gzip decompression
+- Exponential backoff retry on HTTP 5xx/429
+- Rate limiting (30 requests/minute)
 
 ## 📁 Project Structure
 
@@ -114,7 +166,7 @@ make dbt-run
 │   ├── __init__.py
 │   ├── base_connector.py     # Abstract base class
 │   ├── dawum_connector.py    # DAWUM API client
-│   ├── destatis_connector.py # Destatis API client  
+│   ├── destatis_connector.py # GENESIS-Online POST API client (2025)
 │   ├── eurostat_connector.py # Eurostat API client
 │   ├── gesis_connector.py    # GESIS API client
 │   └── soep_connector.py     # SOEP API client
@@ -226,10 +278,55 @@ Pre-commit hooks automatically run:
 
 ## 🗄️ Data Architecture
 
+### GENESIS-Online API (Destatis) - Updated July 2025
+
+**Important**: Since July 15, 2025, the SOAP/XML interface and GET methods have been discontinued. Our connector now uses the new POST-based RESTful JSON interface.
+
+#### API Configuration
+```bash
+# For large datasets (>50MB) - requires registration
+DESTATIS_USER=your.email@domain.org
+DESTATIS_PASS=your_password
+
+# Base URL (REST v2020 with POST methods)
+DESTATIS_BASE_URL=https://www-genesis.destatis.de/genesisWS/rest/2020/
+```
+
+#### Usage Examples
+```bash
+# Extract multiple tables with time range
+make extract-destatis TABLES="12411-0001,12411-0002,21311-0001" START_YEAR="2020" END_YEAR="2023"
+
+# Test with specific area and format
+make extract-destatis TABLES="12411-0001" AREA="de" FORMAT="csv"
+```
+
+#### API Example (POST method)
+```bash
+curl -X POST "https://www-genesis.destatis.de/genesisWS/rest/2020/data/table" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'user:pass' | base64)" \
+  -d '{
+    "name": "12411-0001",
+    "area": "de", 
+    "format": "json",
+    "compress": "true",
+    "startYear": "2020",
+    "endYear": "2023"
+  }'
+```
+
+#### Supported Datasets
+- **12411-0001**: Population by age groups and sex
+- **12411-0002**: Population by citizenship  
+- **21311-0001**: Live births and deaths
+- **81000-0001**: Federal election results
+- And thousands more statistical tables
+
 ### Raw Layer (`raw` schema)
 - **raw_ingestions**: Metadata about data extractions
 - **raw_dawum_polls**: DAWUM polling data (JSON)
-- **raw_destatis_***: Destatis datasets
+- **raw_destatis_***: Destatis datasets (GENESIS-Online)
 - **raw_eurostat_***: Eurostat datasets
 - **raw_web_scrapes**: Scraped content
 

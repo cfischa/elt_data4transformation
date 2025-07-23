@@ -21,7 +21,7 @@ from .utils.logging_config import get_logger
 class ClickHouseConfig(BaseModel):
     """Configuration for ClickHouse connection."""
     host: str = Field(default_factory=lambda: os.getenv("CLICKHOUSE_HOST", "localhost"))
-    port: int = Field(default_factory=lambda: int(os.getenv("CLICKHOUSE_PORT", "9000")))
+    port: int = Field(default_factory=lambda: int(os.getenv("CLICKHOUSE_PORT", "8124")))
     username: str = Field(default_factory=lambda: os.getenv("CLICKHOUSE_USER", "default"))
     password: str = Field(default_factory=lambda: os.getenv("CLICKHOUSE_PASSWORD", ""))
     database: str = Field(default_factory=lambda: os.getenv("CLICKHOUSE_DATABASE", "analytics"))
@@ -434,6 +434,12 @@ class ClickHouseLoader:
             return 0
         
         try:
+            # Get table structure to map columns
+            describe_result = self.client.query(f'DESCRIBE TABLE {table}')
+            # Filter out materialized columns
+            column_names = [row[0] for row in describe_result.result_rows 
+                           if not row[2] or 'MATERIALIZED' not in row[2]]
+            
             total_rows = len(data)
             loaded_rows = 0
             
@@ -441,8 +447,14 @@ class ClickHouseLoader:
             for i in range(0, total_rows, batch_size):
                 batch = data[i:i + batch_size]
                 
-                # Insert batch using JSONEachRow format for better performance
-                self.client.insert(table, batch)
+                # Convert dictionaries to list of lists in column order
+                batch_rows = []
+                for row_dict in batch:
+                    row_list = [row_dict.get(col, None) for col in column_names]
+                    batch_rows.append(row_list)
+                
+                # Insert batch
+                self.client.insert(table, batch_rows, column_names=column_names)
                 loaded_rows += len(batch)
                 
                 self.logger.debug(f"Loaded batch {i//batch_size + 1}: {len(batch)} rows into {table}")
@@ -476,10 +488,10 @@ class ClickHouseLoader:
             source_loaded_at DateTime,
             created_at DateTime,
             updated_at DateTime,
-            event_date Date MATERIALIZED toDate(publication_date)
+            event_date Date MATERIALIZED toDate(ifNull(publication_date, now()))
         ) ENGINE = ReplacingMergeTree(updated_at)
         PARTITION BY toYYYYMM(event_date)
-        ORDER BY (poll_id, publication_date)
+        ORDER BY poll_id
         """
         
         try:
@@ -494,7 +506,7 @@ class ClickHouseLoader:
             self.logger.error(f"Failed to create raw.dawum_polls table: {e}")
             raise
     
-    def upsert_dawum_polls(self, data: List[Dict[str, Any]]) -> int:
+    def upsert_dawum_polls(self, data: List[Dict[str, Any]], batch_size: int = 100) -> int:
         """
         Upsert DAWUM polls data using ReplacingMergeTree strategy.
         
@@ -522,7 +534,7 @@ class ClickHouseLoader:
                 self.logger.info(f"Deleted existing records for {len(poll_ids)} poll_ids")
             
             # Insert new data
-            rows_loaded = self.load_dicts(data, "raw.dawum_polls")
+            rows_loaded = self.load_dicts(data, "raw.dawum_polls", batch_size=batch_size)
             
             # Optimize table to trigger merge
             self.client.command("OPTIMIZE TABLE raw.dawum_polls FINAL")

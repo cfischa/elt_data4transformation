@@ -239,7 +239,8 @@ class BaseConnector(ABC):
         Get the last synchronization time from persistent storage.
         Override in subclasses to implement persistence.
         """
-        # TODO: Implement persistent storage for sync times
+        # Default implementation returns None - subclasses should override
+        # to implement persistent storage for sync times
         return None
     
     def set_last_sync_time(self, timestamp: datetime) -> None:
@@ -247,5 +248,6 @@ class BaseConnector(ABC):
         Set the last synchronization time in persistent storage.
         Override in subclasses to implement persistence.
         """
-        # TODO: Implement persistent storage for sync times
+        # Default implementation does nothing - subclasses should override
+        # to implement persistent storage for sync times
         pass
