@@ -339,7 +339,16 @@ with dag:
     schedule_task = update_scraping_schedule(validation_task)
     
     # Set dependencies
-    targets_task >> scraping_tasks >> [validation_task, cleaning_task] >> archive_task >> schedule_task
+    targets_task >> scraping_tasks
+    
+    # Each scraping task feeds into validation and cleaning
+    for scraping_task in scraping_tasks:
+        scraping_task >> validation_task
+        scraping_task >> cleaning_task
+    
+    # Both validation and cleaning must complete before archiving
+    [validation_task, cleaning_task] >> archive_task
+    archive_task >> schedule_task
 
 
 # Alternative implementation using BashOperator

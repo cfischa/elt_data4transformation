@@ -63,6 +63,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
       AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+      _PIP_ADDITIONAL_REQUIREMENTS: 'clickhouse-connect==0.7.0 aiohttp==3.9.2 tenacity==8.2.3 pydantic==2.5.0 python-dotenv==1.0.0 python-json-logger==2.0.7'
       # Custom environment variables
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: ${CLICKHOUSE_PORT}
