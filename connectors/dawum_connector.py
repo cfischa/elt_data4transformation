@@ -80,7 +80,7 @@ class DawumConnector(BaseConnector):
                 self.logger.info("Fetching DAWUM surveys data")
                 
                 await self.rate_limiter.wait_if_needed()
-                response_data = await self._fetch_page(session, "data.json", params)
+                response_data = await self._fetch_page(session, "", params)  # Changed from "data.json" to "" (root endpoint)
                 
                 surveys = response_data.get('Surveys', {})
                 
