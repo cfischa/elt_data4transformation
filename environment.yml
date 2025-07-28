@@ -90,3 +90,6 @@ dependencies:
       - flask>=2.2.0
       - celery>=5.5.0
       - redis>=5.0.0
+
+      # SPARQL support for GESIS connector
+      - SPARQLWrapper>=2.0.0

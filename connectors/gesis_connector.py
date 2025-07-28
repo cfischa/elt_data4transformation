@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, AsyncGenerator, Optional, List
 from pydantic import BaseModel
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 from .base_connector import BaseConnector, ConnectorConfig
 
@@ -24,197 +25,215 @@ class GESISConfig(ConnectorConfig):
 
 
 class GESISConnector(BaseConnector):
+
+    async def fetch_data(self, *args, **kwargs):
+        """Stub implementation to satisfy abstract base class. Not implemented."""
+        raise NotImplementedError("fetch_data is not implemented in this connector version.")
+
+    async def get_incremental_data(self, *args, **kwargs):
+        """Stub implementation to satisfy abstract base class. Not implemented."""
+        raise NotImplementedError("get_incremental_data is not implemented in this connector version.")
     """
     Connector for GESIS - Leibniz Institute for the Social Sciences.
     
-    TODO: Implement data extraction methods for social science data.
-    GESIS provides access to social science research data and surveys.
+    Provides methods to list available datasets and fetch relevant metadata for a given dataset.
     """
-    
+
     def __init__(self, config: Optional[GESISConfig] = None):
         self.config = config or GESISConfig()
         super().__init__(self.config)
-    
-    def _get_auth_headers(self) -> Dict[str, str]:
-        """Get authentication headers for GESIS API."""
-        headers = {
-            'Accept': 'application/json',
-            'User-Agent': 'BnB-Data4Transformation/1.0'
-        }
-        
-        if self.config.api_key:
-            headers['Authorization'] = f'Bearer {self.config.api_key}'
-        
-        return headers
-    
-    async def fetch_data(self, **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
+
+    async def list_datasets(self) -> List[Dict[str, Any]]:
         """
-        Fetch data from GESIS API.
-        
-        TODO: Implement data fetching for specific datasets:
-        - German General Social Survey (ALLBUS)
-        - European Social Survey (ESS)
-        - International Social Survey Programme (ISSP)
-        - Political surveys and election studies
+        List all available datasets (schema:Dataset) from the GESIS Knowledge Graph using paging.
+        Returns a list of dicts with minimal metadata: id (IRI), title, and type.
         """
-        datasets = kwargs.get('datasets', ['allbus'])  # German General Social Survey
-        
-        for dataset in datasets:
-            self.logger.info(f"Fetching GESIS dataset: {dataset}")
-            
+        import asyncio
+        sparql_url = "https://data.gesis.org/gesiskg/sparql"
+        batch_size = 500
+        offset = 0
+        all_results = []
+        while True:
+            sparql = SPARQLWrapper(sparql_url)
+            query = f'''
+            PREFIX dct: <http://purl.org/dc/terms/>
+            PREFIX schema: <https://schema.org/>
+            SELECT ?resource ?type ?title WHERE {{
+              ?resource a schema:Dataset .
+              BIND(schema:Dataset AS ?type)
+              OPTIONAL {{ ?resource dct:title ?title }}
+            }} OFFSET {offset} LIMIT {batch_size}
+            '''
+            sparql.setQuery(query)
+            sparql.setReturnFormat(JSON)
             try:
-                # TODO: Implement actual API calls
-                # The GESIS API structure may vary - needs investigation
-                # response = await self.get(f"datasets/{dataset}")
-                
-                # Placeholder response
-                yield {
-                    'source': 'gesis',
-                    'dataset': dataset,
-                    'timestamp': datetime.now().isoformat(),
-                    'data': f"TODO: Implement data extraction for {dataset}",
-                    'status': 'placeholder'
-                }
-                
+                results = await asyncio.to_thread(lambda: sparql.query().convert())
+                bindings = results["results"]["bindings"]
+                if not bindings:
+                    break
+                for r in bindings:
+                    all_results.append({
+                        "id": r["resource"]["value"],
+                        "type": r["type"]["value"],
+                        "title": r.get("title", {}).get("value", ""),
+                    })
+                print(f"Fetched {len(all_results)} datasets so far...")
+                offset += batch_size
             except Exception as e:
-                self.logger.error(f"Error fetching dataset {dataset}: {e}")
-                yield {
-                    'source': 'gesis',
-                    'dataset': dataset,
-                    'timestamp': datetime.now().isoformat(),
-                    'error': str(e),
-                    'status': 'error'
-                }
-    
-    async def get_incremental_data(
-        self, 
-        since: datetime, 
-        **kwargs
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+                self.logger.error(f"SPARQL error fetching dataset list: {e}")
+                break
+        return all_results
+
+    async def get_metadata(self, resource_id: str) -> Dict[str, Any]:
         """
-        Fetch incremental data since a specific timestamp.
-        
-        TODO: Implement incremental fetching based on publication dates.
+        Fetch and return all relevant metadata fields for a GESIS resource (Dataset, Variable, Instrument, ScholarlyArticle).
+        Returns a dict with fields relevant to the resource type.
         """
-        self.logger.info(f"Fetching GESIS data since {since}")
-        
-        # TODO: Implement incremental logic
-        async for data in self.fetch_data(**kwargs):
-            yield data
-    
-    async def get_available_datasets(self) -> List[Dict[str, Any]]:
-        """
-        Get list of available datasets from GESIS.
-        
-        TODO: Implement dataset discovery.
-        """
+        import asyncio
+        sparql = SPARQLWrapper("https://data.gesis.org/gesiskg/sparql")
+        # Query for type first
+        type_query = f'''
+        SELECT ?type WHERE {{
+          <{resource_id}> a ?type .
+        }} LIMIT 1
+        '''
+        sparql.setQuery(type_query)
+        sparql.setReturnFormat(JSON)
         try:
-            # TODO: Implement actual API call
-            # response = await self.get("datasets")
-            
-            # Placeholder response with common social science datasets
-            return [
-                {
-                    'id': 'allbus',
-                    'title': 'German General Social Survey (ALLBUS)',
-                    'description': 'Biennial survey of attitudes, behavior, and social structure in Germany',
-                    'last_updated': '2023-12-01'
-                },
-                {
-                    'id': 'ess',
-                    'title': 'European Social Survey (ESS)',
-                    'description': 'Cross-national survey measuring attitudes and behavior across Europe',
-                    'last_updated': '2023-11-15'
-                },
-                {
-                    'id': 'issp',
-                    'title': 'International Social Survey Programme (ISSP)',
-                    'description': 'Cross-national collaboration on social science surveys',
-                    'last_updated': '2023-10-01'
-                },
-                {
-                    'id': 'political_surveys',
-                    'title': 'Political Surveys and Election Studies',
-                    'description': 'Various political attitude and election studies',
-                    'last_updated': '2024-01-01'
-                }
-            ]
-            
+            type_result = await asyncio.to_thread(lambda: sparql.query().convert())
+            type_bindings = type_result["results"]["bindings"]
+            if not type_bindings:
+                return {"id": resource_id, "error": "Resource not found", "status": "error"}
+            resource_type = type_bindings[0]["type"]["value"]
         except Exception as e:
-            self.logger.error(f"Error fetching dataset list: {e}")
-            return []
-    
-    async def get_dataset_metadata(self, dataset_id: str) -> Dict[str, Any]:
-        """
-        Get metadata for a specific dataset.
-        
-        TODO: Implement metadata retrieval.
-        """
+            self.logger.error(f"SPARQL error fetching resource type for {resource_id}: {e}")
+            return {"id": resource_id, "error": str(e), "status": "error"}
+
+        # Now query for relevant fields based on type
+        if resource_type.endswith("Dataset"):
+            query = f'''
+            PREFIX dct: <http://purl.org/dc/terms/>
+            PREFIX disco: <http://rdf-vocabulary.ddialliance.org/discovery#>
+            SELECT ?title ?abstract ?issued ?creator ?variable WHERE {{
+              BIND(<{resource_id}> AS ?study)
+              OPTIONAL {{ ?study dct:title ?title }}
+              OPTIONAL {{ ?study dct:abstract ?abstract }}
+              OPTIONAL {{ ?study dct:issued ?issued }}
+              OPTIONAL {{ ?study dct:creator ?creator }}
+              OPTIONAL {{ ?study disco:variable ?variable }}
+            }}
+            '''
+        elif resource_type.endswith("Variable"):
+            query = f'''
+            PREFIX dct: <http://purl.org/dc/terms/>
+            SELECT ?title ?description ?creator WHERE {{
+              BIND(<{resource_id}> AS ?var)
+              OPTIONAL {{ ?var dct:title ?title }}
+              OPTIONAL {{ ?var dct:description ?description }}
+              OPTIONAL {{ ?var dct:creator ?creator }}
+            }}
+            '''
+        elif resource_type.endswith("Instrument"):
+            query = f'''
+            PREFIX dct: <http://purl.org/dc/terms/>
+            SELECT ?title ?description ?creator WHERE {{
+              BIND(<{resource_id}> AS ?inst)
+              OPTIONAL {{ ?inst dct:title ?title }}
+              OPTIONAL {{ ?inst dct:description ?description }}
+              OPTIONAL {{ ?inst dct:creator ?creator }}
+            }}
+            '''
+        elif resource_type.endswith("ScholarlyArticle"):
+            query = f'''
+            PREFIX dct: <http://purl.org/dc/terms/>
+            SELECT ?title ?abstract ?issued ?creator WHERE {{
+              BIND(<{resource_id}> AS ?art)
+              OPTIONAL {{ ?art dct:title ?title }}
+              OPTIONAL {{ ?art dct:abstract ?abstract }}
+              OPTIONAL {{ ?art dct:issued ?issued }}
+              OPTIONAL {{ ?art dct:creator ?creator }}
+            }}
+            '''
+        else:
+            return {"id": resource_id, "error": f"Unknown or unsupported resource type: {resource_type}", "status": "error"}
+
+        sparql.setQuery(query)
+        sparql.setReturnFormat(JSON)
         try:
-            # TODO: Implement actual API call
-            # response = await self.get(f"datasets/{dataset_id}/metadata")
-            
-            # Placeholder response
-            return {
-                'id': dataset_id,
-                'title': f'Dataset {dataset_id}',
-                'description': 'TODO: Implement metadata retrieval',
-                'variables': [],
-                'methodology': '',
-                'sample_size': 0,
-                'collection_period': '',
-                'last_updated': datetime.now().isoformat()
-            }
-            
+            results = await asyncio.to_thread(lambda: sparql.query().convert())
+            bindings = results["results"]["bindings"]
+            if not bindings:
+                return {"id": resource_id, "error": "No metadata found", "status": "error"}
+            meta = bindings[0]
+            # Build result dict based on type
+            result = {"id": resource_id, "type": resource_type}
+            if resource_type.endswith("Dataset"):
+                variables = [b["variable"]["value"] for b in bindings if "variable" in b]
+                result.update({
+                    "title": meta.get("title", {}).get("value", ""),
+                    "description": meta.get("abstract", {}).get("value", ""),
+                    "creator": meta.get("creator", {}).get("value", ""),
+                    "issued": meta.get("issued", {}).get("value", ""),
+                    "variables": variables,
+                })
+            elif resource_type.endswith("Variable") or resource_type.endswith("Instrument"):
+                result.update({
+                    "title": meta.get("title", {}).get("value", ""),
+                    "description": meta.get("description", {}).get("value", ""),
+                    "creator": meta.get("creator", {}).get("value", ""),
+                })
+            elif resource_type.endswith("ScholarlyArticle"):
+                result.update({
+                    "title": meta.get("title", {}).get("value", ""),
+                    "description": meta.get("abstract", {}).get("value", ""),
+                    "creator": meta.get("creator", {}).get("value", ""),
+                    "issued": meta.get("issued", {}).get("value", ""),
+                })
+            return result
         except Exception as e:
-            self.logger.error(f"Error fetching metadata for {dataset_id}: {e}")
-            return {
-                'id': dataset_id,
-                'error': str(e),
-                'status': 'error'
-            }
-    
-    async def search_datasets(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        """
-        Search for datasets by keyword.
-        
-        TODO: Implement search functionality.
-        """
-        try:
-            # TODO: Implement actual API call
-            # response = await self.get("search", params={'q': query})
-            
-            # Placeholder response
-            return [
-                {
-                    'id': f'search_result_{query}',
-                    'title': f'Search results for: {query}',
-                    'description': 'TODO: Implement search functionality',
-                    'relevance_score': 0.95
-                }
-            ]
-            
-        except Exception as e:
-            self.logger.error(f"Error searching datasets: {e}")
-            return []
+            self.logger.error(f"SPARQL error fetching metadata for {resource_id}: {e}")
+            return {"id": resource_id, "error": str(e), "status": "error"}
 
 
-# Example usage
+# Example usage: Fetch all metadata, deduplicate, and save to JSON
 if __name__ == "__main__":
     import asyncio
-    
+    import json
+    from collections import OrderedDict
+
     async def main():
         async with GESISConnector() as connector:
-            # Test dataset list
-            datasets = await connector.get_available_datasets()
-            print(f"Available datasets: {len(datasets)}")
-            
-            # Test search
-            search_results = await connector.search_datasets("political")
-            print(f"Search results: {len(search_results)}")
-            
-            # Test data fetching
-            async for data in connector.fetch_data(datasets=['allbus']):
-                print(f"Fetched data: {data}")
-    
+            # Step 1: List all resources
+            datasets = await connector.list_datasets()
+            print(f"Available resources: {len(datasets)}")
+            if not datasets:
+                print("No resources found.")
+                return
+
+            # Step 2: Fetch metadata for each resource
+            all_metadata = []
+            seen_ids = set()
+            for i, ds in enumerate(datasets):
+                rid = ds["id"]
+                if rid in seen_ids:
+                    continue
+                seen_ids.add(rid)
+                meta = await connector.get_metadata(rid)
+                all_metadata.append(meta)
+                if (i+1) % 10 == 0:
+                    print(f"Fetched metadata for {i+1} resources...")
+
+            # Step 3: Deduplicate by id (already done above)
+
+            # Step 4: Save to JSON file
+
+            out_path = "meta_data/gesis_metadata.json"
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(all_metadata, f, ensure_ascii=False, indent=2)
+            print(f"Saved metadata for {len(all_metadata)} resources to {out_path}")
+
+            # Optional: Print a sample for review
+            print("Sample metadata entry:")
+            print(json.dumps(all_metadata[0], indent=2, ensure_ascii=False))
+
     asyncio.run(main())

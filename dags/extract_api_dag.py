@@ -52,7 +52,7 @@ dag = DAG(
 
 @task
 def extract_dawum_data(**context) -> Dict[str, Any]:
-    """Extract data from DAWUM API."""
+       #Extract data from DAWUM API.
     import asyncio
     
     async def run_extraction():
@@ -116,7 +116,7 @@ def extract_destatis_data(**context) -> Dict[str, Any]:
 
 @task
 def extract_eurostat_data(**context) -> Dict[str, Any]:
-    """Extract data from Eurostat API."""
+    #Extract data from Eurostat API.""
     import asyncio
     
     async def run_extraction():

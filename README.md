@@ -114,14 +114,14 @@ make dbt-run
 ### 5. Verify Data Loading
 ```bash
 # Check ClickHouse data ingestion
-docker exec clickhouse-server clickhouse-client --query "SELECT COUNT(*) as poll_count FROM raw.dawum_polls"
+docker exec clickhouse clickhouse-client --query "SELECT COUNT(*) as poll_count FROM raw.dawum_polls"
 # Expected: ~3,500+ polling records
 
 # View recent polls
-docker exec clickhouse-server clickhouse-client --query "SELECT poll_id, publication_date, sample_size FROM raw.dawum_polls ORDER BY publication_date DESC LIMIT 5"
+docker exec clickhouse clickhouse-client --query "SELECT poll_id, publication_date, sample_size FROM raw.dawum_polls ORDER BY publication_date DESC LIMIT 5"
 
 # Check all available tables
-docker exec clickhouse-server clickhouse-client --query "SHOW TABLES FROM raw"
+docker exec clickhouse clickhouse-client --query "SHOW TABLES FROM raw"
 ```
 
 ## 📊 Data Sources
@@ -144,12 +144,6 @@ German polling data aggregator providing real-time political polling data.
 ### GENESIS-Online (Destatis) API
 The German Federal Statistical Office provides comprehensive statistical data through their GENESIS-Online REST API.
 
-**API Configuration:**
-```bash
-# Environment variables for .env file
-DESTATIS_USER=your.email@domain.com
-DESTATIS_PASS=your_password
-```
 
 **Example API Usage:**
 ```bash

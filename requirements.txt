@@ -44,3 +44,6 @@ black==24.8.0
 isort==5.13.2
 ruff==0.6.9
 mypy==1.8.0
+
+# SPARQL support for GESIS connector
+SPARQLWrapper>=2.0.0

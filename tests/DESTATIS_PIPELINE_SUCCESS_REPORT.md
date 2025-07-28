@@ -114,7 +114,7 @@ ClickHouseConfig(
 )
 
 DestatisConfig(
-    api_token="17a1d34b0e3b44c4bfe456c872ef8fc5",
+    api_token="7d1fd28cac1c46eb90b01c932f245a33",
     base_url="https://www-genesis.destatis.de/datenbank/online/rest/2020/"
 )
 
