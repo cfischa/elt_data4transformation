@@ -37,7 +37,7 @@ def clickhouse_config():
         "host": os.getenv("CLICKHOUSE_HOST", "localhost"),
         "port": int(os.getenv("CLICKHOUSE_PORT", "8124")),
         "user": os.getenv("CLICKHOUSE_USER", "admin"),
-        "password": os.getenv("CLICKHOUSE_PASSWORD", "asjrh25423sfa#+43qw56j"),
+        "password": os.getenv("CLICKHOUSE_PASSWORD", ""),
     }
 
 

@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """Check ClickHouse database structure"""
 
+
+import os
 import clickhouse_connect
 
 def main():
+    # Load credentials from environment variables
+    host = os.getenv('CLICKHOUSE_HOST', 'localhost')
+    port = int(os.getenv('CLICKHOUSE_PORT', '8124'))
+    username = os.getenv('CLICKHOUSE_USER', '')
+    password = os.getenv('CLICKHOUSE_PASSWORD', '')
     client = clickhouse_connect.get_client(
-        host='localhost', 
-        port=8124, 
-        username='admin', 
-        password='asjrh25423sfa#+43qw56j'
+        host=host,
+        port=port,
+        username=username,
+        password=password
     )
     
     print("=== ClickHouse Database Information ===\n")

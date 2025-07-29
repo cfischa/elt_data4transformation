@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Test script for data source connectors"""
 
+
 import sys
 import asyncio
 from pathlib import Path
+import os
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -14,10 +16,10 @@ def test_clickhouse_connection():
     try:
         import clickhouse_connect
         client = clickhouse_connect.get_client(
-            host='localhost', 
-            port=8124, 
-            username='admin', 
-            password='asjrh25423sfa#+43qw56j'
+            host='localhost',
+            port=8124,
+            username=os.getenv('CLICKHOUSE_USER', ''),
+            password=os.getenv('CLICKHOUSE_PASSWORD', '')
         )
         version = client.query('SELECT version()').result_rows[0][0]
         print(f"✅ ClickHouse connection successful: {version}")

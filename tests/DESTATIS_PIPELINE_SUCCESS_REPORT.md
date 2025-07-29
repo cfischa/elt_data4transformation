@@ -26,11 +26,11 @@
 ### ✅ Infrastructure Fixed
 1. **ClickHouse Authentication** - RESOLVED ✅
    - **Problem:** Default user authentication failing
-   - **Solution:** Found admin credentials: `admin:asjrh25423sfa#+43qw56j`
+   - **Solution:** Found admin credentials: `<REDACTED>`
    - **Status:** Connection successful, version 23.8.16.16
 
 2. **API Token Updated** - IMPLEMENTED ✅
-   - **New Token:** `17a1d34b0e3b44c4bfe456c872ef8fc5`
+   - **New Token:** `<REDACTED>`
    - **URL Updated:** `https://www-genesis.destatis.de/datenbank/online/rest/2020/`
    - **Format:** Correct form-encoded requests with Bearer token
 
@@ -108,13 +108,14 @@ The manual API testing revealed:
 ### Production Deployment Steps:
 ```bash
 # 1. Update configurations with working credentials
+
 ClickHouseConfig(
-    username="admin",
-    password="asjrh25423sfa#+43qw56j"
+    username="<REDACTED>",
+    password="<REDACTED>"
 )
 
 DestatisConfig(
-    api_token="7d1fd28cac1c46eb90b01c932f245a33",
+    api_token="<REDACTED>",
     base_url="https://www-genesis.destatis.de/datenbank/online/rest/2020/"
 )
 

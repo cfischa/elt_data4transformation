@@ -1,5 +1,7 @@
+
 #!/usr/bin/env python3
 """Final verification of BnB Data4Transformation system"""
+import os
 
 def verify_system():
     print("🔍 BnB Data4Transformation - Final System Verification")
@@ -10,10 +12,10 @@ def verify_system():
     try:
         import clickhouse_connect
         client = clickhouse_connect.get_client(
-            host='localhost', 
-            port=8124, 
-            username='admin', 
-            password='asjrh25423sfa#+43qw56j'
+            host='localhost',
+            port=8124,
+            username=os.getenv('CLICKHOUSE_USER', ''),
+            password=os.getenv('CLICKHOUSE_PASSWORD', '')
         )
         
         # Test basic query

@@ -98,7 +98,7 @@ make load-local
 make extract-destatis TABLES="12411-0001,12411-0002" AREA="de" START_YEAR="2020" END_YEAR="2023"
 
 # Test with specific credentials for large datasets
-DESTATIS_USER=your.email@domain.org DESTATIS_PASS=yourpassword make extract-destatis
+DESTATIS_USER=<REDACTED> DESTATIS_PASS=<REDACTED> make extract-destatis
 
 # Run dbt models
 make dbt-run
@@ -307,8 +307,8 @@ Pre-commit hooks automatically run:
 #### API Configuration
 ```bash
 # For large datasets (>50MB) - requires registration
-DESTATIS_USER=your.email@domain.org
-DESTATIS_PASS=your_password
+DESTATIS_USER=<REDACTED>
+DESTATIS_PASS=<REDACTED>
 
 # Base URL (REST v2020 with POST methods)
 DESTATIS_BASE_URL=https://www-genesis.destatis.de/genesisWS/rest/2020/

@@ -32,7 +32,7 @@ Comprehensive integration tests were created and executed for the complete Desta
 ### 1. Destatis API Authentication
 **Issue:** 401 Unauthorized errors with provided API token
 ```
-API Token Used: d276cd2f1bc74bb780fd484cb5fd0fa6
+API Token Used: <REDACTED>
 Error: HTTPStatusError: Client error '401 401'
 ```
 
@@ -57,7 +57,7 @@ Error Code: 516 - Authentication failed: password is incorrect
 - Container configuration requires specific user credentials
 
 **Discovered Solution:**
-- Admin user credentials found: `admin:asjrh25423sfa#+43qw56j`
+- Admin user credentials found: `<REDACTED>`
 - Successfully tested with curl: `curl -u "admin:asjrh25423sfa#+43qw56j" "http://localhost:8124/?query=SELECT%201"`
 
 ## Technical Achievements
@@ -88,8 +88,8 @@ Error Code: 516 - Authentication failed: password is incorrect
 clickhouse_config = ClickHouseConfig(
     host="localhost",
     port=8124,
-    username="admin",
-    password="asjrh25423sfa#+43qw56j",
+    username="<REDACTED>",
+    password="<REDACTED>",
     database="default"
 )
 ```
