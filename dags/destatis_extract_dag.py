@@ -1,11 +1,14 @@
 import sys
 sys.path.append('/opt/airflow')
 """
-Airflow DAG for Destatis API data extraction only.
+Airflow DAG for Destatis API metadata-first cube extraction.
+Implements the official 2025 GENESIS-Online REST API pattern:
+1. Metadata discovery via catalogue/cubes
+2. Raw cube extraction via data/cubefile
 """
 
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from airflow import DAG
 from airflow.decorators import task
@@ -30,66 +33,101 @@ default_args = {
 dag = DAG(
     'destatis_extract_data',
     default_args=default_args,
-    description='Extract data from Destatis API only',
-    schedule_interval=timedelta(hours=6),
+    description='Extract German statistical cube data using metadata from fetch_destatis_metadata DAG',
+    schedule_interval=timedelta(hours=12),  # Twice daily
     max_active_runs=1,
-    tags=['extraction', 'destatis'],
+    tags=['extraction', 'destatis', 'metadata-first', 'cubes'],
 )
 
 @task
-def extract_destatis_data(**context) -> Dict[str, Any]:
-    """Extract data from Destatis API."""
+def load_cube_metadata(**context) -> Dict[str, Any]:
+    """Load cube metadata from the metadata DAG output."""
+    import orjson
+    
+    metadata_file = "meta_data/destatis_cubes_metadata.json"
+    
+    if not os.path.exists(metadata_file):
+        raise FileNotFoundError(f"Metadata file not found: {metadata_file}. Please run fetch_destatis_metadata DAG first.")
+    
+    with open(metadata_file, 'rb') as f:
+        all_metadata = orjson.loads(f.read())
+    
+    # For now, just select first 10 cubes for testing
+    # Later you can modify this to select specific cubes manually
+    selected_cubes = all_metadata[:10]
+    
+    return {
+        'total_cubes_available': len(all_metadata),
+        'selected_cubes_count': len(selected_cubes),
+        'selected_cubes': [cube['code'] for cube in selected_cubes],
+        'metadata_file': metadata_file,
+        'note': 'Currently selecting first 10 cubes for testing. Modify selection logic as needed.',
+        'status': 'success'
+    }
+
+@task
+def extract_destatis_cubes(metadata_result: Dict[str, Any], **context) -> Dict[str, Any]:
+    """Extract cube data from Destatis using pre-loaded metadata."""
     import asyncio
 
     async def run_extraction():
         async with DestatisConnector() as connector:
             data_count = 0
-            extracted_data = []
+            extracted_cubes = []
 
-            # Fetch available tables
-            tables = await connector.get_available_tables()
+            # Extract each selected cube
+            for cube_name in metadata_result['selected_cubes'][:5]:  # Limit to first 5 cubes
+                try:
+                    cube_data = await connector.fetch_cube(cube_name)
+                    if cube_data:
+                        extracted_cubes.append({
+                            'cube_name': cube_name,
+                            'data': cube_data,
+                            'extracted_at': context['ds']
+                        })
+                        data_count += 1
+                except Exception as e:
+                    print(f"Failed to extract cube {cube_name}: {str(e)}")
+                    continue
 
-            # Extract data for each table
-            for table in tables[:5]:  # Limit to first 5 tables
-                async for data in connector.fetch_data(table_ids=[table.name]):
-                    extracted_data.append(data)
-                    data_count += 1
-
-            # Save to file
-            output_file = f"/tmp/destatis_data_{context['ds']}.json"
+            # Save extracted cube data
+            output_file = f"/tmp/destatis_cubes_{context['ds']}.json"
             async with aiofiles.open(output_file, 'w') as f:
-                await f.write(orjson.dumps(extracted_data, option=orjson.OPT_INDENT_2).decode())
+                await f.write(orjson.dumps(extracted_cubes, option=orjson.OPT_INDENT_2).decode())
 
             return {
                 'source': 'destatis',
-                'records_count': data_count,
+                'cubes_extracted': data_count,
                 'output_file': output_file,
+                'metadata_file': metadata_result['metadata_file'],
                 'status': 'success'
             }
 
     return asyncio.run(run_extraction())
 
 @task
-def validate_extracted_data(extraction_result: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate extracted data from Destatis."""
+def validate_extracted_cubes(extraction_result: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate extracted cube data from Destatis."""
     validation_errors = []
     if extraction_result['status'] != 'success':
-        validation_errors.append(f"Extraction failed for destatis")
+        validation_errors.append("Extraction failed for destatis cubes")
     else:
-        if extraction_result['records_count'] == 0:
-            validation_errors.append("No data extracted from destatis")
+        if extraction_result['cubes_extracted'] == 0:
+            validation_errors.append("No cubes extracted from destatis")
         if not os.path.exists(extraction_result['output_file']):
-            validation_errors.append("Output file missing for destatis")
+            validation_errors.append("Cube output file missing for destatis")
+        if not os.path.exists(extraction_result['metadata_file']):
+            validation_errors.append("Metadata file missing for destatis")
 
     return {
-        'total_records': extraction_result['records_count'],
+        'cubes_extracted': extraction_result['cubes_extracted'],
         'validation_errors': validation_errors,
         'status': 'success' if not validation_errors else 'warning'
     }
 
 @task
 def send_notification(validation_result: Dict[str, Any], **context) -> None:
-    """Send notification about extraction results."""
+    """Send notification about cube extraction results."""
     from airflow.providers.slack.hooks.slack_webhook import SlackWebhookHook
     webhook_token = os.getenv('SLACK_WEBHOOK_URL')
     if webhook_token:
@@ -99,16 +137,20 @@ def send_notification(validation_result: Dict[str, Any], **context) -> None:
         )
         status_emoji = "✅" if validation_result['status'] == 'success' else "⚠️"
         message = f"""
-        {status_emoji} *Destatis Data Extraction Complete*
+        {status_emoji} *Destatis Cube Extraction Complete*
         *Date:* {context['ds']}
-        *Records Extracted:* {validation_result['total_records']}
+        *Cubes Extracted:* {validation_result['cubes_extracted']}
         *Status:* {validation_result['status']}
         {('*Errors:*\\n' + '\\n'.join(validation_result['validation_errors'])) if validation_result['validation_errors'] else ''}
         """
         slack_hook.send_text(message)
 
 with dag:
-    destatis_task = extract_destatis_data()
-    validation_task = validate_extracted_data(destatis_task)
+    # Load metadata from separate metadata DAG
+    metadata_task = load_cube_metadata()
+    extraction_task = extract_destatis_cubes(metadata_task)
+    validation_task = validate_extracted_cubes(extraction_task)
     notification_task = send_notification(validation_task)
-    destatis_task >> validation_task >> notification_task
+    
+    # Define task dependencies
+    metadata_task >> extraction_task >> validation_task >> notification_task

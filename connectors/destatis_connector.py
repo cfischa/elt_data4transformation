@@ -26,13 +26,18 @@ from elt.metadata import RawIngestion, DataSource, IngestionStatus
 from elt.utils.logging_config import get_logger
 from elt.utils.persistence import PersistenceManager
 
-# GENESIS REST base URL
-BASE_ENDPOINT = "https://www-genesis.destatis.de/genesisWS/rest/2020"
+# GENESIS REST base URL (Using 2020 API version)
+BASE_URL = "https://www-genesis.destatis.de/genesisWS/rest/2020"
 
-# API endpoints
-ENDPOINT_DATA_TABLE = "data/table"
-ENDPOINT_METADATA_TABLE = "metadata/table"
-ENDPOINT_HELLOWORLD_LOGINCHECK = "helloworld/logincheck"
+# API endpoints (Official 2025 REST API)
+ENDPOINT_CATALOGUE_CUBES = "catalogue/cubes"        # Metadata discovery (primary)
+ENDPOINT_DATA_CUBEFILE = "data/cubefile"            # Raw cube data extraction
+ENDPOINT_DATA_TABLEFILE = "data/tablefile"          # Table data extraction (fallback)
+ENDPOINT_HELLOWORLD_LOGINCHECK = "helloworld/logincheck"  # Auth verification
+
+# Legacy endpoints (deprecated but kept for fallback)
+ENDPOINT_DATA_TABLE = "data/table"                  # Legacy table endpoint
+ENDPOINT_METADATA_TABLE = "metadata/table"          # Legacy metadata endpoint
 
 
 class DestatisInvalidContent(Exception):
@@ -43,26 +48,31 @@ class DestatisInvalidContent(Exception):
 class DestatisConfig(ConnectorConfig):
     """Configuration for GENESIS-Online REST API connector."""
     
-    base_url: str = BASE_ENDPOINT
+    base_url: str = BASE_URL
     username: Optional[str] = None
     password: Optional[str] = None
     api_token: Optional[str] = None  # API token instead of username/password
     rate_limit_requests: int = 30
     rate_limit_period: int = 60
-    timeout: int = 120
+    timeout: int = 180
     max_retries: int = 3
     chunk_size_mb: int = 10
     max_cells_per_request: int = 1000000
 
     def __init__(self, **kwargs):
         import os
+        from dotenv import load_dotenv
+        
+        # Load environment variables from .env file
+        load_dotenv()
+        
         # Load from env if not provided
         username = kwargs.get('username') or os.getenv('DESTATIS_USER')
         password = kwargs.get('password') or os.getenv('DESTATIS_PASS')
         api_token = kwargs.get('api_token') or os.getenv('DESTATIS_API_KEY') or os.getenv('DESTATIS_TOKEN')
         # Pass all to parent
         super().__init__(
-            base_url=kwargs.get('base_url', BASE_ENDPOINT),
+            base_url=kwargs.get('base_url', BASE_URL),
             username=username,
             password=password,
             api_token=api_token,
@@ -75,8 +85,20 @@ class DestatisConfig(ConnectorConfig):
         )
 
 
+class CubeInfo(BaseModel):
+    """Information about a statistical cube from catalogue/cubes."""
+    
+    code: str                                    # Cube code (e.g., "61221BJ002")
+    content: Optional[str] = None               # Human-readable title
+    state: Optional[str] = None                 # Status (e.g., "vollständig mit Werten")
+    time_coverage: Optional[str] = None         # Time span information
+    latest_update: Optional[datetime] = None    # Last update timestamp
+    information: Optional[bool] = None          # Information flag
+    size_estimate: Optional[int] = None         # Estimated data size
+
+
 class TableInfo(BaseModel):
-    """Information about a statistical table."""
+    """Information about a statistical table (legacy/fallback)."""
     
     name: str
     description: Optional[str] = None
@@ -107,7 +129,7 @@ class DestatisConnector(BaseConnector):
     
     def _build_url(self, path: str) -> str:
         """Build URL from base endpoint and path."""
-        return f"{BASE_ENDPOINT.rstrip('/')}/{path.lstrip('/')}"
+        return f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -149,9 +171,19 @@ class DestatisConnector(BaseConnector):
     
     def _prepare_request_headers(self) -> Dict[str, str]:
         """Prepare HTTP headers for API request."""
-        headers = self._get_auth_headers()
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-        headers["Accept"] = "application/json"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json"
+        }
+        
+        # Prioritize API token authentication (working method)
+        if self.config.api_token:
+            headers["username"] = self.config.api_token
+            headers["password"] = ""
+        elif self.config.username and self.config.password:
+            headers["username"] = self.config.username
+            headers["password"] = self.config.password
+            
         return headers
     
     def _prepare_form_data(
@@ -162,9 +194,7 @@ class DestatisConnector(BaseConnector):
         """Prepare form data for API request."""
         form_data = data.copy() if data else {}
         
-        # Add authentication parameters to form data
-        auth_params = self._get_auth_params()
-        form_data.update(auth_params)
+        # Authentication is now in headers, not form data
         
         # Force JSON format unless overridden
         if "format" not in form_data:
@@ -397,6 +427,78 @@ class DestatisConnector(BaseConnector):
         
         return chunk_data, records_count
 
+    async def fetch_cube(
+        self,
+        cube_code: str,
+        language: str = "de",
+        format_type: str = "raw"
+    ) -> Path:
+        """
+        Fetch raw cube data using the official data/cubefile endpoint.
+        
+        This is the recommended approach for getting complete multidimensional
+        data with preserved statistical structure.
+        
+        Args:
+            cube_code: Cube code from get_available_cubes (e.g., "61221BJ002")
+            language: Language for labels ("de" or "en")
+            format_type: Data format ("raw" for cube structure)
+            
+        Returns:
+            Path to the saved raw cube data file
+        """
+        ingestion_start = datetime.now()
+        
+        self.logger.info(f"Starting cube extraction for {cube_code}")
+        
+        try:
+            request_data = {
+                "name": cube_code,
+                "language": language
+            }
+            
+            # Make request to cube endpoint
+            response = await self._make_request(ENDPOINT_DATA_CUBEFILE, request_data)
+            
+            # Process and save cube data
+            output_path = await self._save_cube_data(cube_code, response, language)
+            
+            # Log successful extraction
+            file_size = output_path.stat().st_size if output_path.exists() else 0
+            self.logger.info(
+                f"Successfully extracted cube {cube_code}: "
+                f"saved to {output_path} ({file_size:,} bytes)"
+            )
+            
+            return output_path
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch cube {cube_code}: {e}")
+            raise
+
+    async def _save_cube_data(
+        self, 
+        cube_code: str, 
+        response: httpx.Response,
+        language: str
+    ) -> Path:
+        """Save raw cube data to storage."""
+        # Handle compression if present
+        content = response.content
+        if response.headers.get("content-encoding") == "gzip":
+            content = gzip.decompress(content)
+        
+        # Create output path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"destatis_cube_{cube_code}_{language}_{timestamp}.txt"
+        output_path = Path(tempfile.gettempdir()) / filename
+        
+        # Save raw cube data
+        async with aiofiles.open(output_path, 'wb') as f:
+            await f.write(content)
+        
+        return output_path
+
     async def fetch_table(
         self,
         table_id: str,
@@ -627,6 +729,73 @@ class DestatisConnector(BaseConnector):
         # Combine header with all data
         return header + '\n' + '\n'.join(filter(None, all_data))
     
+    async def get_available_cubes(
+        self, 
+        selection: str = "*", 
+        pagelength: int = 50000,
+        language: str = "de"
+    ) -> List[CubeInfo]:
+        """
+        Get list of available statistical cubes (OFFICIAL METADATA-FIRST APPROACH).
+        
+        This is the primary method for metadata discovery using the official
+        catalogue/cubes endpoint as specified in the 2025 API documentation.
+        
+        Args:
+            selection: Search pattern (e.g., "*" for all, "61*" for demographic data)
+            pagelength: Maximum number of cubes to return per request
+            language: Language for descriptions ("de" or "en")
+            
+        Returns:
+            List of CubeInfo objects with metadata about available cubes
+        """
+        request_data = {
+            "selection": selection,
+            "pagelength": str(pagelength),
+            "language": language
+        }
+        
+        self.logger.info(f"Discovering cubes with selection pattern: {selection}")
+        
+        try:
+            response = await self._make_request(ENDPOINT_CATALOGUE_CUBES, request_data)
+            data = response.json()
+            
+            cubes = []
+            cube_list = data.get("List", [])
+            
+            self.logger.info(f"Found {len(cube_list)} cubes matching pattern '{selection}'")
+            
+            for cube_data in cube_list:
+                cube_info = CubeInfo(
+                    code=cube_data.get("Code", ""),
+                    content=cube_data.get("Content", ""),
+                    state=cube_data.get("State", ""),
+                    time_coverage=cube_data.get("Time", ""),
+                    latest_update=self._parse_datetime(cube_data.get("LatestUpdate")),
+                    information=cube_data.get("Information", False),
+                    size_estimate=None  # Will be estimated based on time coverage
+                )
+                cubes.append(cube_info)
+            
+            # Sort by latest update (newest first) for prioritization
+            cubes.sort(key=lambda x: x.latest_update or datetime.min, reverse=True)
+            
+            self.logger.info(f"Successfully parsed {len(cubes)} cube metadata records")
+            return cubes
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch cube metadata: {e}")
+            # Fallback to legacy table discovery
+            self.logger.warning("Falling back to legacy table discovery...")
+            legacy_tables = await self.get_available_tables()
+            # Convert tables to cubes format for compatibility
+            return [CubeInfo(
+                code=table.name,
+                content=table.description,
+                latest_update=table.updated
+            ) for table in legacy_tables]
+
     async def get_available_tables(self, filter_term: Optional[str] = None) -> List[TableInfo]:
         """Get list of available statistical tables."""
         request_data = {}
@@ -649,9 +818,75 @@ class DestatisConnector(BaseConnector):
     
     async def fetch_data(self, **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Fetch data from GENESIS API (implementation of abstract method).
+        Fetch data using METADATA-FIRST approach with official cube endpoints.
         
-        Yields individual table data records.
+        This method follows the official 2025 API pattern:
+        1. Discovery via catalogue/cubes (metadata)
+        2. Extraction via data/cubefile (raw cubes)
+        
+        Yields individual cube data records with complete metadata.
+        """
+        # Extract parameters
+        cube_codes = kwargs.get("cube_codes", [])
+        selection_pattern = kwargs.get("selection", "*")
+        language = kwargs.get("language", "de")
+        max_cubes = kwargs.get("max_cubes", None)
+        
+        try:
+            # Phase 1: METADATA DISCOVERY (primary approach)
+            if not cube_codes:
+                self.logger.info("No specific cubes requested, discovering via metadata...")
+                cubes = await self.get_available_cubes(
+                    selection=selection_pattern,
+                    language=language
+                )
+                
+                if max_cubes:
+                    cubes = cubes[:max_cubes]
+                    self.logger.info(f"Limited to first {max_cubes} cubes")
+                
+                cube_codes = [cube.code for cube in cubes]
+            
+            # Phase 2: DATA EXTRACTION (cube-by-cube)
+            for cube_code in cube_codes:
+                try:
+                    self.logger.info(f"Extracting cube: {cube_code}")
+                    
+                    # Extract raw cube data
+                    file_path = await self.fetch_cube(cube_code, language)
+                    
+                    yield {
+                        "cube_code": cube_code,
+                        "file_path": str(file_path),
+                        "status": "success",
+                        "format": "raw_cube",
+                        "language": language,
+                        "timestamp": datetime.now().isoformat(),
+                        "extraction_method": "official_cube_api"
+                    }
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to extract cube {cube_code}: {e}")
+                    yield {
+                        "cube_code": cube_code,
+                        "status": "failed",
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat(),
+                        "extraction_method": "official_cube_api"
+                    }
+        
+        except Exception as e:
+            self.logger.error(f"Metadata discovery failed: {e}")
+            # Fallback to legacy table approach
+            self.logger.warning("Falling back to legacy table extraction...")
+            
+            async for legacy_result in self._fetch_data_legacy(**kwargs):
+                yield legacy_result
+
+    async def _fetch_data_legacy(self, **kwargs) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Legacy fetch_data implementation for fallback compatibility.
+        Uses the old data/table endpoint approach.
         """
         table_ids = kwargs.get("table_ids", [])
         area = kwargs.get("area", "de")
@@ -669,7 +904,9 @@ class DestatisConnector(BaseConnector):
                     "table_id": table_id,
                     "file_path": str(file_path),
                     "status": "success",
-                    "timestamp": datetime.now().isoformat()
+                    "format": fmt,
+                    "timestamp": datetime.now().isoformat(),
+                    "extraction_method": "legacy_table_api"
                 }
                 
             except Exception as e:
@@ -678,7 +915,8 @@ class DestatisConnector(BaseConnector):
                     "table_id": table_id,
                     "status": "failed",
                     "error": str(e),
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
+                    "extraction_method": "legacy_table_api"
                 }
     
     async def get_incremental_data(
@@ -687,15 +925,52 @@ class DestatisConnector(BaseConnector):
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Fetch incremental data since timestamp (implementation of abstract method).
+        Fetch incremental data since timestamp using METADATA-FIRST approach.
         
-        For GENESIS, this returns tables updated since the given timestamp.
+        For GENESIS, this returns cubes updated since the given timestamp.
+        Uses the official catalogue/cubes endpoint to check update times.
         """
+        try:
+            # Get all available cubes with metadata
+            cubes = await self.get_available_cubes(
+                selection=kwargs.get("selection", "*"),
+                language=kwargs.get("language", "de")
+            )
+            
+            # Filter cubes updated since the given timestamp
+            updated_cubes = [
+                cube for cube in cubes 
+                if cube.latest_update and cube.latest_update > since
+            ]
+            
+            self.logger.info(
+                f"Found {len(updated_cubes)} cubes updated since {since.isoformat()}"
+            )
+            
+            # Extract data for updated cubes
+            async for data in self.fetch_data(
+                cube_codes=[cube.code for cube in updated_cubes],
+                **kwargs
+            ):
+                yield data
+                
+        except Exception as e:
+            self.logger.error(f"Incremental data fetch failed: {e}")
+            # Fallback to legacy approach
+            async for legacy_result in self._get_incremental_data_legacy(since, **kwargs):
+                yield legacy_result
+
+    async def _get_incremental_data_legacy(
+        self, 
+        since: datetime, 
+        **kwargs
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Legacy incremental data implementation for fallback."""
         tables = await self.get_available_tables()
         
         for table in tables:
             if table.updated and table.updated > since:
-                async for data in self.fetch_data(table_ids=[table.name], **kwargs):
+                async for data in self._fetch_data_legacy(table_ids=[table.name], **kwargs):
                     yield data
 
 
