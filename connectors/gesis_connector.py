@@ -45,157 +45,290 @@ class GESISConnector(BaseConnector):
 
     async def list_datasets(self) -> List[Dict[str, Any]]:
         """
-        List all available datasets (schema:Dataset) from the GESIS Knowledge Graph using paging.
-        Returns a list of dicts with minimal metadata: id (IRI), title, and type.
+        List all available datasets (schema:Dataset) from the GESIS Knowledge Graph.
+        Uses CONSTRUCT query to get all RDF triples for datasets.
         """
         import asyncio
         sparql_url = "https://data.gesis.org/gesiskg/sparql"
-        batch_size = 500
-        offset = 0
-        all_results = []
-        while True:
-            sparql = SPARQLWrapper(sparql_url)
-            query = f'''
-            PREFIX dct: <http://purl.org/dc/terms/>
-            PREFIX schema: <https://schema.org/>
-            SELECT ?resource ?type ?title WHERE {{
-              ?resource a schema:Dataset .
-              BIND(schema:Dataset AS ?type)
-              OPTIONAL {{ ?resource dct:title ?title }}
-            }} OFFSET {offset} LIMIT {batch_size}
-            '''
-            sparql.setQuery(query)
-            sparql.setReturnFormat(JSON)
-            try:
-                results = await asyncio.to_thread(lambda: sparql.query().convert())
-                bindings = results["results"]["bindings"]
-                if not bindings:
-                    break
-                for r in bindings:
-                    all_results.append({
-                        "id": r["resource"]["value"],
-                        "type": r["type"]["value"],
-                        "title": r.get("title", {}).get("value", ""),
-                    })
-                print(f"Fetched {len(all_results)} datasets so far...")
-                offset += batch_size
-            except Exception as e:
-                self.logger.error(f"SPARQL error fetching dataset list: {e}")
-                break
-        return all_results
-
-    async def get_metadata(self, resource_id: str) -> Dict[str, Any]:
-        """
-        Fetch and return all relevant metadata fields for a GESIS resource (Dataset, Variable, Instrument, ScholarlyArticle).
-        Returns a dict with fields relevant to the resource type.
-        """
-        import asyncio
-        sparql = SPARQLWrapper("https://data.gesis.org/gesiskg/sparql")
-        # Query for type first
-        type_query = f'''
-        SELECT ?type WHERE {{
-          <{resource_id}> a ?type .
-        }} LIMIT 1
+        
+        sparql = SPARQLWrapper(sparql_url)
+        
+        # First get a simple list of dataset URIs
+        list_query = '''
+        PREFIX schema: <https://schema.org/>
+        SELECT DISTINCT ?d WHERE {
+          ?d a schema:Dataset .
+        }
         '''
-        sparql.setQuery(type_query)
+        
+        sparql.setQuery(list_query)
         sparql.setReturnFormat(JSON)
-        try:
-            type_result = await asyncio.to_thread(lambda: sparql.query().convert())
-            type_bindings = type_result["results"]["bindings"]
-            if not type_bindings:
-                return {"id": resource_id, "error": "Resource not found", "status": "error"}
-            resource_type = type_bindings[0]["type"]["value"]
-        except Exception as e:
-            self.logger.error(f"SPARQL error fetching resource type for {resource_id}: {e}")
-            return {"id": resource_id, "error": str(e), "status": "error"}
-
-        # Now query for relevant fields based on type
-        if resource_type.endswith("Dataset"):
-            query = f'''
-            PREFIX dct: <http://purl.org/dc/terms/>
-            PREFIX disco: <http://rdf-vocabulary.ddialliance.org/discovery#>
-            SELECT ?title ?abstract ?issued ?creator ?variable WHERE {{
-              BIND(<{resource_id}> AS ?study)
-              OPTIONAL {{ ?study dct:title ?title }}
-              OPTIONAL {{ ?study dct:abstract ?abstract }}
-              OPTIONAL {{ ?study dct:issued ?issued }}
-              OPTIONAL {{ ?study dct:creator ?creator }}
-              OPTIONAL {{ ?study disco:variable ?variable }}
-            }}
-            '''
-        elif resource_type.endswith("Variable"):
-            query = f'''
-            PREFIX dct: <http://purl.org/dc/terms/>
-            SELECT ?title ?description ?creator WHERE {{
-              BIND(<{resource_id}> AS ?var)
-              OPTIONAL {{ ?var dct:title ?title }}
-              OPTIONAL {{ ?var dct:description ?description }}
-              OPTIONAL {{ ?var dct:creator ?creator }}
-            }}
-            '''
-        elif resource_type.endswith("Instrument"):
-            query = f'''
-            PREFIX dct: <http://purl.org/dc/terms/>
-            SELECT ?title ?description ?creator WHERE {{
-              BIND(<{resource_id}> AS ?inst)
-              OPTIONAL {{ ?inst dct:title ?title }}
-              OPTIONAL {{ ?inst dct:description ?description }}
-              OPTIONAL {{ ?inst dct:creator ?creator }}
-            }}
-            '''
-        elif resource_type.endswith("ScholarlyArticle"):
-            query = f'''
-            PREFIX dct: <http://purl.org/dc/terms/>
-            SELECT ?title ?abstract ?issued ?creator WHERE {{
-              BIND(<{resource_id}> AS ?art)
-              OPTIONAL {{ ?art dct:title ?title }}
-              OPTIONAL {{ ?art dct:abstract ?abstract }}
-              OPTIONAL {{ ?art dct:issued ?issued }}
-              OPTIONAL {{ ?art dct:creator ?creator }}
-            }}
-            '''
-        else:
-            return {"id": resource_id, "error": f"Unknown or unsupported resource type: {resource_type}", "status": "error"}
-
-        sparql.setQuery(query)
-        sparql.setReturnFormat(JSON)
+        
         try:
             results = await asyncio.to_thread(lambda: sparql.query().convert())
             bindings = results["results"]["bindings"]
-            if not bindings:
-                return {"id": resource_id, "error": "No metadata found", "status": "error"}
-            meta = bindings[0]
-            # Build result dict based on type
-            result = {"id": resource_id, "type": resource_type}
-            if resource_type.endswith("Dataset"):
-                variables = [b["variable"]["value"] for b in bindings if "variable" in b]
-                result.update({
-                    "title": meta.get("title", {}).get("value", ""),
-                    "description": meta.get("abstract", {}).get("value", ""),
-                    "creator": meta.get("creator", {}).get("value", ""),
-                    "issued": meta.get("issued", {}).get("value", ""),
-                    "variables": variables,
+            
+            datasets = []
+            for binding in bindings:
+                dataset_uri = binding["d"]["value"]
+                datasets.append({
+                    "id": dataset_uri,
+                    "type": "https://schema.org/Dataset",
+                    "title": ""  # Will be filled by get_metadata
                 })
-            elif resource_type.endswith("Variable") or resource_type.endswith("Instrument"):
-                result.update({
-                    "title": meta.get("title", {}).get("value", ""),
-                    "description": meta.get("description", {}).get("value", ""),
-                    "creator": meta.get("creator", {}).get("value", ""),
-                })
-            elif resource_type.endswith("ScholarlyArticle"):
-                result.update({
-                    "title": meta.get("title", {}).get("value", ""),
-                    "description": meta.get("abstract", {}).get("value", ""),
-                    "creator": meta.get("creator", {}).get("value", ""),
-                    "issued": meta.get("issued", {}).get("value", ""),
-                })
-            return result
+            
+            self.logger.info(f"Found {len(datasets)} datasets")
+            return datasets
+            
+        except Exception as e:
+            self.logger.error(f"SPARQL error fetching dataset list: {e}")
+            return []
+
+    async def get_metadata(self, resource_id: str) -> Dict[str, Any]:
+        """
+        Fetch all RDF triples for a specific dataset using CONSTRUCT query.
+        Returns a dict with all available metadata.
+        """
+        import asyncio
+        sparql_url = "https://data.gesis.org/gesiskg/sparql"
+        sparql = SPARQLWrapper(sparql_url)
+        
+        # Use CONSTRUCT query to get all triples for this dataset
+        construct_query = f'''
+        PREFIX schema: <https://schema.org/>
+        
+        CONSTRUCT {{
+          <{resource_id}> ?p ?o .
+        }}
+        WHERE {{
+          <{resource_id}> a schema:Dataset ;
+             ?p ?o .
+        }}
+        '''
+        
+        sparql.setQuery(construct_query)
+        sparql.setReturnFormat(JSON)
+        
+        try:
+            results = await asyncio.to_thread(lambda: sparql.query().convert())
+            
+            # Process the CONSTRUCT result
+            metadata = {
+                "id": resource_id,
+                "type": "https://schema.org/Dataset",
+                "title": "",
+                "description": "",
+                "creator": "",
+                "issued": "",
+                "variables": [],
+                "status": "success",
+                "properties": {}
+            }
+            
+            # Extract triples from the result
+            if "@graph" in results:
+                # JSON-LD format
+                for triple in results["@graph"]:
+                    if "@id" in triple and triple["@id"] == resource_id:
+                        for prop, value in triple.items():
+                            if prop.startswith("@"):
+                                continue
+                            metadata["properties"][prop] = value
+                            
+                            # Map common properties
+                            if "title" in prop.lower():
+                                metadata["title"] = str(value) if not isinstance(value, list) else str(value[0])
+                            elif "abstract" in prop.lower() or "description" in prop.lower():
+                                metadata["description"] = str(value) if not isinstance(value, list) else str(value[0])
+                            elif "creator" in prop.lower():
+                                metadata["creator"] = str(value) if not isinstance(value, list) else str(value[0])
+                            elif "issued" in prop.lower() or "date" in prop.lower():
+                                metadata["issued"] = str(value) if not isinstance(value, list) else str(value[0])
+            
+            elif "results" in results and "bindings" in results["results"]:
+                # Standard SPARQL JSON format
+                for binding in results["results"]["bindings"]:
+                    prop = binding.get("p", {}).get("value", "")
+                    obj = binding.get("o", {}).get("value", "")
+                    
+                    if prop and obj:
+                        # Store all properties
+                        prop_short = prop.split("/")[-1].split("#")[-1]
+                        metadata["properties"][prop_short] = obj
+                        
+                        # Map common properties
+                        if "title" in prop_short.lower():
+                            metadata["title"] = obj
+                        elif "abstract" in prop_short.lower() or "description" in prop_short.lower():
+                            metadata["description"] = obj
+                        elif "creator" in prop_short.lower():
+                            metadata["creator"] = obj
+                        elif "issued" in prop_short.lower() or "date" in prop_short.lower():
+                            metadata["issued"] = obj
+                        elif "variable" in prop_short.lower():
+                            if obj not in metadata["variables"]:
+                                metadata["variables"].append(obj)
+            
+            # Ensure we have some basic info
+            if not metadata["title"] and resource_id:
+                metadata["title"] = f"Dataset {resource_id.split('/')[-1]}"
+            
+            self.logger.info(f"Retrieved {len(metadata['properties'])} properties for {resource_id}")
+            return metadata
+            
         except Exception as e:
             self.logger.error(f"SPARQL error fetching metadata for {resource_id}: {e}")
-            return {"id": resource_id, "error": str(e), "status": "error"}
+            return {
+                "id": resource_id,
+                "type": "https://schema.org/Dataset", 
+                "error": str(e),
+                "status": "error",
+                "title": "",
+                "description": "",
+                "creator": "",
+                "issued": "",
+                "variables": [],
+                "properties": {}
+            }
+
+    async def get_all_datasets_metadata(self, batch_size: int = 50, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get metadata for datasets using SELECT queries with proper pagination.
+        Uses smaller batches to avoid URI length limits on the SPARQL endpoint.
+        """
+        import asyncio
+        from SPARQLWrapper import SPARQLWrapper, JSON
+        
+        sparql_url = "https://data.gesis.org/gesiskg/sparql"
+        
+        # First get list of all dataset URIs (with optional limit)
+        sparql = SPARQLWrapper(sparql_url)
+        
+        # Build the list query with optional LIMIT
+        list_query = '''
+        PREFIX schema: <https://schema.org/>
+        SELECT DISTINCT ?d WHERE {
+          ?d a schema:Dataset .
+        }
+        '''
+        
+        if limit:
+            list_query += f' LIMIT {limit}'
+        
+        sparql.setQuery(list_query)
+        sparql.setReturnFormat(JSON)
+        
+        try:
+            results = await asyncio.to_thread(lambda: sparql.query().convert())
+            dataset_uris = [binding["d"]["value"] for binding in results["results"]["bindings"]]
+            
+            self.logger.info(f"Found {len(dataset_uris)} datasets to process")
+            
+            # Process datasets in smaller batches to avoid URI length limits
+            # For large datasets, use very small batch sizes (20-30 URIs max)
+            effective_batch_size = min(batch_size, 20) if len(dataset_uris) > 100 else min(batch_size, 50)
+            
+            all_metadata = []
+            for i in range(0, len(dataset_uris), effective_batch_size):
+                batch_uris = dataset_uris[i:i + effective_batch_size]
+                
+                # Create a SELECT query for this batch
+                uris_filter = " ".join([f"<{uri}>" for uri in batch_uris])
+                
+                batch_query = f'''
+                PREFIX schema: <https://schema.org/>
+                PREFIX dct: <http://purl.org/dc/terms/>
+                PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+                PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                
+                SELECT ?d ?p ?o WHERE {{
+                  VALUES ?d {{ {uris_filter} }}
+                  ?d a schema:Dataset ;
+                     ?p ?o .
+                }}
+                '''
+                
+                sparql.setQuery(batch_query)
+                sparql.setReturnFormat(JSON)
+                
+                try:
+                    batch_results = await asyncio.to_thread(lambda: sparql.query().convert())
+                    
+                    # Group results by dataset
+                    datasets_data = {}
+                    for binding in batch_results["results"]["bindings"]:
+                        dataset_uri = binding["d"]["value"]
+                        prop = binding["p"]["value"]
+                        obj_data = binding["o"]
+                        
+                        if dataset_uri not in datasets_data:
+                            datasets_data[dataset_uri] = {
+                                "id": dataset_uri,
+                                "type": "https://schema.org/Dataset",
+                                "title": "",
+                                "description": "",
+                                "creator": "",
+                                "issued": "",
+                                "variables": [],
+                                "status": "success",
+                                "properties": {},
+                                "raw_data": ""
+                            }
+                        
+                        # Store the property
+                        prop_short = prop.split("/")[-1].split("#")[-1]
+                        obj_value = obj_data.get("value", "")
+                        
+                        datasets_data[dataset_uri]["properties"][prop_short] = obj_value
+                        
+                        # Add to raw_data for ClickHouse
+                        datasets_data[dataset_uri]["raw_data"] += f"{prop_short}: {obj_value}\\n"
+                        
+                        # Map common properties to standard fields
+                        if "title" in prop_short.lower() or "name" in prop_short.lower():
+                            if not datasets_data[dataset_uri]["title"]:
+                                datasets_data[dataset_uri]["title"] = obj_value
+                        elif "abstract" in prop_short.lower() or "description" in prop_short.lower():
+                            if not datasets_data[dataset_uri]["description"]:
+                                datasets_data[dataset_uri]["description"] = obj_value
+                        elif "creator" in prop_short.lower() or "author" in prop_short.lower():
+                            if not datasets_data[dataset_uri]["creator"]:
+                                datasets_data[dataset_uri]["creator"] = obj_value
+                        elif "issued" in prop_short.lower() or "date" in prop_short.lower():
+                            if not datasets_data[dataset_uri]["issued"]:
+                                datasets_data[dataset_uri]["issued"] = obj_value
+                        elif "variable" in prop_short.lower():
+                            if obj_value not in datasets_data[dataset_uri]["variables"]:
+                                datasets_data[dataset_uri]["variables"].append(obj_value)
+                    
+                    # Add batch to results
+                    batch_metadata = list(datasets_data.values())
+                    all_metadata.extend(batch_metadata)
+                    
+                    self.logger.info(f"Processed batch {i//effective_batch_size + 1}/{(len(dataset_uris) + effective_batch_size - 1)//effective_batch_size}: {len(batch_metadata)} datasets")
+                    
+                except Exception as batch_error:
+                    self.logger.warning(f"Batch {i//effective_batch_size + 1} failed: {batch_error}")
+                    # Continue processing other batches
+                    continue
+            
+            self.logger.info(f"Retrieved metadata for {len(all_metadata)} datasets total")
+            return all_metadata
+            
+        except Exception as e:
+            self.logger.error(f"SPARQL error in batch metadata fetch: {e}")
+            import traceback
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
+            return []
+
+    async def get_limited_datasets_metadata(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get metadata for a limited number of datasets (for testing).
+        """
+        return await self.get_all_datasets_metadata(batch_size=50, limit=limit)
 
 
-# Example usage: Fetch all metadata, deduplicate, and save to JSON
+# Example usage: Fetch all metadata using CONSTRUCT queries
 if __name__ == "__main__":
     import asyncio
     import json

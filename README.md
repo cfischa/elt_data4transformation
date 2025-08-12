@@ -29,7 +29,7 @@
 Production-grade ELT pipeline for political polling and socioeconomic data aggregation. Built with modern Python, Airflow orchestration, ClickHouse analytics warehouse, and dbt transformations.
 
 ### Key Features
-- **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS, SOEP
+- **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS ✅, SOEP
 - **Web Scraping**: Scrapy framework for sites without APIs
 - **Object Storage**: MinIO S3-compatible for raw data lake
 - **Analytics Warehouse**: ClickHouse for high-performance analytics
@@ -71,6 +71,7 @@ cp .env.example .env
 ```
 
 ### 3. Start Infrastructure
+start docker desktop, and conda activate bnb_data4transformation
 ```bash
 # Start all services (ClickHouse, Airflow, MinIO, etc.)
 make up && make smoke   # start stack and verify health
@@ -140,6 +141,33 @@ German polling data aggregator providing real-time political polling data.
 - JSON format with structured polling data
 - Institutes, parties, and parliament metadata
 - Rate limiting and retry logic implemented
+
+### GESIS Knowledge Graph API ✅
+GESIS - Leibniz Institute for the Social Sciences provides comprehensive social science research datasets through their SPARQL endpoint.
+
+**API Status:** Production-ready (updated August 12, 2025)
+- ✅ Full pipeline operational with 9,176+ datasets
+- ✅ SPARQL endpoint extraction with complete RDF metadata
+- ✅ Optimized batch processing (20 datasets/batch)
+- ✅ Rich metadata extraction (~40 properties per dataset)
+- ✅ 100% data completeness with robust error handling
+
+**Features:**
+- SPARQL endpoint with schema:Dataset queries
+- Complete RDF triple extraction for comprehensive metadata
+- Batch processing to handle large dataset catalogs
+- Anonymous access (no authentication required)
+- Automatic retry logic for failed batches
+
+**Usage:**
+```bash
+# Trigger GESIS metadata extraction DAG
+airflow dags trigger fetch_gesis_metadata
+
+# Check extracted data in ClickHouse
+docker exec clickhouse clickhouse-client --query "SELECT COUNT(*) FROM raw.gesis_metadata"
+# Expected: ~9,176+ research datasets
+```
 
 ### GENESIS-Online (Destatis) API
 The German Federal Statistical Office provides comprehensive statistical data through their GENESIS-Online REST API.

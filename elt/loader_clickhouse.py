@@ -545,6 +545,80 @@ class ClickHouseLoader:
             self.logger.error(f"Failed to upsert DAWUM polls: {e}")
             raise
 
+    def upsert_gesis_metadata(self, data: List[Dict[str, Any]], batch_size: int = 100) -> int:
+        """
+        Upsert GESIS metadata into raw.gesis_metadata table.
+        Creates table if it doesn't exist and inserts/updates metadata records.
+        """
+        if not data:
+            self.logger.warning("No GESIS metadata to upsert")
+            return 0
+        
+        try:
+            # Create table if it doesn't exist
+            self.create_gesis_metadata_table()
+            
+            # Prepare data for insertion
+            processed_data = []
+            for item in data:
+                processed_item = {
+                    'resource_id': item.get('id', ''),
+                    'resource_type': item.get('type', ''),
+                    'title': item.get('title', ''),
+                    'description': item.get('description', ''),
+                    'creator': item.get('creator', ''),
+                    'issued': item.get('issued', ''),
+                    'variables': str(item.get('variables', [])),  # Convert list to string
+                    'error_message': item.get('error', ''),
+                    'status': item.get('status', 'success'),
+                    'ingestion_time': datetime.now(),
+                    'raw_data': json.dumps(item)
+                }
+                processed_data.append(processed_item)
+            
+            # Use load_dicts for bulk insert with ReplacingMergeTree
+            total_loaded = self.load_dicts(processed_data, "raw.gesis_metadata", batch_size)
+            
+            self.logger.info(f"Successfully upserted {total_loaded} GESIS metadata records")
+            return total_loaded
+            
+        except Exception as e:
+            self.logger.error(f"Failed to upsert GESIS metadata: {e}")
+            raise
+
+    def create_gesis_metadata_table(self) -> None:
+        """Create the raw.gesis_metadata table with proper schema."""
+        ddl = """
+        CREATE TABLE IF NOT EXISTS raw.gesis_metadata (
+            resource_id String,
+            resource_type String,
+            title String,
+            description String,
+            creator String,
+            issued String,
+            variables String,
+            error_message String,
+            status String,
+            ingestion_time DateTime64(3),
+            raw_data String,
+            event_date Date MATERIALIZED toDate(ingestion_time)
+        ) ENGINE = ReplacingMergeTree(ingestion_time)
+        PARTITION BY toYYYYMM(event_date)
+        ORDER BY resource_id
+        """
+        
+        try:
+            # Create raw database if not exists
+            self.client.command("CREATE DATABASE IF NOT EXISTS raw")
+            
+            # Create table
+            self.client.command(ddl)
+            self.logger.info("Created raw.gesis_metadata table")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create raw.gesis_metadata table: {e}")
+            raise
+
 
 # Example usage and utility functions
 if __name__ == "__main__":
