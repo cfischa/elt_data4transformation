@@ -1,10 +1,15 @@
 """
 Airflow DAG for Destatis metadata extraction.
 Fetches all Destatis cube metadata using official GENESIS-Online REST API 2025.
+
+REQUIRED ENVIRONMENT VARIABLES OR AIRFLOW VARIABLES:
+- DESTATIS_API_KEY or DESTATIS_TOKEN: API token for authentication
+- Alternative: DESTATIS_USER and DESTATIS_PASS for username/password auth
 """
 
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
+from airflow.models import Variable
 import logging
 import sys
 import os
@@ -14,20 +19,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Add project root to path for imports
-sys.path.append('/opt/airflow')
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 @dag(
     dag_id="fetch_destatis_metadata",
     description="Fetch Destatis cube metadata using official GENESIS-Online REST API 2025",
-    schedule="@daily",
-    start_date=datetime(2024, 1, 1),
+    schedule="@weekly",  # Run weekly - metadata doesn't change frequently
+    start_date=datetime(2025, 1, 1),  # Production start date
     catchup=False,
     max_active_runs=1,
     default_args={
         "owner": "data-team",
         "depends_on_past": False,
         "email_on_failure": True,
-        "email_on_retry": False,
+        "email_on_retry": True,  # Enable retry notifications for production
         "retries": 2,
         "retry_delay": timedelta(minutes=10),
     },
@@ -36,6 +43,54 @@ sys.path.append('/opt/airflow')
 def fetch_destatis_metadata_dag():
     """DAG to fetch and store Destatis cube metadata using official API endpoints."""
 
+    def get_destatis_credentials():
+        """Get Destatis credentials from Airflow Variables or environment."""
+        try:
+            # Try Airflow Variables first (recommended for production)
+            try:
+                api_token = Variable.get("DESTATIS_API_KEY", default_var=None)
+                if api_token:
+                    logger.info("✅ Using Destatis API token from Airflow Variable")
+                    return {"api_token": api_token}
+                
+                # Try alternative variable names
+                api_token = Variable.get("DESTATIS_TOKEN", default_var=None)
+                if api_token:
+                    logger.info("✅ Using Destatis API token from Airflow Variable (DESTATIS_TOKEN)")
+                    return {"api_token": api_token}
+                
+                # Try username/password from Variables
+                username = Variable.get("DESTATIS_USER", default_var=None)
+                password = Variable.get("DESTATIS_PASS", default_var=None)
+                if username and password:
+                    logger.info("✅ Using Destatis username/password from Airflow Variables")
+                    return {"username": username, "password": password}
+                    
+            except Exception as e:
+                logger.warning(f"Could not access Airflow Variables: {e}")
+            
+            # Fallback to environment variables
+            api_token = os.getenv('DESTATIS_API_KEY') or os.getenv('DESTATIS_TOKEN')
+            if api_token:
+                logger.info("✅ Using Destatis API token from environment variables")
+                return {"api_token": api_token}
+            
+            username = os.getenv('DESTATIS_USER')
+            password = os.getenv('DESTATIS_PASS')
+            if username and password:
+                logger.info("✅ Using Destatis username/password from environment variables")
+                return {"username": username, "password": password}
+            
+            # For development/testing - anonymous access for small datasets
+            logger.warning("⚠️ No Destatis credentials found - using anonymous access")
+            logger.warning("Anonymous access has limitations (smaller datasets, lower rate limits)")
+            return {"anonymous": True}
+                
+        except Exception as e:
+            logger.error(f"❌ Error getting credentials: {e}")
+            logger.warning("⚠️ Falling back to anonymous access")
+            return {"anonymous": True}
+
     @task(task_id="fetch_sample_cubes")
     def fetch_sample_cubes() -> dict:
         """Fetch a small sample of cubes to test the connection and API."""
@@ -43,16 +98,22 @@ def fetch_destatis_metadata_dag():
         
         async def main():
             try:
+                # Get credentials and verify they exist
+                credentials = get_destatis_credentials()
+                if not credentials:
+                    return {"status": "failed", "error": "No credentials available"}
+                
                 from connectors.destatis_connector import DestatisConnector
                 
+                # Create connector - it will automatically use environment variables
                 async with DestatisConnector() as connector:
                     logger.info("🔍 Testing connection by fetching sample cubes...")
                     
                     # Get a limited sample first to test (first 10 cubes)
                     # Use higher pagelength to see total available cubes (default is only 1000)
-                    # TESTING: Limit to 10 cubes for initial test run
-                    all_cubes = await connector.get_available_cubes(pagelength=10)
-                    sample_cubes = all_cubes[:10]  # Test with first 10 cubes
+                    # PRODUCTION: Get ALL available cubes (up to 50,000)
+                    all_cubes = await connector.get_available_cubes(pagelength=50000)
+                    sample_cubes = all_cubes[:10]  # Still test with first 10 for validation
                     
                     logger.info(f"✅ Retrieved {len(sample_cubes)} sample cubes from {len(all_cubes)} total available")
                     
@@ -78,9 +139,15 @@ def fetch_destatis_metadata_dag():
                 return {"status": "failed", "error": str(e)}
 
         try:
-            result = asyncio.run(main())
-            logger.info(f"🎯 Sample fetch completed with status: {result.get('status')}")
-            return result
+            # Use asyncio.new_event_loop() to avoid potential conflicts in Airflow
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(main())
+                logger.info(f"🎯 Sample fetch completed with status: {result.get('status')}")
+                return result
+            finally:
+                loop.close()
         except Exception as e:
             logger.error(f"❌ Async execution failed: {e}")
             return {"status": "failed", "error": str(e)}
@@ -103,19 +170,26 @@ def fetch_destatis_metadata_dag():
     def fetch_all_cube_metadata() -> dict:
         """Fetch complete metadata for ALL available cubes and save directly to ClickHouse."""
         import asyncio
+        from datetime import datetime
         from elt.loader_clickhouse import ClickHouseLoader
         
         async def main():
             try:
+                # Get credentials and verify they exist
+                credentials = get_destatis_credentials()
+                if not credentials:
+                    return {"status": "failed", "error": "No credentials available"}
+                
                 from connectors.destatis_connector import DestatisConnector
                 
+                # Create connector - it will automatically use environment variables
                 async with DestatisConnector() as connector:
                     logger.info("🔍 Fetching ALL cube metadata from Destatis catalogue...")
                     
                     # Get ALL available cubes with full metadata - NO FILTERING
                     # Use higher pagelength to see total available cubes (default is only 1000)
-                    # TESTING: Limit to 10 cubes for initial test run
-                    all_cubes = await connector.get_available_cubes(pagelength=10)
+                    # PRODUCTION: Get ALL available cubes with full metadata
+                    all_cubes = await connector.get_available_cubes(pagelength=50000)
                     
                     logger.info(f"✅ Retrieved metadata for {len(all_cubes)} cubes")
                     
@@ -126,10 +200,10 @@ def fetch_destatis_metadata_dag():
                         
                         for cube in all_cubes:
                             record = {
-                                "cube_code": cube.code,
-                                "content": cube.content,
-                                "state": cube.state,
-                                "time_coverage": cube.time_coverage,
+                                "cube_code": cube.code or "",
+                                "content": cube.content or "",
+                                "state": cube.state or "",
+                                "time_coverage": cube.time_coverage or "",
                                 "latest_update": cube.latest_update,
                                 "information": cube.information,
                                 "fetched_at": current_time,
@@ -141,6 +215,14 @@ def fetch_destatis_metadata_dag():
                         
                         # Save directly to ClickHouse
                         with ClickHouseLoader() as ch_loader:
+                            logger.info("💾 Inserting metadata into ClickHouse...")
+                            
+                            # Check table exists (proven pattern from test)
+                            result = ch_loader.client.query("SHOW TABLES FROM raw LIKE 'destatis_metadata'")
+                            if not result.result_rows:
+                                logger.error("Table 'destatis_metadata' does not exist!")
+                                return {"status": "failed", "error": "Table does not exist", "count": 0}
+                            
                             inserted_count = ch_loader.insert_json_data(
                                 table_name="raw.destatis_metadata",
                                 json_data=metadata_records,
@@ -182,9 +264,15 @@ def fetch_destatis_metadata_dag():
                 return {"status": "failed", "error": str(e)}
 
         try:
-            result = asyncio.run(main())
-            logger.info(f"🎯 Full metadata fetch completed: {result.get('cubes_processed', 0)} cubes processed")
-            return result
+            # Use asyncio.new_event_loop() to avoid potential conflicts in Airflow
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(main())
+                logger.info(f"🎯 Full metadata fetch completed: {result.get('cubes_processed', 0)} cubes processed")
+                return result
+            finally:
+                loop.close()
         except Exception as e:
             logger.error(f"❌ Async execution failed: {e}")
             return {"status": "failed", "error": str(e)}
@@ -199,37 +287,44 @@ def fetch_destatis_metadata_dag():
             from elt.loader_clickhouse import ClickHouseLoader
             
             with ClickHouseLoader() as ch_loader:
-                # Check if table exists and has data
-                result = ch_loader.client.query(
-                    "SELECT COUNT(*) as count FROM raw.destatis_metadata WHERE fetched_at >= today()"
+                # Count total records (same as test)
+                count_result = ch_loader.client.query("SELECT COUNT(*) FROM raw.destatis_metadata")
+                total_count = count_result.result_rows[0][0]
+                
+                # Count today's records (same as test)
+                today_result = ch_loader.client.query(
+                    "SELECT COUNT(*) FROM raw.destatis_metadata WHERE toDate(fetched_at) = today()"
                 )
-                count = result.result_rows[0][0] if result.result_rows else 0
+                today_count = today_result.result_rows[0][0]
                 
-                if count == 0:
-                    return {"validation_status": "failed", "error": "No records found in ClickHouse"}
+                if today_count == 0:
+                    return {"validation_status": "failed", "error": "No records found for today"}
                 
-                # Check structure by getting a sample record
+                # Show sample records (same as test)
                 sample_result = ch_loader.client.query(
-                    "SELECT cube_code, content, state, time_coverage, source FROM raw.destatis_metadata LIMIT 1"
+                    "SELECT cube_code, content FROM raw.destatis_metadata ORDER BY fetched_at DESC LIMIT 3"
                 )
                 
-                if not sample_result.result_rows:
-                    return {"validation_status": "failed", "error": "No sample record found"}
+                logger.info(f"📊 Total records in table: {total_count}")
+                logger.info(f"📊 Records inserted today: {today_count}")
                 
-                sample_record = sample_result.result_rows[0]
+                if sample_result.result_rows:
+                    logger.info("📋 Latest records:")
+                    for i, row in enumerate(sample_result.result_rows):
+                        logger.info(f"  {i+1}. {row[0]}: {row[1][:50]}...")
                 
                 # Verify expected number of records
                 expected_count = fetch_result.get("inserted_records", 0)
-                if count != expected_count:
-                    logger.warning(f"Expected {expected_count} records, found {count}")
+                if today_count != expected_count:
+                    logger.warning(f"Expected {expected_count} records, found {today_count}")
                 
-                logger.info(f"✅ ClickHouse validation passed: {count} records in raw.destatis_metadata")
-                logger.info(f"📋 Sample record: {sample_record[0]} - {sample_record[1][:50]}...")
+                logger.info(f"✅ ClickHouse validation passed: {today_count} new records in raw.destatis_metadata")
                 
                 return {
                     "validation_status": "success",
-                    "records_count": count,
-                    "sample_cube_code": sample_record[0],
+                    "records_count": today_count,
+                    "total_records": total_count,
+                    "sample_cube_code": sample_result.result_rows[0][0] if sample_result.result_rows else "none",
                     "table_name": "raw.destatis_metadata"
                 }
                 

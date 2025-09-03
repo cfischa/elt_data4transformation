@@ -77,6 +77,12 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-raw-data}
+      # API Keys from .env file
+      DESTATIS_API_KEY: ${DESTATIS_API_KEY}
+      DAWUM_API_KEY: ${DAWUM_API_KEY}
+      EUROSTAT_API_KEY: ${EUROSTAT_API_KEY}
+      GESIS_API_KEY: ${GESIS_API_KEY}
+      SOEP_API_KEY: ${SOEP_API_KEY}
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
       - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs

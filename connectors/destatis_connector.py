@@ -305,10 +305,27 @@ class DestatisConnector(BaseConnector):
             return None
         
         try:
-            # GENESIS API returns dates in format: "dd.mm.yyyy hh:mm:ss"
-            return datetime.strptime(date_str, "%d.%m.%Y %H:%M:%S")
-        except (ValueError, TypeError):
-            self.logger.warning(f"Could not parse datetime: {date_str}")
+            # Try multiple formats that GENESIS API uses
+            formats = [
+                "%d.%m.%Y %H:%M:%S",     # Standard format: "16.06.2025 13:06:35"  
+                "%d.%m.%Y %H:%M:%Sh",    # Format with 'h' suffix: "16.06.2025 13:06:35h"
+            ]
+            
+            # Remove 'h' suffix if present
+            clean_date_str = date_str.rstrip('h')
+            
+            for fmt in formats:
+                try:
+                    return datetime.strptime(clean_date_str, fmt)
+                except ValueError:
+                    continue
+                    
+            # If no format worked, log the exact string for debugging
+            self.logger.warning(f"Could not parse datetime format: '{date_str}' (cleaned: '{clean_date_str}')")
+            return None
+            
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Could not parse datetime: {date_str} - {e}")
             return None
     
     def _calculate_chunks(

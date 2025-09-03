@@ -172,8 +172,8 @@ class ClickHouseLoader:
             for i in range(0, total_rows, batch_size):
                 batch = json_data[i:i + batch_size]
                 
-                # Insert batch
-                self.client.insert(table_name, batch)
+                # Insert batch using insert_df which handles dictionaries better
+                self.client.insert_df(table_name, pd.DataFrame(batch))
                 inserted_rows += len(batch)
                 
                 self.logger.debug(f"Inserted batch {i//batch_size + 1}: {len(batch)} rows")
