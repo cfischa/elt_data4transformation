@@ -31,6 +31,7 @@ BASE_URL = "https://www-genesis.destatis.de/genesisWS/rest/2020"
 
 # API endpoints (Official 2025 REST API)
 ENDPOINT_CATALOGUE_CUBES = "catalogue/cubes"        # Metadata discovery (primary)
+ENDPOINT_CATALOGUE_TABLES = "catalogue/tables"      # Tables listing (fallback/alt)
 ENDPOINT_DATA_CUBEFILE = "data/cubefile"            # Raw cube data extraction
 ENDPOINT_DATA_TABLEFILE = "data/tablefile"          # Table data extraction (fallback)
 ENDPOINT_HELLOWORLD_LOGINCHECK = "helloworld/logincheck"  # Auth verification
@@ -129,7 +130,8 @@ class DestatisConnector(BaseConnector):
     
     def _build_url(self, path: str) -> str:
         """Build URL from base endpoint and path."""
-        return f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
+        base = (self.config.base_url or BASE_URL).rstrip('/')
+        return f"{base}/{path.lstrip('/')}"
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -154,19 +156,20 @@ class DestatisConnector(BaseConnector):
         return {}
     
     def _get_auth_headers(self) -> Dict[str, str]:
-        """Get authentication headers (Basic Auth fallback only)."""
-        headers = {}
-        
+        """Get authentication headers (include legacy username/password header fields)."""
+        headers: Dict[str, str] = {}
         if self.config.api_token:
-            # Try token in Authorization header
             headers["Authorization"] = f"Bearer {self.config.api_token}"
-            # Also try X-API-Key header as alternative
             headers["X-API-Key"] = self.config.api_token
+            # Many GENESIS deployments accept credentials via custom headers
+            headers["username"] = self.config.api_token
+            headers["password"] = ""
         elif self.config.username and self.config.password:
             credentials = f"{self.config.username}:{self.config.password}"
             encoded_credentials = base64.b64encode(credentials.encode()).decode()
             headers["Authorization"] = f"Basic {encoded_credentials}"
-            
+            headers["username"] = self.config.username
+            headers["password"] = self.config.password
         return headers
     
     def _prepare_request_headers(self) -> Dict[str, str]:
@@ -175,15 +178,8 @@ class DestatisConnector(BaseConnector):
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json"
         }
-        
-        # Prioritize API token authentication (working method)
-        if self.config.api_token:
-            headers["username"] = self.config.api_token
-            headers["password"] = ""
-        elif self.config.username and self.config.password:
-            headers["username"] = self.config.username
-            headers["password"] = self.config.password
-            
+        # Add all auth-related headers (Bearer and legacy username/password)
+        headers.update(self._get_auth_headers())
         return headers
     
     def _prepare_form_data(
@@ -194,11 +190,19 @@ class DestatisConnector(BaseConnector):
         """Prepare form data for API request."""
         form_data = data.copy() if data else {}
         
-        # Authentication is now in headers, not form data
+        # Provide credentials in form data (required by GENESIS REST)
+        if self.config.api_token:
+            form_data.setdefault("username", self.config.api_token)
+            form_data.setdefault("password", "")
+        elif self.config.username and self.config.password:
+            form_data.setdefault("username", self.config.username)
+            form_data.setdefault("password", self.config.password)
         
         # Force JSON format unless overridden
         if "format" not in form_data:
             form_data["format"] = "JSON"
+        # Default language if not provided
+        form_data.setdefault("language", "de")
         
         # Add mandatory area parameter if not present
         if endpoint == ENDPOINT_DATA_TABLE and "area" not in form_data:
@@ -535,7 +539,7 @@ class DestatisConnector(BaseConnector):
             fmt: Data format ("json", "sdmx", "csv")
             
         Returns:
-            Path to the saved raw data file in MinIO/local storage
+            Path to the saved raw data file in local storage
         """
         ingestion_start = datetime.now()
         
@@ -779,7 +783,7 @@ class DestatisConnector(BaseConnector):
             data = response.json()
             
             cubes = []
-            cube_list = data.get("List", [])
+            cube_list = data.get("List") or []
             
             self.logger.info(f"Found {len(cube_list)} cubes matching pattern '{selection}'")
             
@@ -802,16 +806,28 @@ class DestatisConnector(BaseConnector):
             return cubes
             
         except Exception as e:
-            self.logger.error(f"Failed to fetch cube metadata: {e}")
-            # Fallback to legacy table discovery
-            self.logger.warning("Falling back to legacy table discovery...")
-            legacy_tables = await self.get_available_tables()
-            # Convert tables to cubes format for compatibility
-            return [CubeInfo(
-                code=table.name,
-                content=table.description,
-                latest_update=table.updated
-            ) for table in legacy_tables]
+            self.logger.warning(f"catalogue/cubes failed ({e}). Trying catalogue/tables...")
+            try:
+                response = await self._make_request(ENDPOINT_CATALOGUE_TABLES, request_data)
+                data = response.json()
+                cubes: List[CubeInfo] = []
+                for t in (data.get("List") or []):
+                    cubes.append(CubeInfo(
+                        code=t.get("Code", ""),
+                        content=t.get("Content", ""),
+                        latest_update=self._parse_datetime(t.get("Updated"))
+                    ))
+                cubes.sort(key=lambda x: x.latest_update or datetime.min, reverse=True)
+                self.logger.info(f"Parsed {len(cubes)} records from catalogue/tables")
+                return cubes
+            except Exception as e2:
+                self.logger.error(f"Failed via catalogue/tables ({e2}). Falling back to legacy list...")
+                legacy_tables = await self.get_available_tables()
+                return [CubeInfo(
+                    code=table.name,
+                    content=table.description,
+                    latest_update=table.updated
+                ) for table in legacy_tables]
 
     async def get_available_tables(self, filter_term: Optional[str] = None) -> List[TableInfo]:
         """Get list of available statistical tables."""
@@ -819,11 +835,15 @@ class DestatisConnector(BaseConnector):
         if filter_term:
             request_data["term"] = filter_term
         
-        response = await self._make_request("find/table", request_data)
+        # Prefer official catalogue/tables; fallback to deprecated find/table
+        try:
+            response = await self._make_request(ENDPOINT_CATALOGUE_TABLES, request_data)
+        except Exception:
+            response = await self._make_request("find/table", request_data)
         data = response.json()
         
         tables = []
-        for table_data in data.get("List", []):
+        for table_data in (data.get("List") or []):
             table_info = TableInfo(
                 name=table_data.get("Code", ""),
                 description=table_data.get("Content", ""),

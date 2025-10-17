@@ -97,7 +97,6 @@ def test_services():
     services = {
         "ClickHouse": ("http://localhost:8124/ping", 200),
         "Airflow": ("http://localhost:8081/health", 200),
-        "MinIO": ("http://localhost:9002/minio/health/ready", 200),
         "Jupyter": ("http://localhost:8888/", 200)
     }
     

@@ -136,13 +136,18 @@ def send_notification(validation_result: Dict[str, Any], **context) -> None:
             webhook_token=webhook_token
         )
         status_emoji = "✅" if validation_result['status'] == 'success' else "⚠️"
-        message = f"""
-        {status_emoji} *Destatis Cube Extraction Complete*
-        *Date:* {context['ds']}
-        *Cubes Extracted:* {validation_result['cubes_extracted']}
-        *Status:* {validation_result['status']}
-        {('*Errors:*\\n' + '\\n'.join(validation_result['validation_errors'])) if validation_result['validation_errors'] else ''}
-        """
+        errors = validation_result['validation_errors']
+        error_block = ""
+        if errors:
+            error_block = "*Errors:*\n" + "\n".join(errors)
+
+        message = (
+            f"{status_emoji} *Destatis Cube Extraction Complete*\n"
+            f"*Date:* {context['ds']}\n"
+            f"*Cubes Extracted:* {validation_result['cubes_extracted']}\n"
+            f"*Status:* {validation_result['status']}\n"
+            f"{error_block}"
+        )
         slack_hook.send_text(message)
 
 with dag:

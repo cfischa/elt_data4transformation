@@ -75,7 +75,7 @@ Error Code: 516 - Authentication failed: password is incorrect
 - **Data Validation:** JSON-stat format compliance checking
 
 ### ✅ Infrastructure Integration
-- **Docker Stack:** All services running (Airflow, ClickHouse, MinIO, PostgreSQL)
+- **Docker Stack:** All services running (Airflow, ClickHouse, PostgreSQL)
 - **Database Connection:** ClickHouse accessible on localhost:8124
 - **File Management:** Temporary directories and cleanup working
 - **Async Operations:** Proper async/await implementation

@@ -88,14 +88,26 @@ def fetch_destatis_metadata_production():
     def test_api_connection():
         """Test API connection with a small sample."""
         import asyncio
-        from connectors.destatis_connector import DestatisConnector
+        from connectors.destatis_connector import (
+            DestatisConnector,
+            DestatisConfig,
+            ENDPOINT_CATALOGUE_CUBES,
+            ENDPOINT_CATALOGUE_TABLES,
+        )
         
         async def test_connection():
             try:
                 credentials = get_destatis_credentials()
                 logger.info(f"Testing with credential type: {credentials.get('type')}")
-                
-                async with DestatisConnector() as connector:
+                # Build connector config explicitly from credentials
+                if credentials.get('type') == 'token':
+                    cfg = DestatisConfig(api_token=credentials.get('value'))
+                elif credentials.get('type') == 'userpass':
+                    cfg = DestatisConfig(username=credentials.get('username'), password=credentials.get('password'))
+                else:
+                    cfg = DestatisConfig()
+
+                async with DestatisConnector(cfg) as connector:
                     # Test with a very small sample
                     cubes = await connector.get_available_cubes(pagelength=3)
                     
@@ -132,17 +144,80 @@ def fetch_destatis_metadata_production():
         
         import asyncio
         from datetime import datetime
-        from connectors.destatis_connector import DestatisConnector
+        from connectors.destatis_connector import DestatisConnector, DestatisConfig
         from elt.loader_clickhouse import ClickHouseLoader
         
         async def fetch_and_store():
             try:
-                async with DestatisConnector() as connector:
-                    logger.info("Fetching ALL Destatis cube metadata...")
-                    
-                    # Get ALL available cubes with full metadata
-                    all_cubes = await connector.get_available_cubes(pagelength=50000)
-                    logger.info(f"Retrieved {len(all_cubes)} cube metadata records")
+                # Resolve credentials and build connector config with tuned timeouts
+                credentials = get_destatis_credentials()
+                common_cfg = dict(timeout=300, rate_limit_requests=25, rate_limit_period=60)
+                if credentials.get('type') == 'token':
+                    cfg = DestatisConfig(api_token=credentials.get('value'), **common_cfg)
+                elif credentials.get('type') == 'userpass':
+                    cfg = DestatisConfig(username=credentials.get('username'), password=credentials.get('password'), **common_cfg)
+                else:
+                    cfg = DestatisConfig(**common_cfg)
+
+                async with DestatisConnector(cfg) as connector:
+                    logger.info("🔍 Fetching ALL Destatis cube metadata with prefix-chunked approach...")
+
+                    # Chunk by code prefixes to avoid timeouts and 5xx
+                    page_size = 1000
+                    prefixes = [str(d) for d in range(10)] + [chr(c) for c in range(ord('A'), ord('Z')+1)]
+                    seen = {}
+
+                    saturated_prefixes = []
+                    for pref in prefixes:
+                        sel = f"{pref}*"
+                        try:
+                            logger.info(f"Fetching prefix {sel} with page size {page_size}")
+                            cubes = await connector.get_available_cubes(selection=sel, pagelength=page_size)
+                            for cube in cubes:
+                                if cube.code and cube.code not in seen:
+                                    seen[cube.code] = cube
+                            if len(cubes) >= page_size:
+                                saturated_prefixes.append(pref)
+                            # Gentle backoff to respect API limits
+                            await asyncio.sleep(0.3)
+                        except Exception as e:
+                            logger.warning(f"Prefix {sel} failed: {e}")
+
+                    # Second pass: refine only saturated prefixes with two-character sub-prefixes
+                    if saturated_prefixes:
+                        logger.info(f"Refining saturated prefixes: {saturated_prefixes}")
+                        for pref in saturated_prefixes:
+                            for ch in prefixes:
+                                sel2 = f"{pref}{ch}*"
+                                try:
+                                    logger.info(f"Refine fetch {sel2} with page size {page_size}")
+                                    cubes2 = await connector.get_available_cubes(selection=sel2, pagelength=page_size)
+                                    for cube in cubes2:
+                                        if cube.code and cube.code not in seen:
+                                            seen[cube.code] = cube
+                                    await asyncio.sleep(0.15)
+                                except Exception as e:
+                                    logger.warning(f"Sub-prefix {sel2} failed: {e}")
+
+                    all_cubes = list(seen.values())
+                    logger.info(f"✅ Retrieved {len(all_cubes)} unique cube metadata records across prefixes")
+
+                    # Transform into metadata records
+                    current_time = datetime.now()
+                    metadata_records = []
+                    for cube in all_cubes:
+                        metadata_records.append({
+                            "cube_code": cube.code or "",
+                            "content": cube.content or "",
+                            "state": cube.state or "",
+                            "time_coverage": cube.time_coverage or "",
+                            "latest_update": cube.latest_update,
+                            "information": cube.information,
+                            "fetched_at": current_time,
+                            "source": "destatis_catalogue",
+                            "created_at": current_time,
+                            "updated_at": current_time,
+                        })
                     
                     if not all_cubes:
                         return {"status": "failed", "error": "No cubes retrieved"}
@@ -168,11 +243,23 @@ def fetch_destatis_metadata_production():
                     
                     # Save to ClickHouse
                     with ClickHouseLoader() as ch_loader:
-                        # Verify table exists
+                        # Ensure table exists; create from SQL if missing
                         result = ch_loader.client.query("SHOW TABLES FROM raw LIKE 'destatis_metadata'")
                         if not result.result_rows:
-                            raise ValueError("Table 'raw.destatis_metadata' does not exist")
-                        
+                            logger.warning("Table 'raw.destatis_metadata' not found. Creating it now...")
+                            sql_path = os.path.join(project_root, 'sql', 'create_destatis_metadata_table.sql')
+                            if not os.path.exists(sql_path):
+                                raise FileNotFoundError(f"Missing DDL file: {sql_path}")
+                            with open(sql_path, 'r', encoding='utf-8') as f:
+                                ddl = f.read()
+                            # Split on semicolons and execute non-empty statements
+                            for stmt in [s.strip() for s in ddl.split(';') if s.strip()]:
+                                ch_loader.client.command(stmt)
+                            # Re-check
+                            result = ch_loader.client.query("SHOW TABLES FROM raw LIKE 'destatis_metadata'")
+                            if not result.result_rows:
+                                raise ValueError("Failed to create table 'raw.destatis_metadata'")
+
                         inserted_count = ch_loader.insert_json_data(
                             table_name="raw.destatis_metadata",
                             json_data=metadata_records,
@@ -185,7 +272,9 @@ def fetch_destatis_metadata_production():
                         "status": "success",
                         "cubes_processed": len(all_cubes),
                         "records_inserted": inserted_count,
-                        "table": "raw.destatis_metadata"
+                        "table": "raw.destatis_metadata",
+                        "page_size_used": page_size,
+                        "potential_more_data": len(all_cubes) == page_size
                     }
                     
             except Exception as e:

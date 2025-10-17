@@ -22,8 +22,7 @@ Based on comprehensive codebase analysis, the following dependencies have been i
 - **ClickHouse Connect 0.8.18** - Main analytics database driver
 - **psycopg2-binary 2.9.10** - PostgreSQL adapter (Airflow metadata)
 - **SQLAlchemy 1.4.54** - SQL toolkit and ORM
-- **MinIO 7.2.16** - S3-compatible object storage
-- **boto3 1.39.11** - AWS SDK for additional S3 operations
+  
 
 ### 📊 **Data Processing & Analytics**
 - **pandas 2.3.1** - Data manipulation and analysis
@@ -166,7 +165,7 @@ mypy connectors elt
 
 1. **Configure Airflow**: Set up `airflow.cfg` and database connections
 2. **Environment Variables**: Ensure all API keys are set in `.env`
-3. **Docker Services**: Start ClickHouse, MinIO, and other infrastructure
+3. **Docker Services**: Start ClickHouse, Airflow, and other infrastructure
 4. **dbt Setup**: Install `dbt-clickhouse` adapter if needed
 5. **Run Pipeline**: Execute `make pipeline` to test end-to-end flow
 

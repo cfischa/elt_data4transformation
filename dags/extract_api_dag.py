@@ -262,17 +262,20 @@ def send_notification(validation_result: Dict[str, Any], **context) -> None:
         
         # Prepare message
         status_emoji = "✅" if validation_result['status'] == 'success' else "⚠️"
-        message = f"""
-        {status_emoji} *API Data Extraction Complete*
-        
-        *Date:* {context['ds']}
-        *Records Extracted:* {validation_result['total_records']}
-        *Sources Processed:* {validation_result['sources_processed']}
-        *Status:* {validation_result['status']}
-        
-        {("*Errors:*\\n" + '\\n'.join(validation_result['validation_errors'])) if validation_result['validation_errors'] else ''}
-        """
-        
+        errors = validation_result['validation_errors']
+        error_block = ""
+        if errors:
+            error_block = "*Errors:*\n" + "\n".join(errors)
+
+        message = (
+            f"{status_emoji} *API Data Extraction Complete*\n\n"
+            f"*Date:* {context['ds']}\n"
+            f"*Records Extracted:* {validation_result['total_records']}\n"
+            f"*Sources Processed:* {validation_result['sources_processed']}\n"
+            f"*Status:* {validation_result['status']}\n\n"
+            f"{error_block}"
+        )
+
         slack_hook.send_text(message)
 
 

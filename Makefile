@@ -1,6 +1,6 @@
 # Common development tasks for BnB Data4Transformation
 
-.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke
+.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke streamlit
 
 # Default target
 help:
@@ -17,12 +17,13 @@ help:
 	@echo "  smoke        Run container health checks"
 	@echo ""
 	@echo "Infrastructure:"
-	@echo "  up           Start all services (ClickHouse, Airflow, MinIO, etc.)"
+	@echo "  up           Start all services (ClickHouse, Airflow, etc.)"
 	@echo "  down         Stop all services"
 	@echo "  logs         View service logs"
 	@echo "  status       Check service health"
 	@echo "  reset        Reset all data and containers"
 	@echo "  init-db      Initialize ClickHouse schemas"
+	@echo "  streamlit    Start Streamlit metadata explorer"
 	@echo ""
 	@echo "Data Pipeline:"
 	@echo "  extract         Run data extraction"
@@ -34,6 +35,7 @@ help:
 	@echo "  pipeline     Run full ELT pipeline"
 	@echo "  load-local   Load sample DAWUM data"
 	@echo "  load-dawum   Load DAWUM polling data"
+ 
 
 # Development Setup
 init:
@@ -48,8 +50,6 @@ dev: init up
 	@echo "Access services at:"
 	@echo "  - Airflow UI: http://localhost:8081 (airflow/airflow)"
 	@echo "  - ClickHouse: http://localhost:8124"
-	@echo "  - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)"
-	@echo "  - MinIO API: http://localhost:9002"
 	@echo "  - Jupyter: http://localhost:8888?token=admin"
 
 # Code Quality
@@ -89,32 +89,32 @@ format:
 # Infrastructure
 up:
 	@echo "🐳 Starting all services..."
-	@docker-compose up -d
+	@docker compose up -d
 	@echo "⏳ Waiting for services to start..."
 	@timeout /t 30 /nobreak > nul
 	@echo "✅ Services started"
 
 down:
 	@echo "🐳 Stopping all services..."
-	@docker-compose down
+	@docker compose down
 
 logs:
 	@echo "📋 Viewing service logs..."
-	@docker-compose logs -f
+	@docker compose logs -f
 
 status:
 	@echo "📊 Checking service health..."
-	@docker-compose ps
+	@docker compose ps
 
 reset:
 	@echo "🗑️ Resetting all data and containers..."
-	@docker-compose down -v --remove-orphans
-	@docker-compose build --no-cache
+	@docker compose down -v --remove-orphans
+	@docker compose build --no-cache
 	@echo "✅ Reset complete"
 
 init-db:
 	@echo "🗃️ Initializing ClickHouse schemas..."
-	@docker-compose exec -T clickhouse clickhouse-client --multiquery < scripts/init_clickhouse.sql
+	@docker compose exec -T clickhouse clickhouse-client --multiquery < scripts/init_clickhouse.sql
 	@echo "✅ Database initialized"
 
 # Data Pipeline
@@ -158,25 +158,25 @@ load:
 
 transform:
 	@echo "🔄 Running dbt transformations..."
-	@docker-compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
+	@docker compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
 
 dbt-run:
 	@echo "🔄 Running dbt models..."
-	@docker-compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
+	@docker compose exec dbt dbt run --profiles-dir /usr/app/dbt_project
 
 dbt-test:
 	@echo "🧪 Running dbt tests..."
-	@docker-compose exec dbt dbt test --profiles-dir /usr/app/dbt_project
+	@docker compose exec dbt dbt test --profiles-dir /usr/app/dbt_project
 
 dbt-docs:
 	@echo "📖 Generating dbt documentation..."
-	@docker-compose exec dbt dbt docs generate --profiles-dir /usr/app/dbt_project
-	@docker-compose exec dbt dbt docs serve --profiles-dir /usr/app/dbt_project --port 8081
+	@docker compose exec dbt dbt docs generate --profiles-dir /usr/app/dbt_project
+	@docker compose exec dbt dbt docs serve --profiles-dir /usr/app/dbt_project --port 8081
 
 dbt-version:
 	@echo "🔍 Checking dbt version and connectivity..."
-	@docker-compose exec dbt dbt --version
-	@docker-compose exec dbt dbt debug --profiles-dir /usr/app/dbt_project
+	@docker compose exec dbt dbt --version
+	@docker compose exec dbt dbt debug --profiles-dir /usr/app/dbt_project
 
 pipeline: extract load transform
 	@echo "🎯 Full ELT pipeline completed"
@@ -204,16 +204,21 @@ test-connections:
 # Jupyter
 jupyter:
 	@echo "📊 Starting Jupyter notebook..."
-	@docker-compose exec jupyter jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+	@docker compose exec jupyter jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+
+streamlit:
+	@echo "🚀 Starting Streamlit metadata explorer..."
+	@docker compose up -d streamlit
+	@echo "🔗 Streamlit UI: http://localhost:$(if $(STREAMLIT_PORT),$(STREAMLIT_PORT),8501)"
 
 # Airflow
 airflow-reset:
 	@echo "🔄 Resetting Airflow database..."
-	@docker-compose exec airflow-webserver airflow db reset --yes
+	@docker compose exec airflow-webserver airflow db reset --yes
 
 airflow-user:
 	@echo "👤 Creating Airflow admin user..."
-	@docker-compose exec airflow-webserver airflow users create \
+	@docker compose exec airflow-webserver airflow users create \
 		--username admin \
 		--firstname Admin \
 		--lastname User \
@@ -226,7 +231,6 @@ monitor:
 	@echo "📊 Opening monitoring dashboard..."
 	@start http://localhost:8080  # Airflow
 	@start http://localhost:8123  # ClickHouse
-	@start http://localhost:9001  # MinIO
 
 # Cleanup
 clean:
@@ -239,8 +243,8 @@ clean:
 # Production
 build:
 	@echo "🏗️ Building production images..."
-	@docker-compose -f docker-compose.prod.yml build
+	@docker compose -f docker-compose.prod.yml build
 
 deploy:
 	@echo "🚀 Deploying to production..."
-	@docker-compose -f docker-compose.prod.yml up -d
+	@docker compose -f docker-compose.prod.yml up -d

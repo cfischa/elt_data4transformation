@@ -4,7 +4,7 @@
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Data Sources  │    │   Extraction    │    │   Raw Storage   │
 │                 │    │                 │    │                 │
-│ • DAWUM API     │───▶│ • Connectors    │───▶│ • MinIO/S3      │
+│ • DAWUM API     │───▶│ • Connectors    │───▶│ • Filesystem    │
 │ • Destatis API  │    │ • Scrapy        │    │ • JSON/Parquet  │
 │ • Eurostat API  │    │ • BeautifulSoup │    │ • ClickHouse    │
 │ • GESIS API     │    │ • Async/Batch   │    │   raw schema    │
@@ -31,7 +31,7 @@ Production-grade ELT pipeline for political polling and socioeconomic data aggre
 ### Key Features
 - **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS ✅, SOEP
 - **Web Scraping**: Scrapy framework for sites without APIs
-- **Object Storage**: MinIO S3-compatible for raw data lake
+- **Object Storage**: Local filesystem for raw data (MinIO removed)
 - **Analytics Warehouse**: ClickHouse for high-performance analytics
 - **Transform Layer**: dbt-core with ClickHouse adapter
 - **Orchestration**: Apache Airflow with TaskFlow API
@@ -71,23 +71,39 @@ cp .env.example .env
 ```
 
 ### 3. Start Infrastructure
-start docker desktop, and conda activate bnb_data4transformation
+Start Docker Desktop, then in your shell `conda activate bnb_data4transformation`.
 ```bash
-# Start all services (ClickHouse, Airflow, MinIO, etc.)
-make up && make smoke   # start stack and verify health
+# (Optional) pin a Compose project name so container names stay consistent
+# PowerShell:   setx COMPOSE_PROJECT_NAME bnb_data4transformation
+# macOS/Linux: export COMPOSE_PROJECT_NAME=bnb_data4transformation
+# Containers will then be named like `bnb_data4transformation_clickhouse_1`.
+
+# Start all services (ClickHouse, Airflow, etc.)
+docker compose up -d
 
 # Check service health
-make status
+docker compose ps
 
-# Initialize ClickHouse schemas
-make init-db
+# (Optional, first run) Initialize ClickHouse schemas
+docker compose exec -T clickhouse \
+  clickhouse-client --multiquery < scripts/init_clickhouse.sql
 
 # Access services:
 # - Airflow UI: http://localhost:8081 (airflow/airflow)
 # - ClickHouse: http://localhost:8124
-# - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)
-# - MinIO API: http://localhost:9002
 # - Jupyter: http://localhost:8888?token=admin
+# - Streamlit UI: http://localhost:8501
+
+# Alternatively, if you prefer Make targets:
+# make up && make smoke
+# make status
+# make init-db
+
+# If Docker reports container-name conflicts (e.g. "clickhouse already in use"),
+# remove the stale standalone containers before re-running:
+#   docker rm -f clickhouse postgres redis
+# or reset the stack completely:
+#   docker compose down --remove-orphans
 ```
 
 ### 4. Run Sample Pipeline
@@ -107,9 +123,8 @@ make dbt-run
 # Access services:
 # - Airflow UI: http://localhost:8081 (airflow/airflow)
 # - ClickHouse: http://localhost:8124
-# - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)
-# - MinIO API: http://localhost:9002
 # - Jupyter: http://localhost:8888?token=admin
+# - Streamlit UI: http://localhost:8501
 ```
 
 ### 5. Verify Data Loading
@@ -413,27 +428,32 @@ curl -X POST "https://www-genesis.destatis.de/genesisWS/rest/2020/data/table" \
 - Email alerts for data quality issues
 - Prometheus alerts for system metrics
 
+## 📚 Streamlit Metadata Explorer
+
+- Start the UI: `make streamlit` (or `docker compose up -d streamlit`)
+- Open your browser at `http://localhost:8501`
+- Overview page shows table/column counts, top tables by size, query volume (24h), and database inventory
+- Extend `streamlit_app/` with new pages to surface metadata marts, data quality results, or decision queues
+
 ## 🔑 Configuration
 
 ### Environment Variables
 See `.env.example` for complete configuration options:
 - **Database**: ClickHouse connection settings
 - **APIs**: Authentication keys for data sources
-- **Storage**: MinIO/S3 credentials
 - **Monitoring**: Slack webhook URLs
 - **Development**: Debug flags, log levels
 
 ### Airflow Connections
 Configure via Airflow UI or environment variables:
 - `clickhouse_default`: ClickHouse connection
-- `minio_default`: Object storage connection
 - `slack_default`: Slack notifications
 
 ## 🚀 Deployment
 
 ### Current Infrastructure Status (July 23, 2025)
 ✅ **All Systems Operational**
-- **Docker Containers**: 8/8 healthy
+- **Docker Containers**: 9/9 healthy
 - **Airflow**: Scheduler + Webserver running (LocalExecutor)
 - **ClickHouse**: Database operational with data
 - **DAWUM Pipeline**: Fully functional with 3,527 polls ingested

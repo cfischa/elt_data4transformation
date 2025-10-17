@@ -102,7 +102,7 @@ def verify_system():
     print("   • ClickHouse: http://localhost:8124")
     print("   • Airflow: http://localhost:8081")
     print("   • Jupyter: http://localhost:8888")
-    print("   • MinIO: http://localhost:9003")
+    # MinIO removed
     
     return True
 

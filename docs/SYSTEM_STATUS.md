@@ -11,7 +11,6 @@
 | Airflow Scheduler | ✅ Running | LocalExecutor mode |
 | Airflow Webserver | ✅ Running | http://localhost:8081 |
 | ClickHouse Server | ✅ Running | http://localhost:8124 |
-| MinIO Storage | ✅ Running | Console: http://localhost:9003 |
 
 ## Data Pipeline Status
 
