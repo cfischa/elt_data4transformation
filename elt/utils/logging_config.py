@@ -209,7 +209,7 @@ def configure_pipeline_logging(
         Configured logger for the pipeline
     """
     # Create log file path
-    log_dir = Path(os.getenv('LOG_FILE_PATH', './data/logs'))
+    log_dir = Path(os.getenv('LOG_FILE_PATH', './logs/app'))
     log_file = log_dir / f"{pipeline_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     
     # Pipeline context
@@ -267,7 +267,7 @@ class TimedLogger:
 def configure_default_logging():
     """Configure default logging for the application."""
     log_level = os.getenv('LOG_LEVEL', 'INFO')
-    log_file_path = os.getenv('LOG_FILE_PATH', './data/logs')
+    log_file_path = os.getenv('LOG_FILE_PATH', './logs/app')
     enable_json = os.getenv('ENABLE_JSON_LOGGING', 'false').lower() == 'true'
     
     # Create log file name

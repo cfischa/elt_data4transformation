@@ -48,6 +48,8 @@ data/raw/
 data/exports/
 logs/
 *.log
+htmlcov/
+.coverage
 
 # OS
 .DS_Store

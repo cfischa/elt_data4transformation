@@ -65,7 +65,7 @@ TELNETCONSOLE_ENABLED = False
 
 # Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-LOG_FILE = os.getenv('LOG_FILE_PATH', './data/logs/scrapy.log')
+LOG_FILE = os.getenv('LOG_FILE_PATH', './logs/app/scrapy.log')
 
 # Custom settings
 FEEDS = {

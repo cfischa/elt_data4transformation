@@ -236,6 +236,7 @@ monitor:
 clean:
 	@echo "🧹 Cleaning up temporary files..."
 	@if exist "htmlcov" rmdir /s /q htmlcov
+	@if exist "logs\app" rmdir /s /q "logs\app"
 	@if exist ".coverage" del .coverage
 	@if exist ".pytest_cache" rmdir /s /q .pytest_cache
 	@if exist "**/__pycache__" rmdir /s /q "**/__pycache__"
