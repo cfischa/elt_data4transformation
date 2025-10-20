@@ -1,0 +1,18 @@
+version: "0.1.0"
+generated_at: "2024-10-17"
+topics:
+  steuern:
+    indicators: []
+    notes: "Fuelle mit konkreten Tabellen/Variablen, sobald Destatis- und GESIS-Mappings vorliegen."
+  klima:
+    indicators: []
+    notes: "Emissionen (Destatis Umweltstatistik), Temperaturreihen, Klimaschutz-Surveys."
+  migration_einwanderung:
+    indicators:
+      - source: "destatis"
+        dataset_id_pattern: "12711*"
+        description: "Bevoelkerungsbewegung nach Herkunft und Ziel."
+    notes: "Beachte unterschiedliche Codes (Destatis vs. GESIS) und ggf. regionale Dimension."
+  bildung:
+    indicators: []
+    notes: "Schulstatistik, Hochschulstatistik sowie GESIS-Bildungssurveys; Frequenzen pruefen."

@@ -198,6 +198,33 @@ models:
               max_value: 50
       - name: trend_direction
         description: "Trend vs previous poll"
+
+  - name: stg_topic_indicator_facts
+    description: "Staged topic indicator facts synthesised from heterogeneous sources"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - topic_id
+            - indicator_id
+            - geo_code
+            - time
+    columns:
+      - name: topic_id
+        description: "Topic identifier aligned with taxonomy"
+        tests:
+          - not_null
+      - name: indicator_id
+        description: "Stable indicator key"
+        tests:
+          - not_null
+      - name: time
+        description: "Observation timestamp/date"
+        tests:
+          - not_null
+      - name: value
+        description: "Indicator value"
+        tests:
+          - not_null
         tests:
           - not_null
           - accepted_values:

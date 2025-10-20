@@ -1,0 +1,117 @@
+version: "0.1.0"
+generated_at: "2024-10-17"
+default_language: "de"
+topics:
+  - id: "steuern"
+    name: "Steuern"
+    description: "Steueraufkommen, Abgaben und fiskalbezogene Kennzahlen."
+    synonyms:
+      - lang: "de"
+        terms: ["Steuern", "Steueraufkommen", "Steuerquote", "Abgaben", "Einnahmen des Staates"]
+      - lang: "en"
+        terms: ["taxes", "tax revenue", "tax burden", "fiscal revenue"]
+    include_keywords:
+      - lang: "de"
+        terms: ["Steueraufkommen", "Steuereinnahmen", "Einkommensteuer", "Korporationssteuer", "Mehrwertsteuer"]
+      - lang: "en"
+        terms: ["tax revenue", "income tax", "corporate tax", "VAT", "fiscal revenue"]
+    exclude_keywords:
+      - lang: "de"
+        terms: ["Steuerung", "Teststeuerung"]
+      - lang: "en"
+        terms: ["steuerung", "control system"]
+    dataset_hints:
+      - source: "destatis"
+        dataset_id: "table_tax_*"
+      - source: "gesis"
+        dataset_id: "taxation_*"
+    examples:
+      de: ["Steueraufkommen nach Steuerarten", "Steuerquote in Deutschland"]
+      en: ["Tax revenue by category", "Corporate tax statistics"]
+    notes: "Erste Entwürfe; verfeinern sobald konkrete Tabellen/Variablen analysiert wurden."
+
+  - id: "klima"
+    name: "Klima"
+    description: "Klimabezogene Kennzahlen wie Emissionen, Temperatur, Wetterextreme."
+    synonyms:
+      - lang: "de"
+        terms: ["Klima", "Klimawandel", "Emissionen", "Treibhausgase", "Temperatur", "Wetter", "Klimagas", "Klimabilanz"]
+      - lang: "en"
+        terms: ["climate", "climate change", "emissions", "greenhouse gas", "temperature", "weather extremes", "climate balance"]
+    include_keywords:
+      - lang: "de"
+        terms: ["CO2", "Emissionen", "Treibhausgas", "Temperatur", "Klimaschutz", "Klimawirksamer", "Energieverwendung", "Energieart", "Klimabilanz", "Klimaziel"]
+      - lang: "en"
+        terms: ["greenhouse gas", "CO2 emissions", "temperature anomaly", "climate indicator", "renewable energy share", "energy consumption"]
+    exclude_keywords:
+      - lang: "de"
+        terms: ["Unternehmensklima", "Investitionsklima"]
+      - lang: "en"
+        terms: ["business climate", "investment climate"]
+    dataset_hints:
+      - source: "destatis"
+        dataset_id_pattern: "32421*"
+      - source: "destatis"
+        dataset_id_pattern: "3111*"
+      - source: "gesis"
+        dataset_id: "environment_*"
+    examples:
+      de: ["Treibhausgasemissionen nach Sektor", "Durchschnittliche Jahrestemperatur"]
+      en: ["Greenhouse gas emissions by sector", "Annual mean temperature"]
+    notes: "Abgrenzung zu Wirtschafts-Stimmungsindikatoren beachten (\"Klima\" als Sentiment)."
+
+  - id: "migration_einwanderung"
+    name: "Migration und Einwanderung"
+    description: "Zuwanderung, Abwanderung, Aufenthaltsstatus und Bevölkerungsbewegungen."
+    synonyms:
+      - lang: "de"
+        terms: ["Migration", "Einwanderung", "Zuwanderung", "Abwanderung", "Migrationshintergrund"]
+      - lang: "en"
+        terms: ["migration", "immigration", "emigration", "net migration", "migrant background"]
+    include_keywords:
+      - lang: "de"
+        terms: ["Zuwanderung", "Abwanderung", "Aufenthaltstitel", "Fluchtmigration", "Asylantrag"]
+      - lang: "en"
+        terms: ["immigration", "emigration", "residence permit", "asylum application", "migration balance"]
+    exclude_keywords:
+      - lang: "de"
+        terms: ["Datenmigration", "Servermigration"]
+      - lang: "en"
+        terms: ["data migration", "system migration"]
+    dataset_hints:
+      - source: "destatis"
+        dataset_id: "migration_*"
+      - source: "gesis"
+        dataset_id: "survey_migration_*"
+    examples:
+      de: ["Wanderungssaldo nach Herkunftsland", "Aufenthaltstitel nach Statusgruppe"]
+      en: ["Net migration by country of origin", "Residence permits by status"]
+    notes: "Integrationen für Aufenthaltsstatus und Fluchtzahlen gesondert kennzeichnen."
+
+  - id: "bildung"
+    name: "Bildung"
+    description: "Bildungsstand, Schul- und Hochschulstatistiken, Bildungsbeteiligung."
+    synonyms:
+      - lang: "de"
+        terms: ["Bildung", "Bildungsstand", "Schüler", "Studierende", "Schulabschlüsse", "PISA"]
+      - lang: "en"
+        terms: ["education", "educational attainment", "students", "enrolment", "graduation", "PISA"]
+    include_keywords:
+      - lang: "de"
+        terms: ["ISCED", "Bildungsabschluss", "Schulabgang", "Studienanfang", "Ausbildungsplatz"]
+      - lang: "en"
+        terms: ["educational attainment", "school enrolment", "tertiary education", "ISCED level"]
+    exclude_keywords:
+      - lang: "de"
+        terms: ["Weiterbildungskosten Unternehmen"]
+      - lang: "en"
+        terms: ["corporate training budget"]
+    dataset_hints:
+      - source: "destatis"
+        dataset_id: "education_*"
+      - source: "gesis"
+        dataset_id: "survey_education_*"
+    examples:
+      de: ["Bildungsstand der Bevölkerung", "Studierende nach Fachrichtung"]
+      en: ["Educational attainment by age group", "University students by field of study"]
+    notes: "GESIS Fragebogendaten erfordern Aggregationslogik für Mikrodatensätze."

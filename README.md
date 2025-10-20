@@ -211,6 +211,11 @@ make extract-destatis TABLES="12411-0001,12411-0002" AREA="de" START_YEAR="2020"
 - Exponential backoff retry on HTTP 5xx/429
 - Rate limiting (30 requests/minute)
 
+### Topic Classification
+- Rule-based classifier (`pipeline/topic_classifier.py`) tags metadata into `analytics.dataset_topics` in ClickHouse.
+- The Streamlit **Topic Classification Browser** (`streamlit_app/pages/3_Topic_Browser.py`) surfaces assignments and matched terms.
+- Register new metadata adapters via `elt.adapters.metadata.register_adapter("source_name", adapter_function)` so additional sources plug into the canonical classification flow without code churn.
+
 ## 📁 Project Structure
 
 ```

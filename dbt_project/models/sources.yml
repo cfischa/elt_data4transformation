@@ -181,6 +181,41 @@ sources:
             tests:
               - not_null
 
+  - name: topics
+    description: "Topic classifier aligned facts and metrics"
+    database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
+    schema: staging
+    tables:
+      - name: topic_indicator_facts
+        description: "Normalised facts per topic/indicator produced by classifier adapters"
+        columns:
+          - name: topic_id
+            description: "Topic identifier matching taxonomy"
+            tests:
+              - not_null
+          - name: indicator_id
+            description: "Stable indicator identifier (source + measure)"
+            tests:
+              - not_null
+          - name: geo_code
+            description: "Geographical key for the observation"
+          - name: time
+            description: "Observation timestamp"
+            tests:
+              - not_null
+          - name: value
+            description: "Numeric value of the observation"
+            tests:
+              - not_null
+          - name: unit
+            description: "Unit-of-measure description"
+          - name: frequency
+            description: "Frequency code (A/Q/M/...)"
+          - name: ingested_at
+            description: "Timestamp when record was ingested"
+            tests:
+              - not_null
+
   - name: soep
     description: "SOEP socio-economic panel data"
     database: "{{ env_var('CLICKHOUSE_DATABASE', 'political_data') }}"
