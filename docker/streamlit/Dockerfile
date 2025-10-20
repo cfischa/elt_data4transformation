@@ -14,6 +14,7 @@ COPY docker/streamlit/requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
 
 COPY streamlit_app /app/streamlit_app
+COPY config /app/config
 
 EXPOSE 8501
 
