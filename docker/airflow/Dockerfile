@@ -15,5 +15,10 @@ USER airflow
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-COPY requirements.txt /opt/airflow/requirements-custom.txt
-RUN pip install --no-cache-dir -r /opt/airflow/requirements-custom.txt
+COPY . /opt/airflow/app
+RUN pip install --no-cache-dir -r /opt/airflow/app/docker/airflow/requirements.txt \
+    && pip install --no-cache-dir /opt/airflow/app
+
+ENV PYTHONPATH=/opt/airflow/app
+
+

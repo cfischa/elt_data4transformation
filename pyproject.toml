@@ -5,7 +5,12 @@ description = "Production-grade ELT pipeline for polling and socioeconomic data"
 authors = ["Your Name <your.email@example.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "connectors"}, {include = "elt"}, {include = "scraping"}]
+packages = [
+    {include = "connectors"},
+    {include = "elt"},
+    {include = "scraping"},
+    {include = "pipeline"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

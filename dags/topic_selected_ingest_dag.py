@@ -7,7 +7,17 @@ from airflow.decorators import task
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
 
-from dags.utils.module_loader import load_module_main
+try:
+    from dags.utils.module_loader import load_module_main
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+
+    current_dir = Path(__file__).resolve().parent
+    utils_path = current_dir / "utils"
+    if utils_path.is_dir() and str(current_dir) not in sys.path:
+        sys.path.insert(0, str(current_dir))
+    from utils.module_loader import load_module_main
 
 ingest_main = load_module_main(__file__, "pipeline.topic_selected_ingest")
 
