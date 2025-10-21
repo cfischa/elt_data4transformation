@@ -194,6 +194,7 @@ services:
     volumes:
       - ./config:/app/config:ro
       - ./streamlit_app:/app/streamlit_app
+      - ./config:/app/config
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
     depends_on:
