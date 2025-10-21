@@ -176,7 +176,7 @@ class DestatisConnector(BaseConnector):
         """Prepare HTTP headers for API request."""
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json"
+            "Accept": "*/*"
         }
         # Add all auth-related headers (Bearer and legacy username/password)
         headers.update(self._get_auth_headers())
@@ -238,7 +238,8 @@ class DestatisConnector(BaseConnector):
     async def _make_request(
         self, 
         endpoint: str, 
-        data: Optional[Dict[str, Any]] = None
+        data: Optional[Dict[str, Any]] = None,
+        expect_json: bool = True,
     ) -> httpx.Response:
         """Make HTTP POST request with retry logic (new API requirement since July 2025)."""
         if not self._client:
@@ -259,8 +260,8 @@ class DestatisConnector(BaseConnector):
         # Handle response errors
         await self._handle_response_errors(response)
         
-        # Validate JSON response content only after status is OK
-        self._validate_response_content(response)
+        if expect_json:
+            self._validate_response_content(response)
         
         return response
     
@@ -382,7 +383,11 @@ class DestatisConnector(BaseConnector):
             request_data = self._build_request_data(table_id, area, fmt, chunk_params)
             
             # Make POST request
-            response = await self._make_request(ENDPOINT_DATA_TABLE, request_data)
+            response = await self._make_request(
+                ENDPOINT_DATA_TABLE,
+                request_data,
+                expect_json=(fmt.lower() == "json"),
+            )
             
             # Process response
             chunk_data, records_count = await self._process_response(response, fmt)
@@ -479,7 +484,11 @@ class DestatisConnector(BaseConnector):
             }
             
             # Make request to cube endpoint
-            response = await self._make_request(ENDPOINT_DATA_CUBEFILE, request_data)
+            response = await self._make_request(
+                ENDPOINT_DATA_CUBEFILE,
+                request_data,
+                expect_json=False,
+            )
             
             # Process and save cube data
             output_path = await self._save_cube_data(cube_code, response, language)

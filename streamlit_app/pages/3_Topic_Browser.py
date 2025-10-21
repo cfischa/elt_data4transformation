@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 import streamlit as st
@@ -151,6 +151,76 @@ def load_summary() -> pd.DataFrame:
     return client.query_df(query)
 
 
+@st.cache_data(ttl=60)
+def load_payload_coverage(sources: Optional[tuple[str, ...]]) -> pd.DataFrame:
+    params: dict[str, Any] = {}
+    filter_clause = ""
+    if sources:
+        filter_clause = "WHERE s.source IN %(sources)s"
+        params["sources"] = sources
+
+    query = f"""
+        WITH selected AS (
+            SELECT DISTINCT source, dataset_id, topic_id
+            FROM analytics.dataset_topics
+        ),
+        payloads AS (
+            SELECT
+                source,
+                dataset_id,
+                topic_id,
+                argMax(ingestion_status, ingestion_completed_at) AS status,
+                max(ingestion_completed_at) AS last_ingestion
+            FROM raw.topic_selected_payloads
+            GROUP BY source, dataset_id, topic_id
+        )
+        SELECT
+            aggregated.source,
+            aggregated.selected_pairs,
+            aggregated.ingested_success,
+            aggregated.ingested_failed,
+            aggregated.pending_ingestion,
+            aggregated.latest_ingestion,
+            round(
+                ifNull(aggregated.ingested_success, 0) / nullIf(aggregated.selected_pairs, 0),
+                3
+            ) AS ingestion_coverage
+        FROM (
+            SELECT
+                s.source AS source,
+                uniqExact(tuple(s.dataset_id, s.topic_id)) AS selected_pairs,
+                uniqExactIf(tuple(s.dataset_id, s.topic_id), p.status = 'success') AS ingested_success,
+                uniqExactIf(tuple(s.dataset_id, s.topic_id), p.status != 'success' AND p.status IS NOT NULL) AS ingested_failed,
+                uniqExactIf(tuple(s.dataset_id, s.topic_id), p.status IS NULL) AS pending_ingestion,
+                maxOrNull(p.last_ingestion) AS latest_ingestion
+            FROM selected AS s
+            LEFT JOIN payloads AS p
+                ON s.source = p.source
+               AND s.dataset_id = p.dataset_id
+               AND s.topic_id = p.topic_id
+            {filter_clause}
+            GROUP BY s.source
+        ) AS aggregated
+        ORDER BY aggregated.source
+    """
+
+    try:
+        return client.query_df(query, parameters=params or None)
+    except Exception:
+        # Table might be empty or undefined during first runs
+        return pd.DataFrame(
+            columns=[
+                "source",
+                "selected_pairs",
+                "ingested_success",
+                "ingested_failed",
+                "pending_ingestion",
+                "latest_ingestion",
+                "ingestion_coverage",
+            ]
+        )
+
+
 summary_df = load_summary()
 
 if summary_df.empty:
@@ -213,6 +283,27 @@ metric_cols[4].metric("Offen", format_number(unlabeled_datasets))
 metric_cols_2 = st.columns(2)
 metric_cols_2[0].metric("Abdeckung (klassifiziert)", f"{coverage_ratio * 100:.1f} %")
 metric_cols_2[1].metric("Abdeckung (gesamt behandelt)", f"{handled_ratio * 100:.1f} %")
+
+payload_summary = load_payload_coverage(tuple(selected_sources) if selected_sources else None)
+st.subheader("Ingestion der Topic-Payloads")
+if payload_summary.empty:
+    st.info("Noch keine Topic-Payloads in ClickHouse oder keine passenden Quellen ausgewählt.")
+else:
+    display_payload = payload_summary.copy()
+    display_payload["latest_ingestion"] = display_payload["latest_ingestion"].astype(str)
+    display_payload["ingestion_coverage"] = display_payload["ingestion_coverage"].fillna(0.0).map(lambda x: f"{x * 100:.1f} %")
+    display_payload = display_payload.rename(
+        columns={
+            "source": "Quelle",
+            "selected_pairs": "Ausgewählte Dataset-Topic-Paare",
+            "ingested_success": "Payloads erfolgreich",
+            "ingested_failed": "Payloads fehlgeschlagen",
+            "pending_ingestion": "Payloads offen",
+            "latest_ingestion": "Letzte Ingestion",
+            "ingestion_coverage": "Ingestion-Abdeckung",
+        }
+    )
+    st.dataframe(display_payload, use_container_width=True, hide_index=True)
 
 
 @st.cache_data(ttl=60)
