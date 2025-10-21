@@ -1,4 +1,3 @@
-import sys
 import logging
 from datetime import datetime, timedelta
 from typing import List
@@ -8,9 +7,9 @@ from airflow.decorators import task
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
 
-sys.path.append("/opt/airflow")
+from dags.utils.module_loader import load_module_main
 
-from pipeline.topic_selected_ingest import main as ingest_main  # noqa: E402
+ingest_main = load_module_main(__file__, "pipeline.topic_selected_ingest")
 
 
 default_args = {
