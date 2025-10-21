@@ -11,6 +11,7 @@ REQUIRED ENVIRONMENT VARIABLES OR AIRFLOW VARIABLES:
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
 from airflow.models import Variable
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 import logging
 import sys
 import os
@@ -341,6 +342,16 @@ def fetch_destatis_metadata_production():
             logger.error(f"Data validation failed: {e}")
             return {"validation_status": "failed", "error": str(e)}
 
+    @task.short_circuit(task_id="has_new_destatis_metadata")
+    def has_new_destatis_metadata(validation_result):
+        """Determine if this run ingested fresh Destatis metadata rows."""
+        new_records = validation_result.get("new_records", 0)
+        if new_records and new_records > 0:
+            logger.info("Detected %s new Destatis metadata rows.", new_records)
+            return True
+        logger.info("No new Destatis metadata detected for this run.")
+        return False
+
     # Define task flow
     test_task = test_api_connection()
     fetch_task = fetch_all_metadata(test_task)
@@ -348,6 +359,22 @@ def fetch_destatis_metadata_production():
     
     # Set up dependencies
     test_task >> fetch_task >> validate_task
+
+    trigger_guard = has_new_destatis_metadata(validate_task)
+
+    trigger_topic_pipeline = TriggerDagRunOperator(
+        task_id="trigger_topic_classifier_pipeline",
+        trigger_dag_id="topic_classifier_pipeline",
+        conf={
+            "sources": ["destatis"],
+            "since": "{{ data_interval_start.isoformat() }}",
+            "triggered_by": "fetch_destatis_metadata_production",
+            "new_metadata_count": "{{ (ti.xcom_pull(task_ids='validate_data', key='return_value') or {}).get('new_records', 0) }}",
+        },
+        wait_for_completion=False,
+    )
+
+    trigger_guard >> trigger_topic_pipeline
 
 # Instantiate the DAG
 fetch_destatis_metadata_production()

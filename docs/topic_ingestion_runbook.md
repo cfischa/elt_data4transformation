@@ -5,7 +5,7 @@ Operate the prototype workflow that converts topic classifier outputs into curat
 
 ## Prerequisites
 - ClickHouse reachable with credentials provided via environment variables (`CLICKHOUSE_HOST`, `CLICKHOUSE_USER`, etc.).
-- Classifier has populated `analytics.dataset_topics` (run `python -m pipeline.topic_classifier` if needed).
+- Metadata DAGs (`fetch_destatis_metadata_clean.py`, `fetch_gesis_metadata_dag.py`) now trigger `topic_classifier_pipeline_dag.py` whenever fresh metadata lands, which in turn runs the classifier and ingestion automatically.
 - `sql/create_topic_selected_payloads_table.sql` applied; the CLI does this automatically on start.
 
 ## Operator Steps
@@ -35,12 +35,13 @@ Operate the prototype workflow that converts topic classifier outputs into curat
    - Reuse `raw.ingestions` bookkeeping with explicit `run_id`.
    - Consider partitioning payloads by topic or date for query efficiency.
 4. **Automation**
-   - Link the Airflow DAG to classifier completion (e.g. TriggerDagRun or dataset-based scheduling).
+   - End-to-end trigger is live via `topic_classifier_pipeline_dag.py` → update dashboards/alerts to surface pipeline status.
    - Introduce idempotent checkpoints using `metadata_hash` and watermarks.
 5. **Testing**
    - Add unit tests for selection query wiring and source bucketing.
    - Implement integration tests using ClickHouse test container.
 6. **Observability**
+   - Surface pipeline health through existing GitHub Actions notifications or dashboards.
    - Add Grafana/alerting for ingestion latency and failure counts.
 7. **Documentation**
    - Update README and architecture diagrams once the end-to-end flow is fully implemented.

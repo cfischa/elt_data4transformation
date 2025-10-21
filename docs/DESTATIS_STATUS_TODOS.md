@@ -18,7 +18,7 @@
 | **Field Mapping** | ⚠️ **Basis-Schema vorhanden, Vervollständigung erforderlich**<br/>• ✅ **TableInfo Schema**: `table_id`, `table_name`, `description`, `updated_at`<br/>• ✅ **Dimension Mapping**: Key-Value Struktur für GENESIS Dimensionen<br/>• ✅ **Value Handling**: Numerische Werte mit NULL-Handling<br/>• ⚠️ **Incomplete**: Nur Grundstruktur für Tabelle `12411-0001`<br/>• ❌ **TODO**: Vollständiges Schema für alle verfügbaren Dimensionen<br/>• ❌ **TODO**: Metadata Enrichment (Einheiten, Beschreibungen)<br/>• ❌ **TODO**: Data Type Validation (Integer, Float, String)<br/>• **Datei**: `connectors/destatis_connector.py:170-220`<br/>• **Ziel-Schema**: ClickHouse-optimierte Spaltenstruktur |
 | **Paginierung** | ✅ **Production-Ready Implementation**<br/>• **Chunk Size**: 10.000 Records per Request (konfigurierbar)<br/>• **Memory Management**: Stream-Processing mit `chunk_size_mb` (default: 100MB)<br/>• **Async Pattern**: Async Iterator für große Datensätze<br/>• **Progress Tracking**: Logging von verarbeiteten Chunks<br/>• **Error Recovery**: Chunk-level Retry bei Fehlern<br/>• **ClickHouse Integration**: Batch-Insert optimiert<br/>• **Performance**: Memory-efficient für TB-scale Daten<br/>• **Config**: `chunk_size_mb`, `max_records_per_chunk` in `DestatisConfig`<br/>• **Datei**: `connectors/destatis_connector.py:fetch_table()` |
 | **Fehlerbehandlung** | ✅ **Enterprise-Grade Error Handling**<br/>• **Retry Logic**: 3 Attempts mit exponential backoff (2s, 4s, 8s)<br/>• **Rate Limiting**: 30 requests/minute mit automatic throttling<br/>• **HTTP Error Codes**: Spezifische Behandlung für 401, 429, 5xx<br/>• **Timeout Handling**: 30s request timeout, 120s total timeout<br/>• **Circuit Breaker**: Bei wiederholten Fehlern temporäre Deaktivierung<br/>• **Exception Types**: Custom exceptions für verschiedene Fehlertypen<br/>• **Logging Integration**: Strukturierte Error-Logs mit Context<br/>• **Recovery Strategies**: Automatic retry, fallback mechanisms<br/>• **Datei**: `connectors/base_connector.py:_make_request_with_retry()`<br/>• **Library**: tenacity für Retry-Decorator |
-| **Airflow DAG** | ❌ **TODO: Destatis-spezifische DAG erstellen**<br/>• **Template verfügbar**: `dags/extract_api_dag.py` als Basis<br/>• **Scheduling**: Täglich um 02:00 UTC (nach Destatis Updates)<br/>• **Dependencies**: ClickHouse Health Check → Extract → Transform → Quality Check<br/>• **Error Notifications**: Slack/Email bei Fehlschlägen<br/>• **SLA**: 4 Stunden für komplette Pipeline<br/>• **Retry Policy**: 2 Retries mit 30min Delay<br/>• **Data Validation**: Automatische Quality Checks nach Extract<br/>• **TODO Datei**: `dags/destatis_extract_dag.py`<br/>• **Sensor**: Prüfung auf neue Daten vor Extract<br/>• **Parallelization**: Multi-table extraction support |
+| **Airflow DAG** | ✅ **Metadata DAG aktiv**<br/>• `dags/fetch_destatis_metadata_clean.py`: wöchentliche Metadaten-Synchronisierung inkl. Validierung<br/>• `dags/topic_selected_ingest_dag.py`: nutzt Klassifizierungen für zielgerichtete Cube/Table-Extraktionen<br/>• `pipeline/topic_selected_ingest.py`: Destatis-Extractor wird hier getriggert<br/>• Vorheriges Proof-of-Concept `dags/destatis_extract_dag.py` wurde entfernt |
 | **Scraping XPath / CSS** | ❌ **Nicht implementiert (REST API fokussiert)**<br/>• **Aktueller Ansatz**: REST API Integration<br/>• **Fallback Option**: Web Scraping als Alternative bei API-Problemen<br/>• **Mögliche Tools**: Scrapy + BeautifulSoup4 + Selenium<br/>• **Target Elements**: Tabellen-Download Links, CSV/Excel Exports<br/>• **Anti-Detection**: Rotating User-Agents, Request Delays<br/>• **Data Sources**: GENESIS-Online Web-Interface als Backup<br/>• **Implementation Status**: Nicht erforderlich bei funktionierender API<br/>• **TODO bei API-Fail**: Scrapy Spider für Tabellen-Downloads<br/>• **Legal Check**: Robots.txt compliance erforderlich |
 | **Anti-Bot** | ✅ **Best Practice Implementation**<br/>• **User-Agent**: `BnB-Data4Transformation/1.0` (custom identifier)<br/>• **Rate Limiting**: 30 requests/minute (konservativ)<br/>• **Request Delays**: 2-5 Sekunden zwischen Requests<br/>• **Session Management**: Persistent HTTP connections<br/>• **Robots.txt**: Automatische Compliance-Prüfung<br/>• **IP Rotation**: Nicht implementiert (nicht erforderlich für API)<br/>• **Header Randomization**: Consistent headers für API-Kompatibilität<br/>• **Retry Behavior**: Exponential backoff bei Rate Limit (429)<br/>• **Monitoring**: Request-Rate Tracking und Alerting<br/>• **Compliance**: Respectful crawling practices |
 | **Cleaning Rules** | ⚠️ **Basis-Pipeline vorhanden, Destatis-Spezifika fehlen**<br/>• ✅ **JSON-stat Normalization**: Pivot-Transformation für OLAP Schema<br/>• ✅ **Encoding**: UTF-8 mit automatischem Fallback auf ISO-8859-1<br/>• ✅ **NULL Handling**: Destatis-spezifische NULL-Werte (`.`, `-`, `...`)<br/>• ✅ **Data Types**: Automatische Typ-Erkennung (String→Float→Integer)<br/>• ⚠️ **Incomplete**: Destatis-spezifische Bereinigungsregeln<br/>• ❌ **TODO**: Einheiten-Extraktion und -Normalisierung<br/>• ❌ **TODO**: Outlier Detection für statistische Daten<br/>• ❌ **TODO**: Duplikat-Erkennung basierend auf Dimensionen<br/>• **Datei**: `connectors/destatis_connector.py:_clean_destatis_data()`<br/>• **Target**: ClickHouse-optimierte Datentypen |
@@ -40,12 +40,12 @@
    □ Testen mit offiziellen Code-Beispielen
    ```
 
-2. **Airflow DAG Erstellung**
+2. **Airflow Orchestrierung**
    ```
-   □ Datei erstellen: dags/destatis_extract_dag.py
-   □ Scheduling konfigurieren (täglich/wöchentlich)
-   □ Error Handling für DAG
-   □ Notifications bei Fehlern
+   ☑ Metadaten-DAG aktiv: dags/fetch_destatis_metadata_clean.py
+   ☑ Topic-gesteuerte Extraktion: dags/topic_selected_ingest_dag.py
+   ☑ Trigger von Klassifizierer → Ingestion automatisieren (topic_classifier_pipeline_dag.py)
+   □ Notifications/Alerting weiter ausbauen
    ```
 
 ### **⚠️ Mittlere Priorität**
@@ -120,7 +120,7 @@ username="admin", password="asjrh25423sfa#+43qw56j"
 | **Connector** | `connectors/destatis_connector.py` | ✅ Implementiert |
 | **Tests** | `tests/integration/test_destatis_pipeline_e2e.py` | ✅ Bereit |
 | **Config** | `DestatisConfig` in connector | ✅ Vollständig |
-| **DAG** | `dags/destatis_extract_dag.py` | ❌ **TODO** |
+| **DAG** | `dags/fetch_destatis_metadata_clean.py` / `dags/topic_selected_ingest_dag.py` | ✅ Live & gepflegt |
 | **Documentation** | `docs/destatis_connector.md` | ❌ **TODO** |
 
 ---

@@ -5,6 +5,7 @@ Fetches all GESIS dataset metadata and saves to meta_data/gesis_metadata.json.
 
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 import logging
 import sys
 import os
@@ -179,6 +180,16 @@ def fetch_gesis_metadata_dag():
                 "message": f"Error: {str(e)}"
             }
 
+    @task.short_circuit(task_id="has_new_gesis_metadata")
+    def has_new_gesis_metadata(load_result: dict) -> bool:
+        """Return True when fresh GESIS metadata rows were ingested."""
+        new_rows = load_result.get("rows_loaded", 0)
+        if new_rows and new_rows > 0:
+            logger.info("Detected %s new GESIS metadata rows.", new_rows)
+            return True
+        logger.info("No new GESIS metadata detected for this run.")
+        return False
+
     # Task dependencies
     test_meta = fetch_10_metadata()
     test_result = load_metadata_clickhouse(test_meta)
@@ -186,7 +197,23 @@ def fetch_gesis_metadata_dag():
     proceed = should_proceed(check)
     all_meta = fetch_all_metadata()
     proceed >> all_meta
-    load_metadata_clickhouse(all_meta)
+    final_load = load_metadata_clickhouse.override(task_id="load_metadata_clickhouse_full")(all_meta)
+
+    trigger_guard = has_new_gesis_metadata(final_load)
+
+    trigger_topic_pipeline = TriggerDagRunOperator(
+        task_id="trigger_topic_classifier_pipeline",
+        trigger_dag_id="topic_classifier_pipeline",
+        conf={
+            "sources": ["gesis"],
+            "since": "{{ data_interval_start.isoformat() }}",
+            "triggered_by": "fetch_gesis_metadata",
+            "new_metadata_count": "{{ (ti.xcom_pull(task_ids='load_metadata_clickhouse_full', key='return_value') or {}).get('rows_loaded', 0) }}",
+        },
+        wait_for_completion=False,
+    )
+
+    trigger_guard >> trigger_topic_pipeline
 
 # Instantiate the DAG
 gesis_metadata_dag = fetch_gesis_metadata_dag()

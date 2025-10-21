@@ -31,8 +31,13 @@ Helper SQL artifacts:
 ## Orchestration & Monitoring
 - Airflow DAGs (`dags/`):
   - `fetch_destatis_metadata_clean.py`: weekly metadata ingestion into `raw.destatis_metadata`.
-  - `destatis_extract_dag.py`: proof-of-concept cube extraction referencing metadata selections.
-  - `load_clickhouse_dag.py`: shared schema bootstrap and raw ingestion bookkeeping.
+  - `fetch_gesis_metadata_dag.py`: daily SPARQL crawl into `raw.gesis_metadata`.
+  - `dawum_ingest_dag.py`: daily polling data load into `raw.dawum_polls`.
+  - `topic_classifier_pipeline_dag.py`: triggered whenever metadata DAGs ingest new records; runs classifier then ingestion.
+  - `topic_selected_ingest_dag.py`: drives post-classification extraction using `pipeline/topic_selected_ingest.py` (triggered by the pipeline DAG).
+  - `dbt_transform_dag.py`: orchestrates ClickHouse transformations and tests.
+- Legacy scaffolds for cube extraction and generic loaders have been removed; favor topic-driven ingestion and dbt orchestration going forward.
+- Metadata DAGs short-circuit when no fresh rows are ingested, ensuring the classifier pipeline only runs when new content arrives.
 - Streamlit Insights (`streamlit_app/pages/3_Topic_Browser.py`):
   - Surfaces coverage of `dataset_topics`, `dataset_topics_review`, and `dataset_topics_excluded`.
   - Includes user messaging pointing to `python -m pipeline.topic_classifier`.

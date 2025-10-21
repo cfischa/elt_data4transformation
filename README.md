@@ -226,11 +226,12 @@ make extract-destatis TABLES="12411-0001,12411-0002" AREA="de" START_YEAR="2020"
 ├── Makefile                  # Common development tasks
 ├── 
 ├── dags/                     # Airflow DAG definitions
-│   ├── extract_api_dag.py    # API data extraction
-│   ├── extract_scrape_dag.py # Web scraping jobs
-│   ├── load_clickhouse_dag.py # Data loading
-│   ├── dbt_transform_dag.py  # dbt transformations
-│   └── dbt_transformation_dag.py # dbt orchestration
+│   ├── dawum_ingest_dag.py            # DAWUM polling ingestion
+│   ├── fetch_destatis_metadata_clean.py # Weekly Destatis metadata crawl
+│   ├── fetch_gesis_metadata_dag.py    # Daily GESIS metadata crawl
+│   ├── topic_classifier_pipeline_dag.py # Triggers classifier + ingestion on new metadata
+│   ├── topic_selected_ingest_dag.py   # Topic-based dataset extraction runner
+│   └── dbt_transform_dag.py           # dbt transformations
 ├── 
 ├── connectors/               # Data source connectors
 │   ├── __init__.py

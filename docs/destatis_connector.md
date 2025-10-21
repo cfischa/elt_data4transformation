@@ -142,15 +142,14 @@ asyncio.run(fetch_data())
 
 ### Airflow DAG
 
-The production DAG (`destatis_extract_dag.py`) includes:
-- Daily execution at 03:00 Europe/Berlin timezone
-- Login check sensor to verify authentication
-- Configurable table list via Airflow Variables
-- Error handling and notifications
+- `fetch_destatis_metadata_clean.py`: weekly metadata crawl that authenticates against GENESIS REST, hydrates `raw.destatis_metadata`, and validates row counts.
+- `topic_classifier_pipeline_dag.py`: triggered when metadata ingestion loads new rows; runs the classifier followed by topic-selected ingestion.
+- `topic_selected_ingest_dag.py`: downstream runner (triggered by the classifier pipeline) that reads classifier selections and uses the connector to fetch requested cubes/tables on demand.
+- The earlier prototype `destatis_extract_dag.py` has been retired; reuse the topic-selected flow for curated dataset pulls.
 
-Required Airflow Variables:
-- `DESTATIS_TOKEN` - API token
-- `DESTATIS_TABLES` - Comma-separated list of table IDs (optional, defaults to "12411-0001,12411-0002")
+Required Airflow Variables / connections:
+- `DESTATIS_API_KEY` or `DESTATIS_TOKEN` - API token (alternatively `DESTATIS_USER` / `DESTATIS_PASS`).
+- Optional `TOPIC_INGEST_*` variables consumed by `topic_selected_ingest_dag.py` to scope extraction runs.
 
 ## Error Handling
 
