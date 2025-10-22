@@ -29,7 +29,9 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     orjson = None
 
 from connectors.destatis_connector import DestatisConnector, DestatisConfig
+from connectors.eurostat_connector import EurostatConnector
 from connectors.gesis_connector import GESISConnector
+from connectors.soep_connector import SOEPConnector
 from elt.loader_clickhouse import ClickHouseLoader
 
 LOGGER = logging.getLogger("topic_selected_ingest")
@@ -152,7 +154,11 @@ def ensure_payload_table(loader: ClickHouseLoader) -> None:
     if not ddl_path.exists():
         LOGGER.warning("DDL file missing: %s", ddl_path)
         return
-    statements = [stmt.strip() for stmt in ddl_path.read_text(encoding="utf-8").split(";") if stmt.strip()]
+    statements = [
+        stmt.strip()
+        for stmt in ddl_path.read_text(encoding="utf-8").split(";")
+        if stmt.strip()
+    ]
     for statement in statements:
         loader.client.command(statement)
 
@@ -200,7 +206,9 @@ async def _extract_destatis(selections: Sequence[Selection]) -> List[IngestionRe
                     cube_exc,
                 )
                 try:
-                    table_path = await connector.fetch_table(selection.dataset_id, fmt="csv")
+                    table_path = await connector.fetch_table(
+                        selection.dataset_id, fmt="csv"
+                    )
                     if not table_path.exists():
                         raise FileNotFoundError(f"Table file missing: {table_path}")
                     payload_text = await asyncio.to_thread(
@@ -211,12 +219,18 @@ async def _extract_destatis(selections: Sequence[Selection]) -> List[IngestionRe
                     try:
                         await asyncio.to_thread(table_path.unlink, True)
                     except Exception:
-                        LOGGER.debug("Temporary file %s could not be removed", table_path)
+                        LOGGER.debug(
+                            "Temporary file %s could not be removed", table_path
+                        )
                 except Exception as exc:  # pragma: no cover - defensive
                     status = "failed"
                     error_message = str(exc)
                     payload_text = error_message
-                    LOGGER.exception("Destatis extraction failed for %s: %s", selection.dataset_id, exc)
+                    LOGGER.exception(
+                        "Destatis extraction failed for %s: %s",
+                        selection.dataset_id,
+                        exc,
+                    )
 
             completed_ts = datetime.utcnow()
             records.append(
@@ -251,12 +265,122 @@ async def _extract_gesis(selections: Sequence[Selection]) -> List[IngestionRecor
             try:
                 metadata = await connector.get_metadata(selection.dataset_id)
                 payload_text = _to_json_text(metadata)
-                record_count = len(metadata.get("properties", {})) if isinstance(metadata, dict) else 0
+                record_count = (
+                    len(metadata.get("properties", {}))
+                    if isinstance(metadata, dict)
+                    else 0
+                )
             except Exception as exc:  # pragma: no cover - defensive
                 status = "failed"
                 error_message = str(exc)
                 payload_text = error_message
-                LOGGER.exception("GESIS extraction failed for %s: %s", selection.dataset_id, exc)
+                LOGGER.exception(
+                    "GESIS extraction failed for %s: %s", selection.dataset_id, exc
+                )
+
+            completed_ts = datetime.utcnow()
+            records.append(
+                IngestionRecord(
+                    selection=selection,
+                    payload_format="json",
+                    payload=payload_text,
+                    records_count=record_count,
+                    ingestion_status=status,
+                    ingestion_started_at=start_ts,
+                    ingestion_completed_at=completed_ts,
+                    error_message=error_message,
+                )
+            )
+    return records
+
+
+async def _extract_soep(selections: Sequence[Selection]) -> List[IngestionRecord]:
+    """Extract SOEP indicator observations for selections."""
+
+    records: List[IngestionRecord] = []
+    if not selections:
+        return records
+
+    async with SOEPConnector() as connector:
+        for selection in selections:
+            start_ts = datetime.utcnow()
+            payload_text = ""
+            record_count = 0
+            status = "success"
+            error_message: Optional[str] = None
+
+            try:
+                async for payload in connector.fetch_data(
+                    datasets=[selection.dataset_id]
+                ):
+                    payload_text = _to_json_text(payload)
+                    record_count = len(payload.get("observations", []))
+                    break
+                if not payload_text:
+                    payload_text = _to_json_text(
+                        {
+                            "source": "soep",
+                            "dataset": selection.dataset_id,
+                            "observations": [],
+                        }
+                    )
+            except Exception as exc:  # pragma: no cover - defensive
+                status = "failed"
+                error_message = str(exc)
+                payload_text = error_message
+                LOGGER.exception(
+                    "SOEP extraction failed for %s: %s", selection.dataset_id, exc
+                )
+
+            completed_ts = datetime.utcnow()
+            records.append(
+                IngestionRecord(
+                    selection=selection,
+                    payload_format="json",
+                    payload=payload_text,
+                    records_count=record_count,
+                    ingestion_status=status,
+                    ingestion_started_at=start_ts,
+                    ingestion_completed_at=completed_ts,
+                    error_message=error_message,
+                )
+            )
+
+    return records
+
+
+async def _extract_eurostat(selections: Sequence[Selection]) -> List[IngestionRecord]:
+    """Extract Eurostat datasets as JSON payloads."""
+
+    records: List[IngestionRecord] = []
+    if not selections:
+        return records
+
+    async with EurostatConnector() as connector:
+        for selection in selections:
+            start_ts = datetime.utcnow()
+            payload_text = ""
+            record_count = 0
+            status = "success"
+            error_message: Optional[str] = None
+
+            try:
+                result = await connector.fetch_dataset(selection.dataset_id)
+                payload_text = _to_json_text(
+                    {
+                        "dataset_id": result.get("dataset_id"),
+                        "metadata": result.get("metadata"),
+                        "records": result.get("records"),
+                        "fetched_at": result.get("fetched_at"),
+                        "raw_path": result.get("raw_path"),
+                    }
+                )
+                record_count = len(result.get("records") or [])
+            except Exception as exc:  # pragma: no cover - defensive
+                status = "failed"
+                error_message = str(exc)
+                payload_text = error_message
+                LOGGER.exception("Eurostat extraction failed for %s: %s", selection.dataset_id, exc)
 
             completed_ts = datetime.utcnow()
             records.append(
@@ -284,8 +408,14 @@ async def _run_extractions(buckets: Dict[str, List[Selection]]) -> List[Ingestio
             all_records.extend(await _extract_destatis(items))
         elif source_lower == "gesis":
             all_records.extend(await _extract_gesis(items))
+        elif source_lower == "eurostat":
+            all_records.extend(await _extract_eurostat(items))
+        elif source_lower == "soep":
+            all_records.extend(await _extract_soep(items))
         else:
-            LOGGER.warning("No extractor registered for source '%s'; marking as failed", source)
+            LOGGER.warning(
+                "No extractor registered for source '%s'; marking as failed", source
+            )
             timestamp = datetime.utcnow()
             for selection in items:
                 all_records.append(
@@ -303,7 +433,9 @@ async def _run_extractions(buckets: Dict[str, List[Selection]]) -> List[Ingestio
     return all_records
 
 
-def dispatch_to_sources(buckets: Dict[str, List[Selection]], dry_run: bool) -> List[IngestionRecord]:
+def dispatch_to_sources(
+    buckets: Dict[str, List[Selection]], dry_run: bool
+) -> List[IngestionRecord]:
     """Execute extraction per source and return prepared ingestion records."""
     if dry_run:
         for source, items in buckets.items():
@@ -322,7 +454,9 @@ def dispatch_to_sources(buckets: Dict[str, List[Selection]], dry_run: bool) -> L
     return asyncio.run(_run_extractions(buckets))
 
 
-def persist_records(loader: ClickHouseLoader, run_id: uuid.UUID, records: Sequence[IngestionRecord]) -> None:
+def persist_records(
+    loader: ClickHouseLoader, run_id: uuid.UUID, records: Sequence[IngestionRecord]
+) -> None:
     """Persist ingestion records into ClickHouse."""
     if not records:
         return
@@ -372,14 +506,35 @@ def persist_records(loader: ClickHouseLoader, run_id: uuid.UUID, records: Sequen
 
 
 def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Ingest topic-selected datasets into ClickHouse.")
-    parser.add_argument("--sources", nargs="*", help="Filter to specific metadata sources (e.g. destatis, gesis).")
-    parser.add_argument("--topics", nargs="*", help="Filter to specific topic identifiers.")
+    parser = argparse.ArgumentParser(
+        description="Ingest topic-selected datasets into ClickHouse."
+    )
+    parser.add_argument(
+        "--sources",
+        nargs="*",
+        help="Filter to specific metadata sources (e.g. destatis, gesis, soep).",
+    )
+    parser.add_argument(
+        "--topics", nargs="*", help="Filter to specific topic identifiers."
+    )
     parser.add_argument("--since", help="ISO timestamp to limit classifier decisions.")
-    parser.add_argument("--limit", type=int, help="Maximum number of selections to process.")
-    parser.add_argument("--min-score", type=float, default=DEFAULT_THRESHOLD, help="Minimum classifier score to accept.")
-    parser.add_argument("--dry-run", action="store_true", help="Print selections without triggering extraction.")
-    parser.add_argument("--log-level", default="INFO", help="Logging level (default: INFO).")
+    parser.add_argument(
+        "--limit", type=int, help="Maximum number of selections to process."
+    )
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=DEFAULT_THRESHOLD,
+        help="Minimum classifier score to accept.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print selections without triggering extraction.",
+    )
+    parser.add_argument(
+        "--log-level", default="INFO", help="Logging level (default: INFO)."
+    )
     return parser.parse_args(argv)
 
 
@@ -413,7 +568,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         LOGGER.info("No selections found matching the filters.")
         return 0
 
-    LOGGER.info("Loaded %d selection(s) across %d source(s)", len(selections), len({sel.source for sel in selections}))
+    LOGGER.info(
+        "Loaded %d selection(s) across %d source(s)",
+        len(selections),
+        len({sel.source for sel in selections}),
+    )
 
     buckets = bucket_by_source(selections)
     records = dispatch_to_sources(buckets, dry_run=args.dry_run)

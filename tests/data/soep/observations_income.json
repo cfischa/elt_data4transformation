@@ -1,0 +1,41 @@
+{
+  "data": [
+    {
+      "year": 2019,
+      "value": 22050.4,
+      "sex": "Total",
+      "age_group": "Total",
+      "region": "Germany",
+      "unit": "EUR",
+      "note": null
+    },
+    {
+      "year": 2020,
+      "value": 22410.7,
+      "sex": "Total",
+      "age_group": "Total",
+      "region": "Germany",
+      "unit": "EUR",
+      "note": "Provisional"
+    },
+    {
+      "year": 2022,
+      "value": 23105.9,
+      "sex": "Total",
+      "age_group": "Total",
+      "region": "Germany",
+      "unit": "EUR",
+      "note": null
+    }
+  ],
+  "links": {
+    "next": null,
+    "prev": null
+  },
+  "meta": {
+    "current_page": 1,
+    "per_page": 100,
+    "total_pages": 1,
+    "total_count": 3
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "dataset": {
+    "code": "nama_10_gdp",
+    "label": "GDP and main components",
+    "description": "Gross domestic product at market prices",
+    "lastUpdate": "2024-01-15T10:00:00Z",
+    "contact": [
+      {
+        "name": "Eurostat Support",
+        "email": "estat-helpdesk@ec.europa.eu"
+      }
+    ],
+    "keywords": ["gdp", "economy", "national accounts"],
+    "themes": ["economy_and_finance"],
+    "unit": "MIO_EUR"
+  },
+  "dimension": {
+    "id": ["geo", "time", "na_item"],
+    "size": [2, 2, 1],
+    "geo": {
+      "label": "Geopolitical entity",
+      "category": {
+        "index": {
+          "DE": 0,
+          "FR": 1
+        },
+        "label": {
+          "DE": "Germany",
+          "FR": "France"
+        }
+      }
+    },
+    "time": {
+      "label": "Time",
+      "category": {
+        "index": {
+          "2020": 0,
+          "2021": 1
+        }
+      }
+    },
+    "na_item": {
+      "label": "National accounts indicator",
+      "category": {
+        "index": {
+          "B1GQ": 0
+        },
+        "label": {
+          "B1GQ": "Gross domestic product at market prices"
+        }
+      }
+    }
+  }
+}

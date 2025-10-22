@@ -29,7 +29,7 @@
 Production-grade ELT pipeline for political polling and socioeconomic data aggregation. Built with modern Python, Airflow orchestration, ClickHouse analytics warehouse, and dbt transformations.
 
 ### Key Features
-- **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS ✅, SOEP
+- **Async API Connectors**: DAWUM ✅, Destatis 🚧, Eurostat, GESIS ✅, SOEP ✅
 - **Web Scraping**: Scrapy framework for sites without APIs
 - **Object Storage**: Local filesystem for raw data (MinIO removed)
 - **Analytics Warehouse**: ClickHouse for high-performance analytics
@@ -182,6 +182,33 @@ airflow dags trigger fetch_gesis_metadata
 # Check extracted data in ClickHouse
 docker exec clickhouse clickhouse-client --query "SELECT COUNT(*) FROM raw.gesis_metadata"
 # Expected: ~9,176+ research datasets
+```
+
+### SOEP Monitor API ✅
+The SOEP Monitor exposes open indicator metadata and aggregated time-series derived from the German Socio-Economic Panel via a public JSON API.
+
+**API Status:** Production-ready (updated October 21, 2025)
+- ✅ Async connector with metadata + observation streaming
+- ✅ Daily Airflow DAG (`fetch_soep_metadata`) populating `raw.soep_metadata`
+- ✅ ClickHouse loader with ReplacingMergeTree upserts
+- ✅ Unified metadata view + topic classifier integration
+
+**Features:**
+- Anonymous access to `https://monitor.soep.de/api/v1`
+- Indicator detail includes topics, dimensions, units, and methodology notes
+- Paginated observation endpoint with optional dimension filters
+- Loader stores raw summaries + detailed payloads for downstream auditing
+
+**Usage:**
+```bash
+# Trigger SOEP metadata extraction DAG
+airflow dags trigger fetch_soep_metadata
+
+# Inspect loaded indicators in ClickHouse
+docker exec clickhouse clickhouse-client --query "SELECT COUNT(*) FROM raw.soep_metadata"
+
+# Explore combined canonical metadata
+docker exec clickhouse clickhouse-client --query "SELECT source, count() FROM analytics.datasets_unified GROUP BY source"
 ```
 
 ### GENESIS-Online (Destatis) API

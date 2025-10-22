@@ -1,0 +1,55 @@
+{
+  "data": [
+    {
+      "id": 101,
+      "slug": "income-distribution",
+      "title": "Household income (median)",
+      "subtitle": "Median equivalised household income",
+      "short_description": "Median equivalised disposable household income in euros.",
+      "topics": [
+        {"id": "income", "title": "Income and Living Conditions"},
+        {"id": "inequality", "title": "Inequality"}
+      ],
+      "dimensions": {
+        "sex": ["Total", "Male", "Female"],
+        "age_group": ["Total", "25-34", "35-44", "45-54", "55-64"],
+        "region": ["Germany", "East Germany", "West Germany"]
+      },
+      "unit": "EUR (2020 prices)",
+      "source": "SOEP-Core v38",
+      "last_updated_at": "2024-03-12T09:30:00Z",
+      "notes": "Real household income, CPI adjusted.",
+      "has_microdata": false
+    },
+    {
+      "id": 102,
+      "slug": "life-satisfaction",
+      "title": "Life satisfaction",
+      "subtitle": "Average life satisfaction (0-10)",
+      "short_description": "Mean reported life satisfaction on a scale from 0 to 10.",
+      "topics": [
+        {"id": "wellbeing", "title": "Subjective Wellbeing"}
+      ],
+      "dimensions": {
+        "sex": ["Total", "Male", "Female"],
+        "age_group": ["Total", "18-29", "30-49", "50-64", "65+"],
+        "region": ["Germany"]
+      },
+      "unit": "Index (0-10)",
+      "source": "SOEP-Core v38",
+      "last_updated_at": "2024-04-02T11:00:00Z",
+      "notes": null,
+      "has_microdata": false
+    }
+  ],
+  "links": {
+    "next": "https://monitor.soep.de/api/v1/indicators?page=2",
+    "prev": null
+  },
+  "meta": {
+    "current_page": 1,
+    "per_page": 50,
+    "total_pages": 10,
+    "total_count": 500
+  }
+}

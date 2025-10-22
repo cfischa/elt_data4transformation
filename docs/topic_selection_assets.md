@@ -7,7 +7,7 @@ This note consolidates the existing components that feed the post-classification
 - `analytics.dataset_topics_review`: low confidence candidates for manual triage (`sql/create_dataset_topics_review_table.sql`).
 - `analytics.dataset_topics_excluded`: excluded datasets keyed by topic and exclusion terms (`sql/create_dataset_topics_excluded_table.sql`).
 - `analytics.topic_classifier_runs`: execution metrics for the rule-based classifier (`sql/create_topic_classifier_runs_table.sql`).
-- `analytics.datasets_unified`: canonical metadata view sourcing `raw.destatis_metadata` and `raw.gesis_metadata` (`sql/create_datasets_unified_view.sql`).
+- `analytics.datasets_unified`: canonical metadata view sourcing `raw.destatis_metadata`, `raw.gesis_metadata`, and `raw.soep_metadata` (`sql/create_datasets_unified_view.sql`).
 - `raw.topic_selected_payloads`: proposed storage for topic-aligned raw dataset payloads (`sql/create_topic_selected_payloads_table.sql`).
 
 Helper SQL artifacts:
@@ -25,6 +25,7 @@ Helper SQL artifacts:
 ## Connector & Loader Building Blocks
 - `connectors/destatis_connector.py`: async GENESIS cube discovery/extraction supporting incremental pulls.
 - `connectors/gesis_connector.py`: SPARQL-based metadata fetcher for research datasets.
+- `connectors/soep_connector.py`: SOEP Monitor API client streaming indicator metadata and observations.
 - `elt/loader_clickhouse.py`: handles ClickHouse connections, schema bootstrap, and batch inserts (`insert_json_data`, `insert_dataframe`).
 - `elt/adapters/metadata.py`: canonicalises heterogeneous source metadata and computes `metadata_hash`.
 
@@ -32,6 +33,7 @@ Helper SQL artifacts:
 - Airflow DAGs (`dags/`):
   - `fetch_destatis_metadata_clean.py`: weekly metadata ingestion into `raw.destatis_metadata`.
   - `fetch_gesis_metadata_dag.py`: daily SPARQL crawl into `raw.gesis_metadata`.
+  - `fetch_soep_metadata_dag.py`: daily SOEP Monitor metadata ingestion into `raw.soep_metadata`.
   - `dawum_ingest_dag.py`: daily polling data load into `raw.dawum_polls`.
   - `topic_classifier_pipeline_dag.py`: triggered whenever metadata DAGs ingest new records; runs classifier then ingestion.
   - `topic_selected_ingest_dag.py`: drives post-classification extraction using `pipeline/topic_selected_ingest.py` (triggered by the pipeline DAG).

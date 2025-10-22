@@ -71,9 +71,7 @@ def load_taxonomy(path: Path) -> Tuple[str, List[TopicRule]]:
                 (
                     str(hint.get("source", "")).lower(),
                     str(
-                        hint.get("dataset_id")
-                        or hint.get("dataset_id_pattern")
-                        or ""
+                        hint.get("dataset_id") or hint.get("dataset_id_pattern") or ""
                     ).lower(),
                 )
             )
@@ -117,7 +115,9 @@ def ensure_schema(loader: ClickHouseLoader) -> None:
             raise
 
 
-def _rows_to_dicts(column_names: Sequence[str], rows: Sequence[Sequence[Any]]) -> List[Dict[str, Any]]:
+def _rows_to_dicts(
+    column_names: Sequence[str], rows: Sequence[Sequence[Any]]
+) -> List[Dict[str, Any]]:
     return [dict(zip(column_names, row)) for row in rows]
 
 
@@ -132,7 +132,9 @@ def fetch_metadata_via_view(
     params: Dict[str, Any] = {}
 
     if since:
-        clauses.append("(latest_update >= parseDateTimeBestEffort(%(since)s) OR latest_update IS NULL)")
+        clauses.append(
+            "(latest_update >= parseDateTimeBestEffort(%(since)s) OR latest_update IS NULL)"
+        )
         params["since"] = since
     if sources:
         clauses.append("source IN %(sources)s")
@@ -189,7 +191,11 @@ def fetch_metadata_with_adapters(
     limit: Optional[int],
 ) -> List[CanonicalDatasetMetadata]:
     """Fallback metadata fetch that uses source-specific adapters."""
-    wanted_sources = set(src.lower() for src in sources) if sources else {"destatis", "gesis"}
+    wanted_sources = (
+        set(src.lower() for src in sources)
+        if sources
+        else {"destatis", "gesis", "eurostat", "soep"}
+    )
     collected: List[CanonicalDatasetMetadata] = []
 
     if "destatis" in wanted_sources:
@@ -222,7 +228,9 @@ def fetch_metadata_with_adapters(
         clauses = []
         params = {}
         if since:
-            clauses.append("tryParseDateTimeBestEffortOrNull(issued) >= parseDateTimeBestEffort(%(since)s)")
+            clauses.append(
+                "tryParseDateTimeBestEffortOrNull(issued) >= parseDateTimeBestEffort(%(since)s)"
+            )
             params["since"] = since
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         limit_clause = f"LIMIT {int(limit)}" if limit else ""
@@ -243,6 +251,63 @@ def fetch_metadata_with_adapters(
         result = loader.client.query(query, parameters=params or None)
         for row in _rows_to_dicts(result.column_names, result.result_rows):
             collected.append(canonicalize_metadata("gesis", row))
+
+    if "eurostat" in wanted_sources:
+        clauses = []
+        params = {}
+        if since:
+            clauses.append("last_update >= parseDateTimeBestEffort(%(since)s)")
+            params["since"] = since
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_clause = f"LIMIT {int(limit)}" if limit else ""
+        query = f"""
+            SELECT
+                dataset_code,
+                title,
+                description,
+                last_update,
+                keywords,
+                themes,
+                dimensions,
+                values_count,
+                fetched_at,
+                raw_metadata
+            FROM raw.eurostat_metadata
+            {where}
+            ORDER BY dataset_code
+            {limit_clause}
+        """
+        result = loader.client.query(query, parameters=params or None)
+        for row in _rows_to_dicts(result.column_names, result.result_rows):
+            collected.append(canonicalize_metadata("eurostat", row))
+
+    if "soep" in wanted_sources:
+        clauses = []
+        params = {}
+        if since:
+            clauses.append("ingestion_time >= parseDateTimeBestEffort(%(since)s)")
+            params["since"] = since
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_clause = f"LIMIT {int(limit)}" if limit else ""
+        query = f"""
+            SELECT
+                slug,
+                title,
+                description,
+                topics,
+                dimensions,
+                available_years,
+                last_updated_at,
+                raw_summary,
+                raw_detail
+            FROM raw.soep_metadata
+            {where}
+            ORDER BY slug
+            {limit_clause}
+        """
+        result = loader.client.query(query, parameters=params or None)
+        for row in _rows_to_dicts(result.column_names, result.result_rows):
+            collected.append(canonicalize_metadata("soep", row))
 
     return collected
 
@@ -279,7 +344,9 @@ def classify_dataset(
     exclusion_candidates: List[Dict[str, Any]] = []
 
     for rule in rules:
-        exclude_hits = [term for term in rule.exclude_terms if term and term in text_blob]
+        exclude_hits = [
+            term for term in rule.exclude_terms if term and term in text_blob
+        ]
         if exclude_hits:
             exclusion_candidates.append(
                 {
@@ -318,7 +385,9 @@ def classify_dataset(
         score += min(0.2, 0.1 * len(matched_synonym_terms))
         score = min(1.0, score)
 
-        matched_terms = matched_hint_terms + matched_include_terms + matched_synonym_terms
+        matched_terms = (
+            matched_hint_terms + matched_include_terms + matched_synonym_terms
+        )
         rationale = f"Matched terms: {', '.join(matched_terms)}"
         record = {
             "topic_id": rule.topic_id,
@@ -463,21 +532,46 @@ def persist_results(
 
 def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run rule-based topic classifier.")
-    parser.add_argument("--taxonomy", type=Path, default=Path("config/topics/taxonomy.yml"), help="Path to taxonomy YAML.")
-    parser.add_argument("--sources", nargs="*", help="Optional list of sources to limit classification to.")
-    parser.add_argument("--since", help="ISO timestamp to only process updated datasets.")
-    parser.add_argument("--limit", type=int, help="Limit total datasets processed (for testing).")
-    parser.add_argument("--dry-run", action="store_true", help="Do not persist results; print summary instead.")
-    parser.add_argument("--log-level", default="INFO", help="Logging level (default: INFO).")
+    parser.add_argument(
+        "--taxonomy",
+        type=Path,
+        default=Path("config/topics/taxonomy.yml"),
+        help="Path to taxonomy YAML.",
+    )
+    parser.add_argument(
+        "--sources",
+        nargs="*",
+        help="Optional list of sources to limit classification to.",
+    )
+    parser.add_argument(
+        "--since", help="ISO timestamp to only process updated datasets."
+    )
+    parser.add_argument(
+        "--limit", type=int, help="Limit total datasets processed (for testing)."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Do not persist results; print summary instead.",
+    )
+    parser.add_argument(
+        "--log-level", default="INFO", help="Logging level (default: INFO)."
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _parse_args(argv)
-    logging.basicConfig(stream=sys.stdout, level=getattr(logging, args.log_level.upper(), logging.INFO), format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
 
     taxonomy_version, topic_rules = load_taxonomy(args.taxonomy)
-    LOGGER.info("Loaded taxonomy version %s with %d topics", taxonomy_version, len(topic_rules))
+    LOGGER.info(
+        "Loaded taxonomy version %s with %d topics", taxonomy_version, len(topic_rules)
+    )
 
     started_at = datetime.utcnow()
     run_id = uuid.uuid4()
@@ -487,8 +581,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         with ClickHouseLoader() as loader:
             ensure_schema(loader)
-            metadata_items = load_canonical_metadata(loader, args.since, args.sources, args.limit)
-            LOGGER.info("Loaded %d metadata records for classification", len(metadata_items))
+            metadata_items = load_canonical_metadata(
+                loader, args.since, args.sources, args.limit
+            )
+            LOGGER.info(
+                "Loaded %d metadata records for classification", len(metadata_items)
+            )
 
             classifications: List[Dict[str, Any]] = []
             review_records: List[Dict[str, Any]] = []
@@ -496,7 +594,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             per_topic_counts = defaultdict(int)
 
             for metadata in metadata_items:
-                assignments, review_candidate, exclusion_candidate = classify_dataset(metadata, topic_rules)
+                assignments, review_candidate, exclusion_candidate = classify_dataset(
+                    metadata, topic_rules
+                )
                 if assignments:
                     decided_at = datetime.utcnow()
                     for match in assignments:
@@ -541,7 +641,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "Classification produced %d topic assignments across %d datasets"
                 " (review: %d, excluded: %d)",
                 len(classifications),
-                len({(c['source'], c['dataset_id']) for c in classifications}),
+                len({(c["source"], c["dataset_id"]) for c in classifications}),
                 len(review_records),
                 len(exclusion_records),
             )

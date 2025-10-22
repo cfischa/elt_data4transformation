@@ -1,0 +1,56 @@
+{
+  "data": {
+    "id": 101,
+    "slug": "income-distribution",
+    "title": "Household income (median)",
+    "subtitle": "Median equivalised household income",
+    "short_description": "Median equivalised disposable household income in euros.",
+    "long_description_html": "<p>The median of equivalised disposable household income expressed in 2020 euros. Based on SOEP-Core households with positive disposable income.</p>",
+    "topics": [
+      {"id": "income", "title": "Income and Living Conditions"},
+      {"id": "inequality", "title": "Inequality"}
+    ],
+    "dimensions": [
+      {
+        "dimension": "sex",
+        "label": "Sex",
+        "categories": [
+          {"value": "total", "label": "Total", "default": true},
+          {"value": "male", "label": "Men", "default": false},
+          {"value": "female", "label": "Women", "default": false}
+        ]
+      },
+      {
+        "dimension": "age_group",
+        "label": "Age group",
+        "categories": [
+          {"value": "total", "label": "Total", "default": true},
+          {"value": "25-34", "label": "25-34", "default": false},
+          {"value": "35-44", "label": "35-44", "default": false},
+          {"value": "45-54", "label": "45-54", "default": false},
+          {"value": "55-64", "label": "55-64", "default": false}
+        ]
+      },
+      {
+        "dimension": "region",
+        "label": "Region",
+        "categories": [
+          {"value": "germany", "label": "Germany", "default": true},
+          {"value": "east", "label": "East Germany", "default": false},
+          {"value": "west", "label": "West Germany", "default": false}
+        ]
+      }
+    ],
+    "unit": {
+      "label": "Euro (2020 prices)",
+      "description": "Values deflated to 2020 consumer prices"
+    },
+    "source": "SOEP-Core v38",
+    "methodology": "Income equivalence scale: OECD-modified.",
+    "last_updated_at": "2024-03-12T09:30:00Z",
+    "available_years": [1991, 1993, 1995, 1998, 2001, 2004, 2007, 2010, 2013, 2016, 2019, 2022],
+    "data_endpoints": {
+      "observations": "https://monitor.soep.de/api/v1/indicators/income-distribution/observations"
+    }
+  }
+}

@@ -55,6 +55,21 @@ async def test_destatis_connector():
         print(f"❌ Destatis connector failed: {e}")
         return False
 
+async def test_eurostat_connector():
+    """Test Eurostat API connector"""
+    try:
+        from connectors.eurostat_connector import EurostatConnector
+
+        connector = EurostatConnector()
+        assert hasattr(connector, 'list_datasets'), "Eurostat connector missing list_datasets method"
+        assert hasattr(connector, 'fetch_dataset'), "Eurostat connector missing fetch_dataset method"
+        assert hasattr(connector, 'fetch_data'), "Eurostat connector missing fetch_data method"
+        print("✅ Eurostat connector initialized successfully (API call test skipped)")
+        return True
+    except Exception as e:
+        print(f"❌ Eurostat connector failed: {e}")
+        return False
+
 def test_imports():
     """Test that all required packages can be imported"""
     imports_to_test = [
@@ -135,6 +150,9 @@ async def main():
     
     print("\n5. Testing Destatis connector:")
     destatis_ok = await test_destatis_connector()
+
+    print("\n6. Testing Eurostat connector:")
+    eurostat_ok = await test_eurostat_connector()
     
     # Summary
     print("\n" + "="*50)
@@ -144,8 +162,9 @@ async def main():
     print(f"   ClickHouse: {'✅' if clickhouse_ok else '❌'}")
     print(f"   DAWUM: {'✅' if dawum_ok else '❌'}")
     print(f"   Destatis: {'✅' if destatis_ok else '❌'}")
-    
-    all_ok = all([imports_ok, services_ok, clickhouse_ok, dawum_ok, destatis_ok])
+    print(f"   Eurostat: {'✅' if eurostat_ok else '❌'}")
+
+    all_ok = all([imports_ok, services_ok, clickhouse_ok, dawum_ok, destatis_ok, eurostat_ok])
     print(f"\n🎯 Overall status: {'✅ All systems operational!' if all_ok else '❌ Some issues found'}")
     
     return all_ok

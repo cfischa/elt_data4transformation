@@ -1,0 +1,37 @@
+{
+  "page": 1,
+  "pageSize": 2,
+  "total": 2345,
+  "datasets": [
+    {
+      "code": "nama_10_gdp",
+      "label": "GDP and main components",
+      "description": "Gross domestic product at market prices",
+      "lastUpdate": "2024-01-15T10:00:00Z",
+      "keywords": ["gdp", "economy"],
+      "themes": ["national_accounts"],
+      "valuesCount": 2048,
+      "dimensions": ["geo", "time", "na_item"],
+      "links": {
+        "self": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/datasets/nama_10_gdp"
+      }
+    },
+    {
+      "code": "demo_pjan",
+      "label": "Population on 1 January by age and sex",
+      "description": "Population as of 1 January classified by age and sex",
+      "lastUpdate": "2024-02-01T08:30:00Z",
+      "keywords": ["population", "demography"],
+      "themes": ["population"],
+      "valuesCount": 4096,
+      "dimensions": ["geo", "time", "age", "sex"],
+      "links": {
+        "self": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/datasets/demo_pjan"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/datasets?page=1&pageSize=2",
+    "next": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/datasets?page=2&pageSize=2"
+  }
+}

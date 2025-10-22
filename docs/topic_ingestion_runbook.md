@@ -5,7 +5,7 @@ Operate the prototype workflow that converts topic classifier outputs into curat
 
 ## Prerequisites
 - ClickHouse reachable with credentials provided via environment variables (`CLICKHOUSE_HOST`, `CLICKHOUSE_USER`, etc.).
-- Metadata DAGs (`fetch_destatis_metadata_clean.py`, `fetch_gesis_metadata_dag.py`) now trigger `topic_classifier_pipeline_dag.py` whenever fresh metadata lands, which in turn runs the classifier and ingestion automatically.
+- Metadata DAGs (`fetch_destatis_metadata_clean.py`, `fetch_gesis_metadata_dag.py`, `fetch_soep_metadata_dag.py`) now trigger `topic_classifier_pipeline_dag.py` whenever fresh metadata lands, which in turn runs the classifier and ingestion automatically.
 - `sql/create_topic_selected_payloads_table.sql` applied; the CLI does this automatically on start.
 
 ## Operator Steps
@@ -15,9 +15,9 @@ Operate the prototype workflow that converts topic classifier outputs into curat
    python -m pipeline.topic_selected_ingest --dry-run --log-level DEBUG --topics migration_einwanderung
    ```
    - Confirms available datasets and grouped sources.
-3. Process a limited batch (Destatis + GESIS extractors are available by default):
+3. Process a limited batch (Destatis, GESIS, and SOEP extractors are available by default):
    ```bash
-   python -m pipeline.topic_selected_ingest --sources destatis --limit 25 --since 2025-10-01T00:00:00
+   python -m pipeline.topic_selected_ingest --sources destatis soep --limit 25 --since 2025-10-01T00:00:00
    ```
 4. Monitor ClickHouse tables:
    - `SELECT COUNT(*) FROM raw.topic_selected_payloads;`
@@ -26,7 +26,7 @@ Operate the prototype workflow that converts topic classifier outputs into curat
 
 ## Follow-Up Tasks
 1. **Connector Coverage**
-   - Add extractors for additional sources (Eurostat, SOEP, web scraping).
+   - Add extractors for additional sources (Eurostat, web scraping).
    - Enhance existing handlers with chunking, incremental fetch, and richer record counts.
 2. **Error Handling & Retries**
    - Add per-source retry logic and status updates (`ingestion_status`).
