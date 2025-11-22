@@ -149,7 +149,7 @@ class DestatisConnector(BaseConnector):
     def _get_auth_params(self) -> Dict[str, str]:
         """Get authentication parameters for query string."""
         if self.config.api_token:
-            # Keep form-based auth as backup
+            # For token auth: token as username, empty password
             return {"username": self.config.api_token, "password": ""}
         elif self.config.username and self.config.password:
             return {"username": self.config.username, "password": self.config.password}
@@ -160,8 +160,9 @@ class DestatisConnector(BaseConnector):
         headers: Dict[str, str] = {}
         if self.config.api_token:
             headers["Authorization"] = f"Bearer {self.config.api_token}"
-            headers["X-API-Key"] = self.config.api_token
-            # Many GENESIS deployments accept credentials via custom headers
+            # headers["X-API-Key"] = self.config.api_token  # Not consistently used by GENESIS
+            
+            # CRITICAL: Official API requires token as username AND empty password header
             headers["username"] = self.config.api_token
             headers["password"] = ""
         elif self.config.username and self.config.password:

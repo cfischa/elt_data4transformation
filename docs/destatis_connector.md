@@ -232,10 +232,14 @@ import logging
 logging.getLogger('DestatisConnector').setLevel(logging.DEBUG)
 ```
 
-Check API response manually:
+Check API response manually (using token):
 ```bash
-curl -X POST "https://www-genesis.destatis.de/genesisWS/rest/2020/helloworld/logincheck" \
-  -d "username=YOUR_TOKEN&password=&format=JSON"
+# Verify token works (requires empty password and correct headers)
+curl -X POST "https://www-genesis.destatis.de/genesisWS/rest/2020/catalogue/cubes" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "username: YOUR_TOKEN" \
+  -H "password: " \
+  -d "username=YOUR_TOKEN&password=&paginatelength=1&format=json"
 ```
 
 ## Rate Limits and Best Practices

@@ -1,0 +1,139 @@
+---
+description: ALWAYS INCLUDE to HAVE Project Context.
+globs: 
+alwaysApply: true
+---
+# Memory Files Structure
+This outlines the fundamental principles, required files, workflow structure, and essential procedures that govern documentation, and maintaining a memory using file system.
+The Memory Files consists of required core files and optional context files. Files build upon each other in a clear hierarchy:
+```mermaid
+flowchart TD
+    SP[ [architecture.md](mdc:docs/architecture.md) ]
+    SP --> SS[ [SYSTEM_STATUS.md](mdc:docs/SYSTEM_STATUS.md) ]
+    SS --> ER[ [error-documentation.mdc](mdc:.cursor/rules/error-documentation.mdc)]
+    SS --> LL[ [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) ]
+```
+## Core Files (Required)
+  4 files: 
+  1. [architecture.md](mdc:docs/architecture.md) (docs/architecture.md): System architecture
+  - How it should work
+  - Component relationships
+  - Dependencies
+  - Work flow of the Solution
+  - Mermaid diagram of solution overview: each component and code flow
+
+  2. [SYSTEM_STATUS.md](mdc:docs/SYSTEM_STATUS.md) (docs/SYSTEM_STATUS.md): Current project status and active context
+  - Current work focus
+  - Active tasks and known issues
+  - Recent changes
+  - Next steps
+  - Replaces tasks/active_context.md and tasks/tasks_plan.md
+  
+  3. [error-documentation.mdc](mdc:.cursor/rules/error-documentation.mdc) (.cursor/rules/error-documentation.mdc): 
+  - During your interaction, if you find a fix to a mistake in this project or a correction you received reusable, you should take note in the @error-documentation.mdc file so you will not make the same mistake again.
+  - Known issues: their state, context, and resolution
+
+  4. [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) (.cursor/rules/lessons-learned.mdc): learning journal for each project
+  - It captures important patterns, preferences, and project intelligence
+  - It is detailed in @lessons-learned.mdc
+  
+  5. [formatting.mdc](mdc:.cursor/rules/formatting.mdc) (.cursor/rules/formatting.mdc): formatting rules for the project
+  - it specifies the formatting rules for the project.
+
+# Core Workflows
+Now we define the procedural workflows to read/write to these memory files.
+
+## PLAN or Architect MODE
+```mermaid
+flowchart TD
+    Start[Start] --> ReadFiles[Read Memory Files ("docs/architecture.md", "docs/SYSTEM_STATUS.md") ]
+    ReadFiles --> CheckFiles{Files Complete?}
+    
+    CheckFiles -->|No| Plan[Create Plan]
+    Plan --> DocumentChat[Document in Chat]
+    
+    CheckFiles -->|Yes| VerifyContext[Verify Context]
+    VerifyContext --> Strategy[Develop Strategy]
+    Strategy --> Present[Present Approach]
+    
+    Present --> Verification{Approach Verified?}
+
+    Verification -->|No| Clarify[Seek Clarification]
+    Clarify --> Strategy[Develop Strategy]
+
+    Verification -->|Yes| DocumentMemory[Document in Memory Files ("docs/architecture.md", "docs/SYSTEM_STATUS.md")]
+```
+
+## ACT or Code MODE
+```mermaid
+flowchart TD
+    Start[Start] --> Context[Check Memory Files ("docs/architecture.md", "docs/SYSTEM_STATUS.md") ]
+    Context --> Update[Update Documentation]
+    Update --> Rules[Update [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc), [error-documentation.mdc](mdc:.cursor/rules/error-documentation.mdc) if needed]
+    Rules --> Execute[Execute Task]
+    Execute --> Document[Document Changes in Memory Files ("docs/architecture.md", "docs/SYSTEM_STATUS.md") ]
+```
+
+# Documentation Updates
+
+Memory Files updates occur when:
+1. Discovering new project patterns
+2. After implementing significant changes
+3. When user requests with **update memory files** (MUST review ALL Core Files)
+4. When context needs clarification
+5. After significant part of Plan is verified
+
+```mermaid
+flowchart TD
+    Start[Update Process]
+    
+    subgraph Process
+        P1[Review Core Files]
+        P2[Document Current State in [SYSTEM_STATUS.md](mdc:docs/SYSTEM_STATUS.md) ]
+        P3[Clarify Next Steps and document in [SYSTEM_STATUS.md](mdc:docs/SYSTEM_STATUS.md) ]
+        P4[Update [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc), [error-documentation.mdc](mdc:.cursor/rules/error-documentation.mdc)]
+        P5 Update [ [architecture.md](mdc:docs/architecture.md) ]
+        
+        P1 --> P2 --> P3 --> P4
+    end
+    
+    Start --> Process
+```
+
+# Project Intelligence ( [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) [.cursor/rules/lessons-learned.mdc] )
+
+The [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) file is my learning journal for each project. It captures important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
+
+```mermaid
+flowchart TD
+    Start{Discover New Pattern}
+    
+    subgraph Learn [Learning Process]
+        D1[Identify Pattern]
+        D2[Validate with User]
+        D3[Document in [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) ]
+    end
+    
+    subgraph Apply [Usage]
+        A1[Read [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) ]
+        A2[Apply Learned Patterns]
+        A3[Improve Future Work]
+    end
+    
+    Start --> Learn
+    Learn --> Apply
+```
+
+## What to Capture
+- Critical implementation paths
+- User preferences and workflow
+- Project-specific patterns
+- Known challenges
+- Evolution of project decisions
+- Tool usage patterns
+
+The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of [lessons-learned.mdc](mdc:.cursor/rules/lessons-learned.mdc) as a living document that grows smarter as we work together.
+
+# MISC
+- Do not use/search files in archive/ directory besides being prompted to do so.
+- Make sure you have the conda environment activated before you start working on the project and execute the commands in the terminal.

@@ -1,0 +1,21 @@
+---
+description: directory structure to follow
+globs: 
+alwaysApply: false
+---  
+# Directory Structure
+```mermaid
+graph TD
+    root[bnb_data4transformation]
+    root --> config[config/]
+    root --> connectors[connectors/ - Data sources: Destatis, Eurostat, etc.]
+    root --> dags[dags/ - Airflow DAGs]
+    root --> data[data/ - Local data storage]
+    root --> dbt[dbt_project/ - dbt models and seeds]
+    root --> docker[docker/ - Docker configs]
+    root --> docs[docs/ - Documentation]
+    root --> elt[elt/ - Loading logic]
+    root --> pipe[pipeline/ - Topic classification pipeline]
+    root --> scrape[scraping/ - Scrapy spiders]
+    root --> stream[streamlit_app/ - Dashboard]
+```

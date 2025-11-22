@@ -1,0 +1,99 @@
+---
+description: defines the workflow for incorporating merge request (MR) feedback and review comments and GitLab MCP integration
+globs:
+alwaysApply: false
+---
+
+
+# MR Review Changes Workflow
+
+This rule defines the workflow for incorporating MR feedback and review comments using Cursor agents with GitLab MCP integration.
+
+## Overview
+
+When addressing merge request review feedback, always use the GitLab MCP to understand the full context of comments and systematically work through each item.
+
+## Workflow Steps
+
+### 1. Initial Information Gathering
+- **Use GitLab MCP** to fetch MR details and discussions
+- **Get complete context** with `mcp_GitLab-MCP_get_merge_request` and `mcp_GitLab-MCP_mr_discussions`
+- **Create comprehensive todo list** from all review comments using `todo_write`
+- **Organize by priority** and complexity
+
+### 2. Review Comment Analysis
+- **Parse all discussions** to understand reviewer intent
+- **Identify patterns** (duplicate code, consistency issues, performance improvements)
+- **Cross-reference** with codebase to find actual locations (line numbers may shift)
+- **Clarify ambiguous comments** by examining code context
+
+### 3. Systematic Implementation
+- **Work through todos one by one** as directed by user
+- **Mark progress** using `todo_write` with status updates (`pending` → `in_progress` → `completed`)
+- **Address root causes** not just symptoms (e.g., create unified methods vs fixing duplicates individually)
+- **Maintain backward compatibility** unless explicitly requested otherwise
+
+### 4. Quality Assurance
+- **Verify functional equivalence** after refactoring
+- **Test edge cases** and error handling
+- **Check for unintended side effects** 
+- **Use parallel tool calls** for efficient information gathering
+
+## Key Principles
+
+### Use GitLab MCP Integration
+```bash
+# Always start with fetching MR context
+mcp_GitLab-MCP_get_merge_request(project_id, merge_request_iid)
+mcp_GitLab-MCP_mr_discussions(project_id, merge_request_iid, per_page=100)
+```
+
+### Task Management
+- **Proactive todo creation** for complex multi-step reviews
+- **Real-time status updates** as work progresses
+- **Clear, actionable descriptions** that reference specific files/lines
+
+### Code Quality Focus
+- **Eliminate duplication** through unified methods
+- **Improve maintainability** while preserving functionality
+- **Follow project formatting rules** (% formatting vs f-strings, etc.)
+- **Enhance error handling** and logging consistency
+
+### Collaboration Approach
+- **Ask clarifying questions** when comments are ambiguous
+- **Suggest alternative solutions** when appropriate
+- **Explain trade-offs** and design decisions
+- **Confirm understanding** before implementing major refactors
+
+## Example Implementation Pattern
+
+```python
+# 1. Fetch MR context
+mr_data = mcp_GitLab-MCP_get_merge_request(project_id="13", merge_request_iid="8")
+discussions = mcp_GitLab-MCP_mr_discussions(project_id="13", merge_request_iid="8")
+
+# 2. Create comprehensive todo list
+todo_write(merge=false, todos=[
+    {"id": "mr8-duplicate-code", "content": "Refactor duplicate phase logic", "status": "pending"},
+    {"id": "mr8-imports", "content": "Clean up duplicate imports", "status": "pending"}
+])
+
+# 3. Work systematically through each item
+# Mark in-progress, implement, mark completed
+todo_write(merge=true, todos=[
+    {"id": "mr8-duplicate-code", "status": "in_progress"}
+])
+# ... implement changes ...
+todo_write(merge=true, todos=[
+    {"id": "mr8-duplicate-code", "status": "completed"}
+])
+```
+
+## Success Criteria
+
+- ✅ All review comments addressed systematically
+- ✅ Functional equivalence maintained after refactoring  
+- ✅ Code quality improvements beyond minimum requirements
+- ✅ Clear documentation of changes and trade-offs
+- ✅ Proactive identification of related improvements
+- ✅ Consistent formatting and style throughout

@@ -1,0 +1,30 @@
+---
+alwaysApply: true
+---
+# Formatting Rules
+Use Google Style for Python code. https://google.github.io/styleguide/pyguide.html
+
+e.g.:Adhere to this generating docstrings. So also include args and return types etc.
+Use Google style guide for Python docstrings. Include: 1) Brief one-line summary ending with period. 2) Additional description if needed. 3) Args: section listing all parameters with types and descriptions. 4) Returns: section describing return value and type. 5) For complex returns like tuples, describe each element. Example format: """Brief summary. / / Extended description. / / Args: / param_name: Description. / / Returns: / type: Description."""
+
+
+
+## strings
+Use % formatting instead of f-strings in Python logging statements. Example: logger.info("Message: %s", variable) instead of logger.info(f"Message: {variable}"). This avoids unnecessary string interpolation when the log level would filter out the message, improving performance. The logging module handles the string formatting lazily only when the message will actually be logged.
+
+## Environment Variables
+When accessing environment variables in the codebase:
+- **ALWAYS** use `os.getenv("KEY", "default")` or `os.environ["KEY"]` if mandatory.
+- Ensure `load_dotenv()` is called in entry points (e.g., `main.py`, `dags`).
+
+Example:
+```python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ✅ Correct
+api_key = os.getenv("OPENAI_API_KEY", "")
+db_url = os.getenv("XY_URL")
+```

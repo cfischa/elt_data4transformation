@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+import csv
+import io
 import os
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Iterable, List, Optional, Tuple, Union
@@ -12,7 +15,7 @@ from elt.utils.logging_config import get_logger
 from elt.utils.persistence import PersistenceManager
 
 
-DEFAULT_BASE_URL = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0"
+DEFAULT_BASE_URL = "https://ec.europa.eu/eurostat/api/dissemination"
 
 
 class EurostatConfig(ConnectorConfig):
@@ -66,55 +69,132 @@ class EurostatConnector(BaseConnector):
     ) -> Dict[str, Any]:
         """Return a paginated list of Eurostat datasets."""
 
-        params: Dict[str, Any] = {
-            "page": max(page, 1),
-            "pageSize": max(page_size, 1),
-            "lang": language,
-        }
-        if search:
-            params["search"] = search
-        if since:
-            # API expects ISO-8601 without microseconds
-            if since.tzinfo is None:
-                since_utc = since.replace(tzinfo=timezone.utc)
-            else:
-                since_utc = since.astimezone(timezone.utc)
-            params["lastUpdateFrom"] = since_utc.isoformat().replace("+00:00", "Z")
+        catalogue_response = await self.get(
+            "catalogue/toc/txt",
+            params={"lang": language},
+        )
+        toc_text = catalogue_response.get("content") if isinstance(catalogue_response, dict) else None
+        if not toc_text:
+            self.logger.warning("Eurostat catalogue response was empty")
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total": 0,
+                "items": [],
+                "links": {},
+            }
 
-        payload = await self.get("datasets", params=params)
-        datasets = payload.get("datasets") or payload.get("dataSets") or []
+        datasets = self._parse_catalogue_toc(
+            toc_text,
+            search=search,
+            since=since,
+        )
 
-        items: List[Dict[str, Any]] = []
-        for entry in datasets:
-            last_update_raw = entry.get("lastUpdate") or entry.get("last_update")
-            last_update: Optional[datetime] = None
-            if isinstance(last_update_raw, str):
-                try:
-                    last_update = datetime.fromisoformat(last_update_raw.replace("Z", "+00:00"))
-                except ValueError:
-                    self.logger.debug("Could not parse lastUpdate '%s'", last_update_raw)
+        total = len(datasets)
+        start_index = max(page - 1, 0) * max(page_size, 1)
+        end_index = start_index + max(page_size, 1)
+        items = datasets[start_index:end_index]
 
-            items.append(
-                {
-                    "code": entry.get("code") or entry.get("id"),
-                    "title": entry.get("label") or entry.get("title") or "",
-                    "description": entry.get("description") or entry.get("label") or "",
-                    "last_update": last_update,
-                    "keywords": list(entry.get("keywords") or entry.get("tags") or []),
-                    "themes": list(entry.get("themes") or entry.get("categories") or []),
-                    "dimensions": list(entry.get("dimensions") or entry.get("dimensionIds") or []),
-                    "values_count": entry.get("valuesCount") or entry.get("values_count"),
-                    "raw": entry,
-                }
-            )
+        links: Dict[str, Any] = {}
+        if end_index < total:
+            links["next"] = {
+                "page": page + 1,
+                "pageSize": page_size,
+            }
 
         return {
-            "page": payload.get("page", page),
-            "page_size": payload.get("pageSize", page_size),
-            "total": payload.get("total"),
+            "page": page,
+            "page_size": page_size,
+            "total": total,
             "items": items,
-            "links": payload.get("links", {}),
+            "links": links,
         }
+
+    def _parse_catalogue_toc(
+        self,
+        toc_text: str,
+        *,
+        search: Optional[str] = None,
+        since: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Parse the Eurostat catalogue table-of-contents text export."""
+
+        buffer = io.StringIO(toc_text)
+        reader = csv.DictReader(buffer, delimiter="\t")
+
+        hierarchy: List[str] = []
+        datasets: List[Dict[str, Any]] = []
+
+        search_lower = search.lower() if search else None
+        since_date: Optional[datetime] = None
+        if since:
+            since_date = since if since.tzinfo is None else since.astimezone(timezone.utc).replace(tzinfo=None)
+
+        for row in reader:
+            raw_title = (row.get("title") or "").lstrip("\ufeff")
+            if not raw_title:
+                continue
+
+            indent = len(raw_title) - len(raw_title.lstrip(" "))
+            level = max(indent // 4, 0)
+            title = raw_title.strip()
+
+            entry_type = (row.get("type") or "").strip().lower()
+            if level >= len(hierarchy):
+                hierarchy.extend([""] * (level - len(hierarchy) + 1))
+            hierarchy[level] = title
+            hierarchy = hierarchy[: level + 1]
+
+            if entry_type != "table":
+                continue
+
+            code = (row.get("code") or "").strip()
+            if not code:
+                continue
+
+            last_update = self._parse_catalogue_date(row.get("last update of data"))
+            if since_date and last_update and last_update < since_date:
+                continue
+
+            if search_lower:
+                haystack = f"{code} {title}".lower()
+                if search_lower not in haystack:
+                    continue
+
+            values_raw = (row.get("values") or "").strip()
+            try:
+                values_count = int(values_raw.replace(" ", "")) if values_raw else None
+            except ValueError:
+                values_count = None
+
+            dataset_entry = {
+                "code": code,
+                "title": title,
+                "description": title,
+                "last_update": last_update,
+                "keywords": [],
+                "themes": [segment for segment in hierarchy[:-1] if segment],
+                "dimensions": [],
+                "values_count": values_count,
+                "raw": row,
+            }
+            datasets.append(dataset_entry)
+
+        return datasets
+
+    @staticmethod
+    def _parse_catalogue_date(value: Optional[str]) -> Optional[datetime]:
+        """Parse catalogue date strings of format DD.MM.YYYY."""
+
+        if not value:
+            return None
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            return datetime.strptime(candidate, "%d.%m.%Y")
+        except ValueError:
+            return None
 
     async def get_available_datasets(
         self,
@@ -144,30 +224,55 @@ class EurostatConnector(BaseConnector):
     ) -> Dict[str, Any]:
         """Fetch rich metadata for a given dataset code."""
 
-        params = {"lang": language}
-        response = await self.get(f"datasets/{dataset_id}", params=params)
-        dataset_info = response.get("dataset", response)
-        dimension_info = response.get("dimension") or dataset_info.get("dimension") or {}
+        params = {
+            "lang": language,
+            "lastTimePeriod": 1,
+        }
+        response = await self.get(f"statistics/1.0/data/{dataset_id}", params=params)
 
-        last_update_raw = dataset_info.get("lastUpdate") or dataset_info.get("last_update")
+        dataset_info = response if isinstance(response, dict) else {}
+        raw_dimension = dataset_info.get("dimension", {})
+
+        dimension_ids: List[str] = []
+        if isinstance(raw_dimension, dict):
+            existing_ids = raw_dimension.get("id")
+            if isinstance(existing_ids, list):
+                dimension_ids = [str(item) for item in existing_ids]
+            else:
+                dimension_ids = [key for key in raw_dimension.keys()]
+            dimension_info: Dict[str, Any] = dict(raw_dimension)
+            if "id" not in dimension_info:
+                dimension_info["id"] = dimension_ids
+        else:
+            dimension_info = raw_dimension
+
+        updated_raw = dataset_info.get("updated")
         last_update: Optional[datetime] = None
-        if isinstance(last_update_raw, str):
+        if isinstance(updated_raw, str):
+            cleaned = updated_raw.replace("Z", "+00:00")
             try:
-                last_update = datetime.fromisoformat(last_update_raw.replace("Z", "+00:00"))
+                last_update = datetime.fromisoformat(cleaned)
             except ValueError:
-                self.logger.debug("Could not parse dataset lastUpdate '%s'", last_update_raw)
+                self.logger.debug("Could not parse dataset 'updated' timestamp '%s'", updated_raw)
+
+        label = dataset_info.get("label")
+        cleaned_raw = copy.deepcopy(dataset_info) if dataset_info else {}
+        cleaned_raw.pop("value", None)
+        if isinstance(cleaned_raw, dict) and isinstance(dimension_info, dict):
+            cleaned_raw["dimension"] = dimension_info
 
         return {
             "id": dataset_id,
-            "title": dataset_info.get("label") or dataset_info.get("title") or dataset_id,
-            "description": dataset_info.get("description") or dataset_info.get("label") or "",
+            "title": label or dataset_id,
+            "description": label or dataset_id,
             "last_update": last_update,
-            "keywords": list(dataset_info.get("keywords") or dataset_info.get("tags") or []),
-            "themes": list(dataset_info.get("themes") or dataset_info.get("categories") or []),
-            "unit": dataset_info.get("unit"),
-            "contact": dataset_info.get("contact"),
+            "keywords": [],
+            "themes": [],
+            "unit": (dataset_info.get("extension") or {}).get("unit"),
+            "contact": (dataset_info.get("extension") or {}).get("contact"),
             "dimension": dimension_info,
-            "raw": response,
+            "dimensions": dimension_ids,
+            "raw": cleaned_raw,
         }
 
     async def get_countries(self, language: str = "en") -> List[Dict[str, Any]]:
@@ -175,7 +280,7 @@ class EurostatConnector(BaseConnector):
 
         params = {"lang": language, "pageSize": 500}
         try:
-            response = await self.get("classifications/geo", params=params)
+            response = await self.get("statistics/1.0/classifications/geo", params=params)
         except Exception as exc:  # pragma: no cover - graceful degradation
             self.logger.warning("Eurostat geo classification lookup failed: %s", exc)
             return []
@@ -219,9 +324,9 @@ class EurostatConnector(BaseConnector):
                 values_list = list(values)
                 if not values_list:
                     continue
-                params[f"filter[{dimension}]"] = ",".join(values_list)
+                params[dimension] = ",".join(str(value) for value in values_list)
 
-        raw_data = await self.get(f"data/{dataset_id}", params=params)
+        raw_data = await self.get(f"statistics/1.0/data/{dataset_id}", params=params)
         expanded_records = self._expand_dataset_values(raw_data)
 
         timestamp = datetime.now(timezone.utc)
