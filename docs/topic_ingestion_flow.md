@@ -24,8 +24,10 @@ Classifier -> Selection Query -> Extraction Runner -> ClickHouse Loader -> Monit
 - For each chunk:
   1. Instantiate the appropriate connector:
      - `DestatisConnector` for GENESIS cubes (implemented: downloads raw cube files, stringifies their contents, and removes temp artefacts after persistence).
+     - `EurostatConnector` for Eurostat datasets (implemented: fetches JSON-stat, parses TOC for discovery).
      - `GESISConnector` for SPARQL datasets (implemented: executes CONSTRUCT queries and stores prettified JSON metadata).
-     - Future adapters for Eurostat, SOEP, web scraping, etc.
+     - `SOEPConnector` for SOEP Monitor data (implemented: fetches indicator metadata and streams time-series observations).
+     - Future adapters for web scraping, etc.
   2. Fetch raw payloads (JSON, CSV, RDF, etc.) and normalise into a uniform structure:
      ```json
      {

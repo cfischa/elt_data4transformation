@@ -3,3 +3,4 @@ clickhouse-connect==0.7.0
 pandas==2.2.3
 plotly==5.24.0
 PyYAML==6.0.1
+watchdog==3.0.0
