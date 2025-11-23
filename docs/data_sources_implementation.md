@@ -61,6 +61,8 @@ This document details the implementation of the **Destatis**, **Eurostat**, and 
 
 **Source File**: `connectors/soep_connector.py`
 
+> **⚠️ Status Note**: The SOEP Monitor API is currently offline/unreachable. The implementation below describes the intended logic, but refactoring to a file-based loader (using manual SOEP-Core downloads) is recommended. See `docs/SOEP_CONNECTOR_STATUS.md`.
+
 ### Metadata Extraction
 - **Method**: Sequential fetching of indicator lists and details from the SOEP Monitor API.
 - **Endpoint**: `/indicators` (list) and `/indicators/{slug}` (detail).
