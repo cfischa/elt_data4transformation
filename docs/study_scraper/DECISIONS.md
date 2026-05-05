@@ -35,120 +35,127 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Date:** 2026-04-30
 - **Decision:** `scraping/` will not be the home of new code. New scraping
   code lives under `study_scraper/`. We may either delete `scraping/` later
-  or leave it frozen alongside the legacy ELT. Decision deferred to A4.
+  or leave it frozen alongside the legacy ELT.
 - **Rationale:** `scraping/settings.py` and `spiders/example_spider.py`
   reference modules (`pipelines`, `middlewares`, `items`, `utils`) that do
   not exist on disk. Fixing this in place buys nothing for the new project.
 
+### A4. Topics sheet format = CSV (resolves Q1)
+- **Date:** 2026-05-05
+- **Decision:** Maintainer-edited topics live in
+  `config/topics/topics.csv` with columns:
+  `id, name, description, language, include_keywords, exclude_keywords,
+  synonyms`. List-valued columns use `|` as separator (CSV-friendly,
+  unambiguous). The existing `taxonomy.yml` is treated as a derived/legacy
+  view; the scraper reads CSV directly.
+- **Rationale:** Maintainer chose CSV in Q1.
+- **Consequence:** Need a CSV loader (`study_scraper/topics.py`) and a
+  bootstrap CSV seeded from the four topics in `taxonomy.yml`.
+
+### A5. "Study" definition is inclusive (resolves Q3)
+- **Date:** 2026-05-05
+- **Decision:** A "study" is any artifact (HTML page or PDF) that is about
+  at least one configured topic. Pure-qualitative policy papers without
+  numbers are **in**. We capture them with a flag
+  `has_quantitative_data: bool` (best-effort detection during extraction)
+  so step 2 can filter if needed.
+- **Rationale:** Maintainer chose "in" in Q3. Keeping a quantitative flag
+  keeps the door open for step-2 filtering without losing recall now.
+
+### A6. Tier-1 discovery sources = SSOAR, OpenAlex, DAWUM, Bundestag (resolves Q4)
+- **Date:** 2026-05-05
+- **Decision:** Build, in order: GESIS SSOAR → OpenAlex → DAWUM (reused as
+  a source, not as the whole pipeline) → Bundestag publications. Tier 2
+  (think tanks, polling release pages, BASE/CORE) is deferred until the
+  eval harness exists.
+- **Rationale:** Maintainer confirmed Q4.
+
+### A7. Storage stack = Supabase, with a local-dev fallback (resolves Q5)
+- **Date:** 2026-05-05
+- **Decision:** Primary store is **Supabase** (Postgres for structured
+  data, Supabase Storage for raw PDFs/HTML artifacts). Connection via
+  `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` env vars. ClickHouse remains
+  available as a documented secondary sink **only if** Supabase is not
+  reachable for a given deployment — but is not the default.
+- **Local-dev fallback:** Code targets a clean SQL interface (asyncpg /
+  psycopg) so a local Postgres (Docker container or `supabase start`) is
+  drop-in equivalent. SQLite is **not** a fallback — Supabase-specific
+  features (RLS, JSONB, full-text search) push us toward Postgres
+  consistently.
+- **Schema:** SQL migrations live under `study_scraper/migrations/` and
+  are also valid Supabase migrations.
+- **Rationale:** Maintainer chose Supabase in Q5. ClickHouse stays as the
+  documented escape hatch per the wording "otherwise stay with
+  ClickHouse".
+- **Open sub-question:** Maintainer needs to provision a Supabase project
+  and share `SUPABASE_URL` + service key (or set up a local
+  `supabase start` instance) before live ingestion. See follow-up Q11.
+
+### A8. Orchestration = CLI + cron (resolves Q6)
+- **Date:** 2026-05-05
+- **Decision:** No Airflow. The scraper is a Typer-based CLI exposed as
+  `python -m study_scraper ...`. Periodic runs via cron locally or a
+  GitHub Action when the project graduates to scheduled cloud runs.
+- **Rationale:** Maintainer confirmed Q6.
+
+### A9. Two-stage topic relevance: rules + local embeddings (resolves Q7)
+- **Date:** 2026-05-05
+- **Decision:** Stage 1 = rule-based matcher ported from
+  `pipeline/topic_classifier.py` (cheap; runs over candidate titles +
+  abstracts during discovery). Stage 2 = sentence-embedding similarity
+  (multilingual model running locally; default
+  `paraphrase-multilingual-MiniLM-L12-v2` or similar — exact pick recorded
+  when integrated) over the abstract / first-page text. Both scores are
+  stored on the `Study` row; final decision uses a tunable threshold per
+  topic.
+- **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
+  cost and external-call dependency.
+
+### A10. Eval gold set deferred (resolves Q8 partially)
+- **Date:** 2026-05-05
+- **Decision:** No gold set yet. Build the pipeline first; define the
+  gold set after the first end-to-end run produces real candidates the
+  maintainer can review and curate.
+- **Rationale:** Maintainer answered "gold set later" in Q8.
+- **Consequence:** Phase 5 (eval harness) is reordered to come **after**
+  Phase 4 (first source end-to-end). The eval-driven success criteria in
+  `GOAL.md` remain valid as the eventual bar — they just aren't measured
+  until the gold set exists.
+
 ---
 
-## Open questions (block first implementation)
+## Open questions
 
-> Format: each Q has **(a) a concrete proposal** and **(b) what I need from
-> you**. Reply with the Q number and either "yes" / "no, X instead" /
-> specifics.
+These are non-blocking. Each has a default that ships unless the
+maintainer objects.
 
-### Q1. What is the topics sheet format?
-**Proposal:** Keep `config/topics/taxonomy.yml` as the source of truth, but
-add a thin loader so the scraper can also read a CSV at
-`config/topics/topics.csv` with columns `id,name,description,
-include_keywords,exclude_keywords,language`. The CSV is the
-human-editable surface; a converter generates/updates the YAML.
-**Need from you:** Confirm CSV-as-edit-surface, or prefer Google Sheets
-sync, or stick to YAML only? If Google Sheets: do you want a one-way pull
-into the repo (committed snapshot) or a runtime fetch?
+### Q2. Topic count for v1
+**Default (in effect):** Start with the 4 topics already in
+`taxonomy.yml` (`steuern`, `klima`, `migration_einwanderung`, `bildung`),
+seeded into `topics.csv`. Maintainer can add rows any time.
+**Override needed?** Only if you want a different starting set.
 
-### Q2. How big is the topic list, day 1?
-**Proposal:** Start with the 4 topics already in `taxonomy.yml`
-(`steuern`, `klima`, `migration_einwanderung`, `bildung`) plus 2–4 you add
-during the next iteration. Optimize for those, not for 50.
-**Need from you:** Confirm 4–8 topics for v1, and name any topics you want
-added now.
-
-### Q3. What counts as a "study" worth keeping?
-**Proposal:** A study is an artifact (HTML page or PDF) that:
-1. Is about at least one configured topic (passes the topic filter), **and**
-2. Contains or summarizes representative quantitative data about German
-   society (polls, surveys, official statistics with methodology notes).
-"Contains" is a weaker test than "extractable now"; we capture the artifact
-+ best-effort metadata even if we can't parse the numbers on day 1.
-**Need from you:** Confirm. Specifically: do you want pure-qualitative
-policy papers (no numbers) excluded, included with a flag, or included
-without distinction?
-
-### Q4. Which discovery sources do we target first?
-**Proposal — tier 1 (build first, in this order):**
-1. **GESIS SSOAR** — `https://www.ssoar.info` open social science repo;
-   already partially understood by the legacy GESIS connector.
-2. **OpenAlex** — `https://api.openalex.org` free academic graph, REST API,
-   strong filtering by topic + year + language.
-3. **DAWUM polls aggregator** — `https://dawum.de` already has a connector;
-   reuse it as one source rather than the whole pipeline.
-4. **Bundestag publications search** — `https://www.bundestag.de` for
-   published studies and Sachstandsberichte commissioned by the parliament.
-
-**Proposal — tier 2 (after tier 1 works end-to-end):**
-- Think tank sitemaps/RSS: Bertelsmann Stiftung, DIW Berlin, Ifo, Konrad-
-  Adenauer-Stiftung, Friedrich-Ebert-Stiftung, Sachverständigenrat.
-- Polling release pages: Allensbach, Forsa, Infratest dimap (where
-  permissible).
-- BASE / CORE academic search.
-
-**Proposal — explicitly deferred:** general news scraping (legal/ToS
-friction), social media (out of scope per `GOAL.md`).
-
-**Need from you:** Confirm tier 1, edit tier 2, flag any source that's
-either critical for v1 or that you want excluded for legal/political reasons.
-
-### Q5. Storage stack for v1
-**Proposal:** **DuckDB** as the primary store (file-based, zero-ops, fast
-analytical queries, plays nicely with Pandas/Polars). Raw artifacts (PDFs,
-HTML snapshots) on the local filesystem under `data/study_scraper/raw/`,
-referenced by hash. Defer ClickHouse to v2 if a real need shows up.
-**Need from you:** OK to drop ClickHouse for v1? Or do you want the scraper
-to write into the existing ClickHouse instance from day 1?
-
-### Q6. Orchestration for v1
-**Proposal:** A Python CLI (`python -m study_scraper run --topic steuern`)
-plus a `Makefile` target. No Airflow. Periodic runs via cron or a GitHub
-Action when ready.
-**Need from you:** Confirm. Or do you want to keep Airflow because the
-container is already running?
-
-### Q7. Topic relevance: rules + semantic, or rules only?
-**Proposal:** Two-stage. Stage 1 = the existing rule-based matcher
-(cheap, transparent, used during discovery to filter candidate URLs and
-titles). Stage 2 = a semantic relevance score using sentence embeddings
-(applied to abstract / first-page text after fetch) — needed because many
-real studies use vocabulary that doesn't literally match the taxonomy
-keywords.
-**Need from you:** OK to add a small embeddings model (e.g. multilingual
-`paraphrase-multilingual-MiniLM` or similar)? Local-only inference, no
-external API calls. If you'd rather keep v1 rules-only and add embeddings
-in v2, say so.
-
-### Q8. Eval harness — what does "the goal is reached" mean concretely?
-**Proposal:** Maintain a small **gold set** at
-`docs/study_scraper/eval/gold/<topic_id>.yml` listing 20+ known studies per
-topic with expected metadata. The scraper's eval mode runs against these
-and emits a report (`eval/report-YYYY-MM-DD.md`) with coverage, precision,
-extraction-field completeness. The success criteria in `GOAL.md` are the
-acceptance bar.
-**Need from you:** Will you supply the initial gold set (you know the field;
-I don't)? Or do you want me to bootstrap one from each tier-1 source's
-high-confidence matches and have you review?
-
-### Q9. Are the success-criteria thresholds in GOAL.md correct?
-**Proposal:** As written: ≥80% coverage on gold set, ≥90% topic precision,
-≥95% required-fields populated, ≥99% record-id stability, on at least 3
-topics.
-**Need from you:** Adjust thresholds, or confirm. These drive when we say
-"done".
+### Q9. Success-criteria thresholds
+**Default (in effect):** As written in `GOAL.md` — ≥80% coverage on gold
+set, ≥90% topic precision, ≥95% required-fields populated, ≥99% record-id
+stability, on ≥3 topics.
+**Override needed?** Only if you want different numbers. Becomes
+measurable once Q8 (gold set) is resolved.
 
 ### Q10. Language scope
-**Proposal:** German + English only for v1. Many German-society studies are
-published in English (especially academic ones).
-**Need from you:** Confirm. Add or drop languages.
+**Default (in effect):** German + English. Many German-society studies
+are published in English (academic ones especially).
+**Override needed?** Only if you want to add or drop languages.
+
+### Q11. Supabase provisioning (new — follow-up to A7)
+**Default (in effect):** Code is being written behind a config interface
+that works against either a hosted Supabase project or a local
+`supabase start` / Postgres container. Until you provide credentials,
+`make scrape` against live sources won't run end-to-end — but unit tests
+and CLI smoke tests will.
+**Need from you (when ready to ingest live):** Either (a) a Supabase
+project URL + service-role key (placed in `.env`, not committed), or
+(b) confirmation that you'll run `supabase start` locally for now.
 
 ---
 

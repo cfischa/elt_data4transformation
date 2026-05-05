@@ -1,6 +1,6 @@
 # Common development tasks for BnB Data4Transformation
 
-.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke streamlit
+.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke streamlit scrape scrape-topics scrape-test
 
 # Default target
 help:
@@ -240,6 +240,19 @@ clean:
 	@if exist ".coverage" del .coverage
 	@if exist ".pytest_cache" rmdir /s /q .pytest_cache
 	@if exist "**/__pycache__" rmdir /s /q "**/__pycache__"
+
+# Study scraper (new core, see docs/study_scraper/)
+scrape-topics:
+	@python -m study_scraper topics
+
+scrape:
+	@if [ -z "$(TOPIC)" ] || [ -z "$(SOURCE)" ]; then \
+		echo "Usage: make scrape SOURCE=<id> TOPIC=<id> [LIMIT=N]"; exit 2; \
+	fi
+	@python -m study_scraper run --source $(SOURCE) --topic $(TOPIC) $(if $(LIMIT),--limit $(LIMIT))
+
+scrape-test:
+	@pytest tests/study_scraper -q
 
 # Production
 build:

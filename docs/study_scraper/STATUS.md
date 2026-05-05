@@ -1,6 +1,17 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-04-30 (initial bootstrap)._
+_Last updated: 2026-05-05 (decisions Q1, Q3–Q8 resolved; Phase 2 starting)._
+
+## State at a glance
+
+- **Knowledge base:** bootstrapped under `docs/study_scraper/`.
+- **Decisions:** A1–A10 accepted. Q2, Q9, Q10 default-accepted (not
+  blocking). New non-blocking Q11 tracks Supabase provisioning.
+- **Code:** none yet under `study_scraper/`. Phase 2 (project skeleton) is
+  unblocked and starting in this iteration.
+- **Stack chosen:** Supabase (Postgres + Storage) for storage, Typer CLI
+  for orchestration, two-stage relevance (rules + local embeddings),
+  topics edited as CSV.
 
 This is an honest read of what's in the repo today, written as input to the
 scraper pivot. It is **not** a release status report for the legacy ELT

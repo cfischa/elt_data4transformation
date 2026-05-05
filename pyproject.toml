@@ -10,6 +10,7 @@ packages = [
     {include = "elt"},
     {include = "scraping"},
     {include = "pipeline"},
+    {include = "study_scraper"},
 ]
 
 [tool.poetry.dependencies]
