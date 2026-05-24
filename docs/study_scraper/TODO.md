@@ -35,23 +35,28 @@ before they start.
 - [ ] Smoke test: `python -m study_scraper --help` and a unit test that
       loads the CSV.
 
-## Phase 3 — Data model + storage layer
+## Phase 3 — Data model + storage layer (done — except dedup tail)
 
-- [ ] Implement `Topic` Pydantic model + CSV loader.
-- [ ] Implement `Study` Pydantic model: `id (sha256 of canonical_url),
-      canonical_url, source_urls[], title, authors[], publisher,
-      publication_date, language, topic_ids[], topic_scores{topic_id:
-      float}, has_quantitative_data, abstract, key_findings[],
-      survey_metadata?, raw_artifact_ref, fetched_at, source_id,
-      provenance{}`.
-- [ ] Write SQL migration files under `study_scraper/migrations/`
-      (Postgres-compatible, valid as Supabase migrations).
-- [ ] Storage adapter targeting Supabase (Postgres + Storage). Local-dev
-      mode reads `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` from env; falls
-      back to a plain Postgres URL when those are absent so unit tests
-      can run against a Docker container.
-- [ ] Deduplication: canonical-URL hash + DOI fallback + title-near-
-      duplicate (rapidfuzz, threshold tunable).
+- [x] `Topic` Pydantic model + CSV loader. (Phase 2)
+- [x] `Study` Pydantic model with sha256-of-canonical-URL id, validators
+      for timezone-aware fetched_at and unit-interval topic_scores.
+      `SurveyMetadata`, `Provenance`, `CrawlRun` models added.
+- [x] SQL migrations under `study_scraper/migrations/` (Postgres-
+      compatible). Schema: `studies`, `crawl_runs`, `crawl_run_studies`,
+      `schema_versions`. GIN index on `topic_ids`.
+- [x] Synchronous Postgres storage adapter (`study_scraper/storage/`).
+      Reads `POSTGRES_URL` first; derives a Postgres URL from
+      `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` for hosted Supabase.
+      SQLite is explicitly unsupported (A7).
+- [x] `python -m study_scraper migrate` command; idempotent.
+- [x] Local-dev docker-compose at `study_scraper/docker-compose.yml`
+      pinning `supabase/postgres:15.1.0.117` on port 5544 (no conflict
+      with the legacy Airflow Postgres on 5432).
+- [x] 12 storage integration tests against real Postgres
+      (run via `STUDY_SCRAPER_TEST_DSN`); skipped if env var absent.
+- [ ] Deduplication beyond canonical-URL hash (DOI fallback + title
+      near-duplicate via rapidfuzz). Deferred into Phase 4 — easier to
+      decide thresholds once we see real SSOAR candidates.
 
 ## Phase 4 — One source end-to-end
 

@@ -25,6 +25,8 @@ PyYAML = "^6.0.1"
 # Database
 clickhouse-driver = "^0.2.6"
 clickhouse-connect = "^0.7.0"
+# study_scraper: Postgres / Supabase
+psycopg = {version = "^3.1.0", extras = ["binary"]}
 
 # API Clients
 requests = "^2.31.0"

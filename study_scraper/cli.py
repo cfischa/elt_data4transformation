@@ -13,6 +13,7 @@ import typer
 
 from study_scraper import __version__
 from study_scraper.config import get_settings
+from study_scraper.storage import PostgresStorage, StorageError, resolve_database_url
 from study_scraper.topics import load_topics
 
 app = typer.Typer(
@@ -82,6 +83,35 @@ def run(
         f"[stub] would run source={source} topic={topic} limit={limit}; "
         f"discovery sources land in Phase 4."
     )
+
+
+def _storage_from_settings() -> PostgresStorage:
+    settings = get_settings()
+    try:
+        url = resolve_database_url(
+            postgres_url=settings.postgres_url,
+            supabase_url=settings.supabase_url,
+            supabase_service_key=settings.supabase_service_key,
+        )
+    except StorageError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    return PostgresStorage(url)
+
+
+@app.command()
+def migrate() -> None:
+    """Apply pending SQL migrations to the configured Postgres database.
+
+    Reads connection from `POSTGRES_URL` (preferred for local dev) or
+    `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` (hosted Supabase). See
+    `docs/study_scraper/DECISIONS.md` A7.
+    """
+    storage = _storage_from_settings()
+    applied = storage.migrate()
+    if not applied:
+        typer.echo("schema up to date; no migrations applied")
+    else:
+        typer.echo(f"applied {len(applied)} migration(s): {applied}")
 
 
 if __name__ == "__main__":
