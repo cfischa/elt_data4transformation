@@ -58,23 +58,38 @@ before they start.
       near-duplicate via rapidfuzz). Deferred into Phase 4 — easier to
       decide thresholds once we see real SSOAR candidates.
 
-## Phase 4 — One source end-to-end
+## Phase 4 — One source end-to-end (DONE)
 
-- [ ] Implement `DiscoverySource` interface in `study_scraper/discovery/`.
-- [ ] First source: **GESIS SSOAR** (`iter_candidates(topic) ->
-      AsyncIterator[Candidate]`).
-- [ ] HTTP fetcher: rate-limited, retried (tenacity), robots.txt-aware.
-- [ ] PDF text extractor (pypdf), HTML extractor (BeautifulSoup +
-      readability heuristics).
-- [ ] Stage-1 topic filter: port the matching logic from
+- [x] `DiscoverySource` Protocol + `Candidate` model in
+      `study_scraper/discovery/base.py`.
+- [x] First source: **GESIS SSOAR** via OAI-PMH (`oai_dc` metadata
+      prefix). Synchronous iterator. Supports both live (HTTP to
+      ssoar.info) and `--from-file` (local OAI XML fixture) modes that
+      share the same parser.
+- [x] Stage-1 rule-based topic filter ported from
       `pipeline/topic_classifier.py` into
       `study_scraper/topic_filter.py`, decoupled from ClickHouse.
-- [ ] Persist `Study` rows + raw artifacts (Supabase Storage; local-fs
-      fallback when storage credentials absent).
-- [ ] CLI: `python -m study_scraper run --source ssoar --topic klima
-      --limit 50` should produce records.
-- [ ] Manual review of first 50 results; record findings in
-      `docs/study_scraper/notes/first-run-<date>.md`.
+      Default `min_score=0.2` for SSOAR (one include keyword anywhere).
+      Per-topic exclude keywords short-circuit.
+- [x] Pipeline orchestrator (`study_scraper/pipeline.py::run_one`): for
+      each candidate, applies filter, promotes to `Study`, upserts,
+      records `CrawlRun` and `crawl_run_studies` junction.
+- [x] `has_quantitative_data` heuristic (cheap, noisy by design —
+      gates nothing, just hints).
+- [x] CLI commands: `run --source ssoar --topic <id> [--from-file PATH]
+      [--limit N] [--min-score F]`, `list --topic <id>`.
+- [x] First-run notes at `docs/study_scraper/notes/first-run-2026-05-24.md`.
+- [x] **Milestone:** 6 verified climate-relevant SSOAR studies
+      persisted to Postgres (maintainer goal "3 studies in DB"
+      exceeded). Idempotent re-runs confirmed.
+- [ ] HTTP fetcher polish: tenacity retries, robots.txt check, custom
+      backoff on 429. Deferred — current SSOAR client is a thin
+      `httpx.Client` without retries. Bring in when adding OpenAlex
+      (which has stricter rate limits).
+- [ ] PDF + HTML artifact download. Deferred — Phase 4 captures
+      metadata + abstract from OAI Dublin Core, which is enough for
+      topical relevance. Full-text fetching lands when stage-2
+      semantic scoring needs it (Phase 6).
 
 ## Phase 5 — Second + third source
 

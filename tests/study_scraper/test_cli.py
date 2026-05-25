@@ -44,12 +44,14 @@ def test_run_rejects_unknown_topic(runner: CliRunner) -> None:
     assert "unknown topic" in (result.output or "").lower()
 
 
-def test_run_stub_succeeds_with_known_topic(runner: CliRunner) -> None:
+def test_run_rejects_unknown_source(runner: CliRunner) -> None:
+    # SSOAR is the only source wired up in Phase 4; OpenAlex / Bundestag
+    # come later. An unknown source must error cleanly.
     result = runner.invoke(
-        app, ["run", "--source", "ssoar", "--topic", "klima", "--limit", "5"]
+        app, ["run", "--source", "openalex", "--topic", "klima"]
     )
-    assert result.exit_code == 0
-    assert "stub" in result.stdout.lower()
+    assert result.exit_code != 0
+    assert "unknown source" in (result.output or "").lower()
 
 
 def test_python_dash_m_entrypoint_resolves() -> None:

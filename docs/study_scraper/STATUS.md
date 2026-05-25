@@ -1,27 +1,37 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-24 (Phases 2 + 3 shipped; Phase 4 next)._
+_Last updated: 2026-05-24 (Phase 4 milestone hit: 6 verified klima
+studies in Postgres)._
 
 ## State at a glance
 
-- **Knowledge base:** bootstrapped under `docs/study_scraper/`.
+- **Knowledge base:** under `docs/study_scraper/`.
 - **Decisions:** A1–A10 accepted. Q2, Q9, Q10 default-accepted (not
-  blocking). Q11 (Supabase provisioning) tracked as non-blocking: a
-  local-Postgres path now exists end-to-end.
-- **Code (Phase 2):** package skeleton, Typer CLI, topics CSV loader,
-  pyproject + Makefile wiring, 15 unit tests.
-- **Code (Phase 3):** `Study`/`SurveyMetadata`/`Provenance`/`CrawlRun`
-  Pydantic models with sha256-of-URL id and tz-aware datetimes; SQL
-  migration `0001_init.sql` (Postgres-compatible, valid as Supabase
-  migrations); synchronous Postgres storage adapter with
-  upsert/list/migrate; `migrate` CLI; `study_scraper/docker-compose.yml`
-  (supabase/postgres image, port 5544); 12 storage integration tests
-  against real Postgres (sandbox-verified).
-- **Stack in effect:** Supabase-compatible Postgres for storage (running
-  locally via the new compose file in dev; hosted Supabase later), Typer
-  CLI for orchestration, two-stage relevance (rules + local embeddings)
-  deferred to Phase 6, topics edited as CSV.
-- **Next:** Phase 4 — first discovery source (SSOAR) end-to-end.
+  blocking). Q11 (Supabase provisioning) tracked as non-blocking: the
+  local-Postgres path is fully working end-to-end.
+- **Code (Phase 2):** package skeleton, Typer CLI, topics CSV loader.
+- **Code (Phase 3):** `Study` / `SurveyMetadata` / `Provenance` /
+  `CrawlRun` models; SQL migration; Postgres storage adapter with
+  upsert/list/migrate; `migrate` CLI; `study_scraper/docker-compose.yml`.
+- **Code (Phase 4):** SSOAR OAI-PMH discovery source (live + fixture);
+  rule-based topic filter ported from the legacy classifier, decoupled
+  from ClickHouse; pipeline orchestrator (`run_one`) with idempotent
+  upserts and crawl-run bookkeeping; `run` and `list` CLI commands.
+- **Milestone hit (2026-05-24):** maintainer's goal "verified 3
+  studies/datasets relevant for the defined use case and pulled the
+  data to database" — exceeded with **6 verified climate-relevant
+  SSOAR studies** in Postgres. See
+  `docs/study_scraper/notes/first-run-2026-05-24.md`.
+- **Tests:** 65 pass — 7 SSOAR parser tests against the fixture, 9
+  topic-filter tests, 5 end-to-end pipeline tests against real Postgres,
+  plus topics/models/storage/CLI.
+- **Known sandbox limit:** the dev sandbox blocks outbound HTTP to
+  ssoar.info / openalex.org / etc. Live mode of the SSOAR source has
+  been written but not exercised here; it shares the parser with the
+  fixture path that *is* tested. Maintainer can verify live by dropping
+  `--from-file` when running from a network-enabled machine.
+- **Next:** Phase 5 — second + third sources (OpenAlex, Bundestag) on
+  top of the same `DiscoverySource` interface.
 
 This is an honest read of what's in the repo today, written as input to the
 scraper pivot. It is **not** a release status report for the legacy ELT
