@@ -192,11 +192,28 @@ Control-dock surface: a third page **"Sources"** with
   - a queue of **candidate studies** discovered by the
     reference-follower but not yet ingested.
 
-## Phase 6 — Stage-2 semantic relevance (unchanged from earlier plan)
+## Phase 6 — Claim extraction (Phase 6-mini shipped) + semantic relevance
 
-Lower priority now that A12 emphasises recall over precision; remains
-in the roadmap so that the *human* reviewer's view of candidates is
-ranked sensibly, even though we no longer use it as an ingest gate.
+Triggered by the 2026-05-28 example-question measurement (see notes):
+the project's goal is to answer political questions; abstracts alone
+weren't enough, so claim extraction lands.
+
+- [x] **Phase 6-mini** — regex-based claim extractor over title +
+      abstract. `claims` table (migration 0003) stores `(numeric_value,
+      unit, snippet, study_id, extractor='regex-v1')`. Pipeline calls
+      `extract_claims` after every upsert. Search CLI:
+      `python -m study_scraper search <keyword>`.
+- [ ] **Phase 6-full** — extend claim extraction over full-text PDF
+      after Phase 5c's PDF fetching is in place. 5×–10× more claims per
+      study. Extractor id `regex-v2` or similar; schema is already
+      ready.
+- [ ] **LLM-based extractor** — replace / supplement `regex-v1` with
+      an LLM pass that disambiguates the *referent* of each %. New
+      extractor id `llm-v1`. Cost considered; only fire on studies
+      that pass the topic threshold.
+- [ ] **Stage-2 semantic relevance** — was the original Phase 6.
+      Reordered: lower priority now that A12 emphasises recall. Still
+      useful as a ranking tool for human review in the dock.
 
 ## Phase 7 — Eval harness (deferred, post-Phase 5c)
 

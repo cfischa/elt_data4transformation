@@ -1,8 +1,26 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-28 (paradigm sharpened: A12 makes coverage the
-primary metric; Phase 5 partial shipped; sources-expansion + new-
-source discovery are the next phases)._
+_Last updated: 2026-05-28 (Q12 review queue + Phase 6-mini claim
+extraction; both example questions now answerable end-to-end with
+real numbers)._
+
+## Example-question measurement (2026-05-28)
+
+Per maintainer: "Goal of the project is to answer political questions
+based on the studies." Measured against two test questions:
+
+- **"How many Germans want stricter climate laws?"** —
+  `python -m study_scraper search klimaschutzgesetz` returns **62 %**
+  (Forsa 2021, n=1009) and **44 %** (Sommer/Mattauch/Pahle 2022,
+  n=6063) with source links and snippets.
+- **"How many Germans want nuclear energy back?"** —
+  `python -m study_scraper search atomkraft` returns **55 %** (Innofact
+  März 2025, n=1003) plus 36 % oppose / 9 % undecided and **65 %**
+  (Civey longitudinal seit Mitte 2022).
+
+Mechanism works end-to-end. Coverage volume isn't there yet. See
+`docs/study_scraper/notes/example-questions-2026-05-28.md` for the
+full before / after and honest next-steps verdict.
 
 ## Paradigm note (2026-05-28)
 

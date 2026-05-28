@@ -22,6 +22,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional
 
+from study_scraper.claims import extract_claims
 from study_scraper.discovery.base import Candidate, DiscoverySource
 from study_scraper.models import CrawlRun, Provenance, Study
 from study_scraper.storage import PostgresStorage
@@ -135,21 +136,30 @@ def run_one(
                     )
                     continue
                 study = _candidate_to_study(cand, match, now=run.started_at)
+                claims = extract_claims(
+                    study_id=study.id,
+                    title=study.title,
+                    abstract=study.abstract,
+                )
                 if match.score < min_score:
                     storage.upsert_study(study, status="pending")
+                    storage.upsert_claims(study.id, claims)
                     pending_count += 1
                     LOGGER.info(
-                        "pending (%.2f): %s — %s",
+                        "pending (%.2f): %d claim(s): %s — %s",
                         match.score,
+                        len(claims),
                         cand.title[:80],
                         cand.canonical_url,
                     )
                     continue
                 is_new = storage.upsert_study(study, status="kept")
+                storage.upsert_claims(study.id, claims)
                 kept_ids.append((study.id, is_new))
                 LOGGER.info(
-                    "kept (%.2f): %s — %s",
+                    "kept (%.2f): %d claim(s): %s — %s",
                     match.score,
+                    len(claims),
                     cand.title[:80],
                     cand.canonical_url,
                 )

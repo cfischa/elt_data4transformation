@@ -38,7 +38,10 @@ class TestOpenAlexFromFile:
     def test_parses_all_results(self, klima) -> None:
         with OpenAlexSource(from_file=FIXTURE) as src:
             cands = list(src.iter_candidates(klima))
-        assert len(cands) == 6  # 4 unique climate + 1 dedup + 1 negative
+        # 4 academic climate + 1 cross-source dedup test +
+        # 2 polling-release records (Forsa climate-law, nuclear poll) +
+        # 1 off-topic negative control = 8.
+        assert len(cands) == 8
 
     def test_canonical_url_prefers_doi_over_openalex_id(self, klima) -> None:
         with OpenAlexSource(from_file=FIXTURE) as src:

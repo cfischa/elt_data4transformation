@@ -192,6 +192,52 @@ def list_studies(
         typer.echo(f"{'':10}  {row['canonical_url']}")
 
 
+@app.command()
+def search(
+    query: str = typer.Argument(
+        ...,
+        help="Keyword(s) to look for inside extracted claim snippets.",
+    ),
+    unit: str = typer.Option(
+        "%",
+        "--unit",
+        help="Claim unit to filter on. Default '%'. Pass 'all' to disable.",
+    ),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """Search extracted claims by keyword.
+
+    Use this to answer questions like "what % of Germans support X?" —
+    each hit shows the matched snippet, the numeric value, and a link
+    back to the underlying study.
+
+    Coverage caveat: only abstracts have been scanned; full-text PDF
+    extraction is a later phase. A miss here means *we haven't ingested
+    a study whose abstract contains the answer*, not necessarily that
+    no such study exists.
+    """
+    storage = _storage_from_settings()
+    unit_arg = None if unit == "all" else unit
+    rows = storage.search_claims(query=query, unit=unit_arg, limit=limit)
+    if not rows:
+        typer.echo("(no claims matched)")
+        return
+    for row in rows:
+        value = row.get("numeric_value")
+        value_str = f"{float(value):>5.1f}{row.get('unit') or ''}" if value is not None else "  —"
+        title = (row.get("title") or "").replace("\n", " ")
+        if len(title) > 70:
+            title = title[:67] + "..."
+        typer.echo(
+            f"{value_str}  [{row.get('source_id'):<8}]  {title}"
+        )
+        snippet = (row.get("claim_text") or "").replace("\n", " ")
+        if len(snippet) > 160:
+            snippet = snippet[:157] + "..."
+        typer.echo(f"          \"{snippet}\"")
+        typer.echo(f"          {row.get('canonical_url')}")
+
+
 review_app = typer.Typer(
     help="Human review of pending candidates (Q12 review queue).",
     no_args_is_help=True,

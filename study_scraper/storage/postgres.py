@@ -365,6 +365,117 @@ class PostgresStorage:
                 return {row["status"]: int(row["c"]) for row in cur.fetchall()}
 
     # ------------------------------------------------------------------
+    # Claims (Phase 6-mini)
+    # ------------------------------------------------------------------
+
+    def upsert_claims(
+        self,
+        study_id: str,
+        claims: Iterable[Any],
+        *,
+        extractor: str = "regex-v1",
+    ) -> int:
+        """Replace the claims for one study; return the count written.
+
+        Idempotent: deletes existing claims from this `extractor` for the
+        study and re-inserts. Other extractors' claims (when we add LLM-
+        based extraction) are untouched.
+        """
+        rows = [
+            (
+                claim.id,
+                claim.study_id,
+                claim.claim_text,
+                claim.numeric_value,
+                claim.unit,
+                claim.source_field,
+                extractor,
+            )
+            for claim in claims
+        ]
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"DELETE FROM {SCHEMA}.claims "
+                    f"WHERE study_id = %s AND extractor = %s",
+                    (study_id, extractor),
+                )
+                if rows:
+                    cur.executemany(
+                        f"""
+                        INSERT INTO {SCHEMA}.claims (
+                            id, study_id, claim_text, numeric_value,
+                            unit, source_field, extractor
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
+                        """,
+                        rows,
+                    )
+            conn.commit()
+        return len(rows)
+
+    def search_claims(
+        self,
+        *,
+        query: str,
+        unit: Optional[str] = "%",
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """ILIKE-search over claim_text. Joins back to studies for context."""
+        params: List[Any] = []
+        clauses: List[str] = []
+        if unit is not None:
+            clauses.append("c.unit = %s")
+            params.append(unit)
+        clauses.append("lower(c.claim_text) LIKE %s")
+        params.append(f"%{query.lower()}%")
+        where = " AND ".join(clauses)
+        params.append(limit)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT  c.id            AS claim_id,
+                            c.claim_text,
+                            c.numeric_value,
+                            c.unit,
+                            c.source_field,
+                            s.id            AS study_id,
+                            s.title,
+                            s.canonical_url,
+                            s.source_id,
+                            s.publication_date,
+                            s.topic_ids,
+                            s.status
+                    FROM    {SCHEMA}.claims  c
+                    JOIN    {SCHEMA}.studies s ON s.id = c.study_id
+                    WHERE   {where}
+                      AND   s.status <> 'rejected'
+                    ORDER   BY s.publication_date DESC NULLS LAST,
+                               c.numeric_value DESC NULLS LAST
+                    LIMIT   %s
+                    """,
+                    params,
+                )
+                return list(cur.fetchall())
+
+    def claims_for_study(self, study_id: str) -> List[Dict[str, Any]]:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT * FROM {SCHEMA}.claims WHERE study_id = %s "
+                    f"ORDER BY source_field, numeric_value DESC",
+                    (study_id,),
+                )
+                return list(cur.fetchall())
+
+    def count_claims(self) -> int:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.claims")
+                return int(cur.fetchone()["c"])
+
+    # ------------------------------------------------------------------
     # Crawl runs
     # ------------------------------------------------------------------
 
