@@ -111,6 +111,27 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A11. Streamlit allowed for the control UI only (scoped exception to A2)
+- **Date:** 2026-05-28
+- **Decision:** Streamlit is permitted **inside `study_scraper/console/`**
+  and nowhere else. The ingest pipeline (`study_scraper/discovery/`,
+  `pipeline.py`, `storage/`, CLI) must not import `streamlit` —
+  enforced by code review, not by tooling.
+- **Rationale:** A2 says the project must run without Streamlit. The
+  control UI is a separate concern (read-only DB views + a CSV editor)
+  with no path into the ingest pipeline; keeping it inside the same
+  package is convenient and keeps it from drifting away from the data
+  model. The cost of a tiny streamlit dependency for the operator UI
+  is small; the cost of building a separate package for two pages is
+  large.
+- **Scope of the UI:** strictly two features for v1, both requested by
+  the maintainer: (1) topics editor with live "what would match"
+  preview, (2) coverage / status overview. No charts, no live ingest
+  control, no auth — the dock runs locally against the operator's own
+  Postgres. Anything beyond that needs a new decision.
+- **Run command:** `streamlit run study_scraper/console/Home.py`. Not
+  containerised. No legacy `streamlit_app/` reuse.
+
 ### A10. Eval gold set deferred (resolves Q8 partially)
 - **Date:** 2026-05-05
 - **Decision:** No gold set yet. Build the pipeline first; define the

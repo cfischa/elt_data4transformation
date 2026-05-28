@@ -1,6 +1,6 @@
 # Common development tasks for BnB Data4Transformation
 
-.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke streamlit scrape scrape-topics scrape-test
+.PHONY: help init dev test lint format up down logs reset extract load transform pipeline status init-db dbt-run dbt-version smoke streamlit scrape scrape-topics scrape-test scrape-status scrape-dock
 
 # Default target
 help:
@@ -253,6 +253,12 @@ scrape:
 
 scrape-test:
 	@pytest tests/study_scraper -q
+
+scrape-status:
+	@python -m study_scraper status
+
+scrape-dock:
+	@streamlit run study_scraper/console/Home.py
 
 # Production
 build:

@@ -1,7 +1,7 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-24 (Phase 4 milestone hit: 6 verified klima
-studies in Postgres)._
+_Last updated: 2026-05-28 (Phase 5 partial: OpenAlex live, multi-topic
+ingest validated, control dock shipped)._
 
 ## State at a glance
 
@@ -17,21 +17,33 @@ studies in Postgres)._
   rule-based topic filter ported from the legacy classifier, decoupled
   from ClickHouse; pipeline orchestrator (`run_one`) with idempotent
   upserts and crawl-run bookkeeping; `run` and `list` CLI commands.
-- **Milestone hit (2026-05-24):** maintainer's goal "verified 3
-  studies/datasets relevant for the defined use case and pulled the
-  data to database" — exceeded with **6 verified climate-relevant
-  SSOAR studies** in Postgres. See
+- **Code (Phase 5, partial):** OpenAlex `/works` discovery source
+  (live + fixture, abstract reconstruction from inverted index, DOI
+  preferred canonical URL); per-upsert merge of `source_urls` and
+  `topic_ids` arrays so re-discovery accumulates rather than
+  overwrites; status / coverage report module used by both the CLI
+  `status` command and the Streamlit dock; Streamlit control dock
+  (`study_scraper/console/`) with Home (status) + Topics (editor with
+  live "what would match" preview) per A11.
+- **Milestone hit (2026-05-24):** "3 climate studies in DB" goal
+  exceeded — 6 verified SSOAR studies. See
   `docs/study_scraper/notes/first-run-2026-05-24.md`.
-- **Tests:** 65 pass — 7 SSOAR parser tests against the fixture, 9
-  topic-filter tests, 5 end-to-end pipeline tests against real Postgres,
-  plus topics/models/storage/CLI.
-- **Known sandbox limit:** the dev sandbox blocks outbound HTTP to
-  ssoar.info / openalex.org / etc. Live mode of the SSOAR source has
-  been written but not exercised here; it shares the parser with the
-  fixture path that *is* tested. Maintainer can verify live by dropping
-  `--from-file` when running from a network-enabled machine.
-- **Next:** Phase 5 — second + third sources (OpenAlex, Bundestag) on
-  top of the same `DiscoverySource` interface.
+- **Multi-topic broader run (2026-05-28):** 13 studies across 2 topics
+  (klima, migration_einwanderung) × 2 sources (SSOAR, OpenAlex). See
+  `docs/study_scraper/notes/multi-topic-run-2026-05-28.md`. Two real
+  findings: migration topic vocabulary missing word forms
+  (Migranten/Zuwanderer), cross-source dedup gap (same study, 2 URLs).
+  Both queued in `TODO.md`.
+- **Data shape:** documented in `docs/study_scraper/DATA.md` — schema,
+  indexes, example row, common SQL queries.
+- **Tests:** 86 pass — 10 OpenAlex parser tests, 3 status report tests,
+  3 console tests (page compile + CSV writer), plus the Phase 4 suite.
+- **Known sandbox limit:** the dev sandbox blocks outbound HTTP. Live
+  modes of both sources share their parser with the fixture path that
+  *is* tested; the maintainer verifies live by dropping `--from-file`.
+- **Next:** Phase 5b — cross-source dedup (DOI fallback + title
+  near-duplicate); Phase 5c — Bundestag DIP source; Phase 6 — stage-2
+  semantic relevance.
 
 This is an honest read of what's in the repo today, written as input to the
 scraper pivot. It is **not** a release status report for the legacy ELT

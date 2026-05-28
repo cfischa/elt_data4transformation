@@ -91,14 +91,32 @@ before they start.
       topical relevance. Full-text fetching lands when stage-2
       semantic scoring needs it (Phase 6).
 
-## Phase 5 — Second + third source
+## Phase 5 — Second + third source (in progress)
 
-- [ ] Add OpenAlex source (per A6).
-- [ ] Add DAWUM source (port the existing legacy connector behind the
-      `DiscoverySource` interface; do not import the legacy ClickHouse
-      loader).
-- [ ] Add Bundestag publications source.
-- [ ] Validate dedup across sources.
+- [x] **OpenAlex source** (`study_scraper/discovery/openalex.py`) —
+      `/works` JSON, abstract reconstruction from inverted index,
+      DOI-preferred canonical URL, `from_file` fixture mode. 10 unit
+      tests against a real-DOI fixture.
+- [x] **Multi-topic, multi-source ingest** validated end-to-end
+      against real Postgres: 13 studies across 2 topics × 2 sources;
+      see `docs/study_scraper/notes/multi-topic-run-2026-05-28.md`.
+- [x] **Status / coverage report** (`study_scraper/status.py`) — used
+      by the CLI `status` command and the Streamlit dock; 3 integration
+      tests.
+- [x] **Streamlit control dock** (`study_scraper/console/`) — Home page
+      (status overview) + Topics page (editor with live "what would
+      match" preview against current DB). Scope-limited by A11. 3
+      tests (page compile + CSV writer round-trip).
+- [ ] **DAWUM source** (port the legacy connector behind
+      `DiscoverySource`; no ClickHouse imports). Defer until tier-2 if
+      it doesn't surface signal that the existing 2 sources miss.
+- [ ] **Bundestag publications source** — DIP REST API
+      (https://search.dip.bundestag.de/api/v1/), free key by email.
+      Pushed to next iteration to keep scope tight.
+- [ ] **Cross-source dedup** — DOI fallback + title-near-duplicate
+      (rapidfuzz). Made concrete by the multi-topic run: the same
+      Erdgas study appeared as 2 rows under SSOAR and OpenAlex.
+      Lands in Phase 5b.
 
 ## Phase 6 — Stage-2 semantic relevance
 

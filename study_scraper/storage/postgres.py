@@ -173,11 +173,25 @@ class PostgresStorage:
                 payload = self._study_to_row(study)
                 placeholders = ", ".join(["%s"] * len(payload))
                 columns = ", ".join(payload.keys())
-                updates = ", ".join(
-                    f"{col} = EXCLUDED.{col}"
-                    for col in payload
-                    if col not in {"id", "created_at"}
-                )
+                # Most columns overwrite on conflict, but accumulate
+                # array fields that grow with each re-discovery
+                # (source_urls, topic_ids) — different sources can
+                # surface the same canonical_url, and the same study can
+                # match multiple topics across runs.
+                _MERGE_ARRAY_COLS = {"source_urls", "topic_ids"}
+                _PRESERVE_COLS = {"id", "created_at"}
+                update_parts: List[str] = []
+                for col in payload:
+                    if col in _PRESERVE_COLS:
+                        continue
+                    if col in _MERGE_ARRAY_COLS:
+                        update_parts.append(
+                            f"{col} = (SELECT ARRAY(SELECT DISTINCT unnest("
+                            f"{SCHEMA}.studies.{col} || EXCLUDED.{col})))"
+                        )
+                    else:
+                        update_parts.append(f"{col} = EXCLUDED.{col}")
+                updates = ", ".join(update_parts)
 
                 cur.execute(
                     f"""

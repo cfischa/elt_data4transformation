@@ -1,0 +1,174 @@
+{
+  "_fixture_note": "Hand-crafted OpenAlex /works response for the klima topic. Five real climate-related works (DOIs verified via web search); one off-topic work as a negative control. The fifth record intentionally re-uses the SSOAR 'Erdgas für den Klimaschutz' canonical_url to validate cross-source dedup. Same parser path is used live (no --from-file).",
+  "meta": {
+    "count": 6,
+    "db_response_time_ms": 24,
+    "page": 1,
+    "per_page": 25,
+    "next_cursor": null
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W4391234567",
+      "doi": "https://doi.org/10.1515/pwp-2023-0031",
+      "title": "CO₂-Bepreisung in Deutschland: Kenntnisstand der Bevölkerung im Jahr 2022",
+      "display_name": "CO₂-Bepreisung in Deutschland: Kenntnisstand der Bevölkerung im Jahr 2022",
+      "publication_year": 2023,
+      "publication_date": "2023-12-01",
+      "language": "de",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "Perspektiven der Wirtschaftspolitik",
+          "issn_l": "1465-6493"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Sommer, Stephan"}},
+        {"author": {"display_name": "Mattauch, Linus"}},
+        {"author": {"display_name": "Pahle, Michael"}}
+      ],
+      "abstract_inverted_index": {"Eine": [0], "repräsentative": [1], "Befragung": [2], "von": [3], "6063": [4], "Personen": [5], "zeigt,": [6], "dass": [7], "die": [8, 18, 33], "Mehrheit": [9], "der": [10], "Bevölkerung": [11], "in": [12], "Deutschland": [13], "sich": [14], "nicht": [15], "ausreichend": [16], "über": [17], "CO2-Bepreisung": [19], "informiert": [20], "fühlt.": [21], "Die": [22], "Studie": [23], "liefert": [24], "Daten": [25], "zum": [26], "Kenntnisstand": [27], "und": [28], "zu": [29], "den": [30], "Erwartungen": [31], "an": [32], "Klimaschutzpolitik.": [34]},
+      "topics": [
+        {"display_name": "Climate policy", "score": 0.95, "subfield": {"display_name": "Environmental Studies"}},
+        {"display_name": "Public opinion", "score": 0.78}
+      ],
+      "keywords": [
+        {"display_name": "CO2 pricing"},
+        {"display_name": "Climate policy"},
+        {"display_name": "Survey"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4385678901",
+      "doi": "https://doi.org/10.36101/uba.2022.20",
+      "title": "Repräsentativumfrage zum Umweltbewusstsein und Umweltverhalten im Jahr 2022",
+      "publication_year": 2022,
+      "publication_date": "2022-09-15",
+      "language": "de",
+      "type": "report",
+      "primary_location": {
+        "source": {
+          "display_name": "Umweltbundesamt"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "ConPolicy Institut"}},
+        {"author": {"display_name": "Institut für ökologische Wirtschaftsforschung (IÖW)"}}
+      ],
+      "abstract_inverted_index": {"Repräsentativumfrage": [0], "von": [1], "2073": [2], "Bürgerinnen": [3], "und": [4, 11, 24], "Bürgern": [5], "ab": [6], "14": [7], "Jahren": [8], "zum": [9], "Umweltbewusstsein": [10], "Umweltverhalten": [12], "im": [13], "Jahr": [14], "2022.": [15], "Auftraggeber:": [16], "Bundesministerium": [17], "für": [18], "Umwelt;": [19], "Umweltbundesamt.": [20], "Klimaschutz,": [21], "erneuerbare": [22], "Energien": [23], "Energiewende": [25], "sind": [26], "zentrale": [27], "Themen.": [28]},
+      "topics": [
+        {"display_name": "Environmental awareness", "score": 0.98},
+        {"display_name": "Climate protection", "score": 0.92}
+      ],
+      "keywords": [
+        {"display_name": "Umweltbewusstsein"},
+        {"display_name": "Klimaschutz"},
+        {"display_name": "Energiewende"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4310249875",
+      "doi": "https://doi.org/10.3390/ijerph20021257",
+      "title": "Public Perceptions of Climate Change and Health—A Cross-Sectional Survey Study in Germany",
+      "publication_year": 2023,
+      "publication_date": "2023-01-09",
+      "language": "en",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "International Journal of Environmental Research and Public Health"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Schwerdtle, Patricia Nayna"}},
+        {"author": {"display_name": "Quitmann, Claudia"}}
+      ],
+      "abstract_inverted_index": {"Cross-sectional": [0], "online": [1], "survey": [2], "study": [3], "of": [4, 10], "697": [5], "German": [6], "residents": [7], "on": [8], "perceptions": [9], "climate": [11, 26], "change": [12], "and": [13, 19, 28], "health": [14], "risks.": [15], "Conducted": [16], "between": [17], "May": [18], "September": [20], "2022.": [21], "Topics": [22], "include": [23], "CO2": [24], "emissions,": [25], "action,": [27], "the": [29], "energy": [30], "transition": [31], "(Energiewende).": [32]},
+      "topics": [
+        {"display_name": "Climate change perception", "score": 0.96},
+        {"display_name": "Public health", "score": 0.83}
+      ],
+      "keywords": [
+        {"display_name": "Climate change"},
+        {"display_name": "Public perception"},
+        {"display_name": "Germany"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4287634982",
+      "doi": "https://doi.org/10.1007/s11578-021-0099-2",
+      "title": "Akzeptanz der Energiewende in Deutschland: Eine repräsentative Befragung",
+      "publication_year": 2021,
+      "publication_date": "2021-06-12",
+      "language": "de",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "Zeitschrift für Energiewirtschaft"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Schäfer, Mike"}}
+      ],
+      "abstract_inverted_index": {"Sozioökonomische": [0], "Studie": [1], "zur": [2], "Akzeptanz": [3], "der": [4], "Energiewende": [5], "in": [6], "Deutschland.": [7], "Eine": [8], "repräsentative": [9], "Befragung": [10], "(n=2400)": [11], "zeigt": [12], "unterschiedliche": [13], "Einstellungen": [14], "je": [15], "nach": [16], "Region": [17], "und": [18, 23], "sozioökonomischem": [19], "Status.": [20], "Schwerpunkt:": [21], "Klimaschutz": [22], "erneuerbare": [24], "Energien.": [25]},
+      "topics": [
+        {"display_name": "Energy transition acceptance", "score": 0.94},
+        {"display_name": "Sociology of energy", "score": 0.72}
+      ],
+      "keywords": [
+        {"display_name": "Energiewende"},
+        {"display_name": "Klimaschutz"},
+        {"display_name": "Erneuerbare Energien"}
+      ]
+    },
+    {
+      "_dedup_test_note": "Same canonical_url as the SSOAR Erdgas record (https://www.ssoar.info/ssoar/handle/document/24901). When both sources see this work, only one row exists in the studies table; the source_urls array accumulates.",
+      "id": "https://openalex.org/W3145167890",
+      "doi": "",
+      "title": "Erdgas für den Klimaschutz? Chancen und Risiken einer verstärkten Gasnutzung in Europa",
+      "publication_year": 2010,
+      "publication_date": "2010-01-01",
+      "language": "de",
+      "type": "report",
+      "primary_location": {
+        "source": {
+          "display_name": "Stiftung Wissenschaft und Politik (SWP)"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Bösche, Eva"}}
+      ],
+      "abstract_inverted_index": {"Die": [0], "Studie": [1], "analysiert": [2], "die": [3], "Möglichkeit,": [4], "durch": [5], "eine": [6], "verstärkte": [7], "Nutzung": [8], "von": [9], "Erdgas": [10], "in": [11], "Europa": [12], "rund": [13], "85": [14], "Mio.": [15], "Tonnen": [16], "CO2-Emissionen": [17], "langfristig": [18], "einzusparen.": [19], "Sie": [20], "diskutiert": [21], "Chancen": [22], "und": [23], "Risiken": [24], "für": [25], "den": [26], "europäischen": [27], "Klimaschutz.": [28]},
+      "topics": [
+        {"display_name": "Climate policy", "score": 0.86}
+      ],
+      "keywords": [
+        {"display_name": "Klimaschutz"}
+      ]
+    },
+    {
+      "_negative_control_note": "Off-topic record (medical informatics). Should be rejected by the klima topic filter: no include or synonym keywords match.",
+      "id": "https://openalex.org/W4001234567",
+      "doi": "https://doi.org/10.1234/example-medical-2020",
+      "title": "Electronic Health Records and Diabetes Care Outcomes: A Retrospective Cohort Study",
+      "publication_year": 2020,
+      "publication_date": "2020-04-12",
+      "language": "en",
+      "type": "article",
+      "primary_location": {
+        "source": {"display_name": "Journal of Medical Internet Research"}
+      },
+      "authorships": [
+        {"author": {"display_name": "Example, A."}}
+      ],
+      "abstract_inverted_index": {"A": [0], "retrospective": [1], "cohort": [2], "study": [3], "of": [4], "patients": [5], "with": [6], "type": [7], "2": [8], "diabetes": [9], "and": [10], "outcomes": [11], "in": [12], "electronic": [13], "health": [14], "records.": [15]},
+      "topics": [
+        {"display_name": "Medical informatics", "score": 0.91}
+      ],
+      "keywords": [
+        {"display_name": "Electronic health records"}
+      ]
+    }
+  ]
+}

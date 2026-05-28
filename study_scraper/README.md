@@ -21,7 +21,39 @@ This package is the **independent project** described in
 ```
 python -m study_scraper --help
 python -m study_scraper topics
-python -m study_scraper run --source ssoar --topic klima --limit 50  # Phase 4
+python -m study_scraper migrate                                  # apply SQL
+python -m study_scraper run --source ssoar    --topic klima --limit 50
+python -m study_scraper run --source openalex --topic klima --limit 50
+python -m study_scraper list --topic klima
+python -m study_scraper status                                   # coverage overview
+streamlit run study_scraper/console/Home.py                       # control dock
+```
+
+## Control dock
+
+`streamlit run study_scraper/console/Home.py` boots the operator UI.
+Two pages, two features (per `docs/study_scraper/DECISIONS.md` A11 —
+Streamlit is allowed inside `console/` only):
+
+- **Home** — status overview: total studies, per-topic / per-source
+  coverage, recent crawl runs, keep rate, failures.
+- **Topics** — edit a topic's keywords; the page shows in real time
+  how many studies *already in the DB* would match the new definition,
+  plus the diff against the saved topic. Saving writes back to
+  `config/topics/topics.csv`; the next CLI run picks it up. The dock
+  does **not** start an ingest.
+
+## Reading the data
+
+Studies, crawl runs, and the join table all live in the
+**`study_scraper`** Postgres schema. The schema, indexes, and example
+queries are documented in [`../docs/study_scraper/DATA.md`](../docs/study_scraper/DATA.md).
+
+Quick peek without leaving the shell:
+
+```bash
+python -m study_scraper list --topic klima
+psql "$POSTGRES_URL" -c "SELECT title, topic_scores FROM study_scraper.studies LIMIT 5"
 ```
 
 ## Hard rules

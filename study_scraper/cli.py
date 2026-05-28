@@ -13,6 +13,7 @@ import typer
 
 from study_scraper import __version__
 from study_scraper.config import get_settings
+from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage, StorageError, resolve_database_url
@@ -115,13 +116,16 @@ def run(
     ),
 ) -> None:
     """Run a discovery source against one topic and persist results."""
-    if source != "ssoar":
+    if source == "ssoar":
+        ctx = SSOARSource(from_file=from_file)
+    elif source == "openalex":
+        ctx = OpenAlexSource(from_file=from_file)
+    else:
         raise typer.BadParameter(
-            f"unknown source {source!r}; supported: ssoar (Phase 4)"
+            f"unknown source {source!r}; supported: ssoar, openalex"
         )
     topic_obj = _load_topic(topic)
     storage = _storage_from_settings()
-    ctx = SSOARSource(from_file=from_file)
 
     with ctx as src:
         crawl_run = run_one(
@@ -136,6 +140,16 @@ def run(
         f"run {crawl_run.id}: seen={crawl_run.candidates_seen} "
         f"kept={crawl_run.candidates_kept} errors={crawl_run.errors}"
     )
+
+
+@app.command()
+def status() -> None:
+    """Print a coverage / health overview to stdout (cron-friendly)."""
+    from study_scraper.status import build_status, format_text
+
+    storage = _storage_from_settings()
+    report = build_status(storage)
+    typer.echo(format_text(report))
 
 
 @app.command("list")
