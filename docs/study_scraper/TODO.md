@@ -107,16 +107,141 @@ before they start.
       (status overview) + Topics page (editor with live "what would
       match" preview against current DB). Scope-limited by A11. 3
       tests (page compile + CSV writer round-trip).
-- [ ] **DAWUM source** (port the legacy connector behind
-      `DiscoverySource`; no ClickHouse imports). Defer until tier-2 if
-      it doesn't surface signal that the existing 2 sources miss.
-- [ ] **Bundestag publications source** — DIP REST API
-      (https://search.dip.bundestag.de/api/v1/), free key by email.
-      Pushed to next iteration to keep scope tight.
-- [ ] **Cross-source dedup** — DOI fallback + title-near-duplicate
-      (rapidfuzz). Made concrete by the multi-topic run: the same
-      Erdgas study appeared as 2 rows under SSOAR and OpenAlex.
-      Lands in Phase 5b.
+- [ ] **Cross-source dedup** (Phase 5b) — DOI fallback +
+      title-near-duplicate (rapidfuzz). Made concrete by the multi-
+      topic run: the same Erdgas study appeared as 2 rows under SSOAR
+      and OpenAlex. Pre-req for fair source-coverage counts.
+
+## Phase 5c — Sources expansion (primary metric is coverage; A12)
+
+A12 reframed: more sources = more coverage. The earlier "pull DAWUM
+only if a gap shows up" is overturned. Plan: wire **every source on
+this list** behind the `DiscoverySource` interface. Order is
+effort-ascending; each entry has a one-line live-mode plan + a
+fixture for sandbox dev.
+
+Academic / repository (lowest-friction, highest yield):
+- [ ] **DAWUM** — port the legacy `connectors/dawum_connector.py`
+      behind `DiscoverySource`. Polling-aggregator-shaped data;
+      especially valuable for topical surveys (klima, migration,
+      steuern).
+- [ ] **BASE** (Bielefeld Academic Search Engine) — OAI-PMH
+      compatible; same parser shape as SSOAR.
+- [ ] **CORE** — REST API, free key, broad academic coverage.
+- [ ] **GESIS DBK** (Datenbestandskatalog, the wider GESIS catalog
+      beyond SSOAR) — likely SPARQL via the existing legacy GESIS
+      connector; port behind interface.
+
+Government:
+- [ ] **Bundestag DIP** — REST API at
+      `https://search.dip.bundestag.de/api/v1/`, free key by email.
+      Drucksachen, Sachstandsberichte, Vorgänge.
+- [ ] **Destatis GENESIS** — port the existing legacy connector.
+- [ ] **Umweltbundesamt (UBA)** — has a structured publications list
+      (HTML + RSS). Climate-heavy.
+- [ ] **BAMF Forschungszentrum** — Migration / Integration. Has a
+      publications page with a sitemap.
+
+Think tanks (heterogeneous; one source class can cover several with a
+config-driven scraper):
+- [ ] **SWP** (Stiftung Wissenschaft und Politik) — RSS + sitemap.
+- [ ] **DIW Berlin** — RSS + publications page.
+- [ ] **Ifo** — RSS.
+- [ ] **Bertelsmann Stiftung** — sitemap.
+- [ ] **FES** (Friedrich-Ebert-Stiftung) — sitemap.
+- [ ] **KAS** (Konrad-Adenauer-Stiftung) — sitemap.
+- [ ] **Sachverständigenrat** — publications page.
+
+Civic society / data:
+- [ ] **wahlrecht.de** — long-running election + polling site.
+
+Implementation note: rather than 12 bespoke classes, group think tanks
+behind one **sitemap/RSS source** parameterised by per-publisher YAML
+config. The interface stays the same; the operator adds new think
+tanks by editing config, not Python.
+
+## Phase 5d — New-source discovery (per A12)
+
+"Browsing tool which finds new studies/sources which are not already
+in the standard list" — the missing capability the maintainer flagged
+2026-05-28. Coverage isn't bounded by the source list we hard-code;
+the tool must keep finding new sources too.
+
+Three mechanisms, ranked by yield / effort:
+
+- [ ] **Reference / related-works follower** — when we ingest an
+      OpenAlex Work, follow `referenced_works[]` and `related_works[]`
+      one hop. Each becomes a candidate `Study`. Cheap recall booster.
+      We already capture these IDs (need to expand the OpenAlex source
+      to write them to `provenance`).
+- [ ] **Domain audit** — periodic WebSearch (or, on the maintainer's
+      machine, real web search) for `<topic include keyword> studie
+      Deutschland`, capture result URLs, group by domain. Domains we
+      don't have a source for surface as **candidate sources** in the
+      dock for human review (accept → add to the sitemap-source YAML).
+- [ ] **Citation-context mining (Phase 6+)** — when we have the full
+      text of a study (PDF extracted), find URLs and DOIs in the
+      references section, normalize them to candidate studies. Defer
+      until PDF extraction lands.
+
+Control-dock surface: a third page **"Sources"** with
+  - the table of known sources (id, kind, last successful run, study
+    count, error count),
+  - a queue of **candidate sources** discovered by the audit, with
+    accept / reject buttons,
+  - a queue of **candidate studies** discovered by the
+    reference-follower but not yet ingested.
+
+## Phase 6 — Stage-2 semantic relevance (unchanged from earlier plan)
+
+Lower priority now that A12 emphasises recall over precision; remains
+in the roadmap so that the *human* reviewer's view of candidates is
+ranked sensibly, even though we no longer use it as an ingest gate.
+
+## Phase 7 — Eval harness (deferred, post-Phase 5c)
+
+Per A10, gold set is built after we have real candidates to curate.
+Once Phase 5c has the broader source set ingesting, the gold set's
+coverage estimates become meaningful.
+
+## OPEN — needs maintainer call (Discuss-if-not-sure questions)
+
+These touch design, not just sequencing. Calling them out so the next
+build pass doesn't bake in an assumption you'd reverse.
+
+### Q12. Keep candidates below the threshold (recall over precision)?
+**Proposal:** Add a `candidates` table parallel to `studies`. Anything
+the source yields and survives the exclude-keywords short-circuit gets
+written there, regardless of score. Promotion to `studies` happens
+when score ≥ threshold OR a human accepts in the dock. This makes the
+human-in-the-loop precision story honest — nothing is dropped silently
+just for being borderline.
+**Cost:** one new table, a "review queue" page in the dock, doubles
+write volume.
+**Need:** yes/no on the proposal. (My recommendation: yes, this is
+the cleanest expression of A12.)
+
+### Q13. Reset success-criteria thresholds in GOAL.md?
+**Proposal:** I rewrote GOAL.md's success criteria for the new
+framing (source count ≥ 8, studies-per-topic ≥ 50 on ≥ 3 topics,
+recall ≥ 80 % on a gold set, plus secondary precision ≥ 70 %, fields
+≥ 90 %). These are guesses — they need your ratification or override.
+**Need:** confirm the numbers, or send replacements.
+
+### Q14. Think tanks as one config-driven source or N source classes?
+**Proposal:** one **SitemapSource** class taking a YAML config that
+lists `(publisher_id, sitemap_url, css_selectors_for_metadata)`. The
+operator adds a new think tank by editing YAML, not Python. Trades a
+bit of indirection for a lot less code to maintain.
+**Need:** yes/no. (My recommendation: yes.)
+
+### Q15. New-source discovery — how aggressive?
+**Proposal:** all three mechanisms (reference-follower, domain audit,
+citation mining) are useful eventually. For now, build the **reference
+/ related-works follower first** because we already have the data
+(OpenAlex returns these IDs for free). Domain audit lands when the
+dock's Sources page exists. Citation mining waits for PDF extraction.
+**Need:** confirm the order, or override.
 
 ## Phase 6 — Stage-2 semantic relevance
 

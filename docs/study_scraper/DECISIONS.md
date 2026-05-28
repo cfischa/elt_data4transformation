@@ -111,6 +111,40 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A12. Coverage is the primary metric (paradigm sharpened)
+- **Date:** 2026-05-28
+- **Decision:** Coverage — the breadth of studies we have ingested
+  across the universe of German-political-topic publications — is the
+  **primary** project metric. Precision, extraction quality, and the
+  other dimensions in `GOAL.md` are secondary and serve coverage being
+  useful. When designs conflict, the choice that produces broader
+  coverage wins by default.
+- **Rationale:** Maintainer (2026-05-28): "Heart of the project is a
+  high coverage of all studies for German politic topics." The
+  original `GOAL.md` listed coverage as one of six dimensions; that
+  framing implied equal weighting and led to a precision-leaning
+  default at ingest time. The new framing matches the project's
+  intent.
+- **Consequences (changes to current code / docs):**
+  1. `GOAL.md` rewritten: coverage promoted to primary; precision /
+     extraction-quality reclassified as secondary; old narrow framing
+     "studies that contain extractable survey/poll data" removed (it
+     conflicted with A5 anyway).
+  2. Old success criteria (precision ≥ 90 %, fields ≥ 95 %) lowered to
+     secondary thresholds. New primary criteria added: source count,
+     studies-per-topic count, new-source discovery.
+  3. The default ingest `min_score` stays a tunable knob, but the
+     **default direction is recall over precision**. Precision is
+     dock-managed (the topics editor's preview panel lets the operator
+     fix false positives by editing keywords, not by raising the
+     threshold).
+  4. **No source dropped speculatively.** My earlier reasoning of
+     "pull DAWUM only if a coverage gap shows up" is overturned by
+     this decision — more sources = more coverage, period, unless a
+     source is genuinely off-topic or paywalled.
+  5. New work category: **new-source discovery** — tooling that finds
+     candidate sources we haven't wired up yet. Becomes Phase 5d.
+
 ### A11. Streamlit allowed for the control UI only (scoped exception to A2)
 - **Date:** 2026-05-28
 - **Decision:** Streamlit is permitted **inside `study_scraper/console/`**

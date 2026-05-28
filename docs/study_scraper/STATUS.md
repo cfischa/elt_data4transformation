@@ -1,7 +1,17 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-28 (Phase 5 partial: OpenAlex live, multi-topic
-ingest validated, control dock shipped)._
+_Last updated: 2026-05-28 (paradigm sharpened: A12 makes coverage the
+primary metric; Phase 5 partial shipped; sources-expansion + new-
+source discovery are the next phases)._
+
+## Paradigm note (2026-05-28)
+
+Per A12, **coverage is now the primary metric**. The project is about
+getting a broad overview of what exists across the universe of German-
+political-topic studies. Precision, extraction quality, and other
+dimensions are secondary and exist to make coverage useful for a human
+reviewer. The dock manages precision; ingest favours recall. See
+`GOAL.md` and `DECISIONS.md` A12.
 
 ## State at a glance
 
