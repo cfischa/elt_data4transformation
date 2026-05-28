@@ -25,6 +25,7 @@ class StatusReport:
     generated_at: datetime
     total_studies: int
     studies_with_quant: int
+    studies_per_status: Dict[str, int]
     studies_per_topic: Dict[str, int]
     studies_per_source: Dict[str, int]
     studies_per_topic_source: List[Dict[str, Any]]
@@ -35,6 +36,18 @@ class StatusReport:
     recent_runs: List[Dict[str, Any]]
     candidates_seen_total: int
     candidates_kept_total: int
+
+    @property
+    def pending_count(self) -> int:
+        return self.studies_per_status.get("pending", 0)
+
+    @property
+    def rejected_count(self) -> int:
+        return self.studies_per_status.get("rejected", 0)
+
+    @property
+    def kept_count(self) -> int:
+        return self.studies_per_status.get("kept", 0)
 
     @property
     def keep_rate(self) -> Optional[float]:
@@ -56,9 +69,19 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             studies_with_quant = int(cur.fetchone()["c"])
 
             cur.execute(
+                f"SELECT status, COUNT(*) AS c "
+                f"FROM {SCHEMA}.studies GROUP BY status"
+            )
+            studies_per_status = {row["status"]: int(row["c"]) for row in cur.fetchall()}
+
+            # Per-topic / per-source breakdowns only count `kept`
+            # studies (the user-facing coverage). `pending` and
+            # `rejected` are surfaced separately via studies_per_status.
+            cur.execute(
                 f"""
                 SELECT unnest(topic_ids) AS topic_id, COUNT(*) AS c
                 FROM   {SCHEMA}.studies
+                WHERE  status = 'kept'
                 GROUP  BY topic_id
                 ORDER  BY c DESC
                 """
@@ -69,6 +92,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                 f"""
                 SELECT source_id, COUNT(*) AS c
                 FROM   {SCHEMA}.studies
+                WHERE  status = 'kept'
                 GROUP  BY source_id
                 ORDER  BY c DESC
                 """
@@ -79,6 +103,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                 f"""
                 SELECT unnest(topic_ids) AS topic_id, source_id, COUNT(*) AS c
                 FROM   {SCHEMA}.studies
+                WHERE  status = 'kept'
                 GROUP  BY topic_id, source_id
                 ORDER  BY c DESC
                 """
@@ -130,6 +155,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         generated_at=datetime.now(timezone.utc),
         total_studies=total_studies,
         studies_with_quant=studies_with_quant,
+        studies_per_status=studies_per_status,
         studies_per_topic=studies_per_topic,
         studies_per_source=studies_per_source,
         studies_per_topic_source=studies_per_topic_source,
@@ -148,7 +174,11 @@ def format_text(report: StatusReport) -> str:
     lines: List[str] = []
     lines.append(f"study scraper status @ {report.generated_at.isoformat(timespec='seconds')}")
     lines.append("=" * 64)
-    lines.append(f"  total studies              : {report.total_studies}")
+    lines.append(
+        f"  studies (kept/pending/rejected): "
+        f"{report.kept_count} / {report.pending_count} / {report.rejected_count}  "
+        f"(total {report.total_studies})"
+    )
     lines.append(f"  with quantitative data     : {report.studies_with_quant}")
     lines.append(f"  total crawl runs           : {report.total_runs} "
                  f"({report.successful_runs} clean / {report.failed_runs} with errors)")

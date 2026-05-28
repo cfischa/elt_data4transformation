@@ -127,9 +127,11 @@ This document tracks design decisions for the study scraper. Two sections:
   intent.
 - **Consequences (changes to current code / docs):**
   1. `GOAL.md` rewritten: coverage promoted to primary; precision /
-     extraction-quality reclassified as secondary; old narrow framing
-     "studies that contain extractable survey/poll data" removed (it
-     conflicted with A5 anyway).
+     extraction-quality reclassified as secondary. Studies containing
+     extractable survey/poll data remain a **selection emphasis**
+     (priority signal via `has_quantitative_data`, not a hard filter)
+     — restored per maintainer 2026-05-28. Qualitative studies stay
+     in scope per A5.
   2. Old success criteria (precision ≥ 90 %, fields ≥ 95 %) lowered to
      secondary thresholds. New primary criteria added: source count,
      studies-per-topic count, new-source discovery.

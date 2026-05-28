@@ -156,11 +156,23 @@ def status() -> None:
 def list_studies(
     topic: Optional[str] = typer.Option(None, "--topic"),
     source: Optional[str] = typer.Option(None, "--source"),
+    status: str = typer.Option(
+        "kept",
+        "--status",
+        help="kept (default) | pending | rejected | all",
+    ),
     limit: int = typer.Option(20, "--limit"),
 ) -> None:
-    """Print persisted studies, newest first."""
+    """Print persisted studies, newest first. Status defaults to kept."""
     storage = _storage_from_settings()
-    rows = storage.list_studies(topic_id=topic, source_id=source, limit=limit)
+    status_arg = None if status == "all" else status
+    if status_arg is not None and status_arg not in {"pending", "kept", "rejected"}:
+        raise typer.BadParameter(
+            f"--status must be one of: kept, pending, rejected, all"
+        )
+    rows = storage.list_studies(
+        topic_id=topic, source_id=source, status=status_arg, limit=limit
+    )
     if not rows:
         typer.echo("(no rows)")
         return
@@ -178,6 +190,59 @@ def list_studies(
             f"{row.get('language') or '--'}  {title}"
         )
         typer.echo(f"{'':10}  {row['canonical_url']}")
+
+
+review_app = typer.Typer(
+    help="Human review of pending candidates (Q12 review queue).",
+    no_args_is_help=True,
+)
+app.add_typer(review_app, name="review")
+
+
+@review_app.command("pending")
+def review_pending(
+    topic: Optional[str] = typer.Option(None, "--topic"),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """List candidates awaiting human review."""
+    storage = _storage_from_settings()
+    rows = storage.list_studies(
+        topic_id=topic, status="pending", limit=limit
+    )
+    if not rows:
+        typer.echo("(none pending)")
+        return
+    for row in rows:
+        score = row.get("topic_scores") or {}
+        score_str = ",".join(f"{k}={v:.2f}" for k, v in score.items())
+        title = (row.get("title") or "").replace("\n", " ")
+        if len(title) > 80:
+            title = title[:77] + "..."
+        typer.echo(f"{row['id'][:12]}  {score_str:<18}  {title}")
+        typer.echo(f"{'':14}  {row['canonical_url']}")
+
+
+@review_app.command("promote")
+def review_promote(
+    study_id: str = typer.Argument(...),
+    by: str = typer.Option(..., "--by", help="Reviewer name / handle."),
+) -> None:
+    """Promote a pending candidate to kept."""
+    storage = _storage_from_settings()
+    changed = storage.promote_study(study_id, reviewed_by=by)
+    typer.echo("promoted" if changed else "no change (already kept or unknown id)")
+
+
+@review_app.command("reject")
+def review_reject(
+    study_id: str = typer.Argument(...),
+    by: str = typer.Option(..., "--by", help="Reviewer name / handle."),
+    reason: Optional[str] = typer.Option(None, "--reason"),
+) -> None:
+    """Reject a candidate. Decision is sticky across re-runs."""
+    storage = _storage_from_settings()
+    changed = storage.reject_study(study_id, reviewed_by=by, reason=reason)
+    typer.echo("rejected" if changed else "no change (already rejected or unknown id)")
 
 
 if __name__ == "__main__":

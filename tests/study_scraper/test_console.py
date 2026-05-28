@@ -24,6 +24,7 @@ CONSOLE_DIR = Path(__file__).resolve().parents[2] / "study_scraper" / "console"
 PAGE_FILES = [
     CONSOLE_DIR / "Home.py",
     CONSOLE_DIR / "pages" / "1_Topics.py",
+    CONSOLE_DIR / "pages" / "2_Review.py",
 ]
 
 

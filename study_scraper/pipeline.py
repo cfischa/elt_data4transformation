@@ -111,6 +111,7 @@ def run_one(
     )
 
     kept_ids: List[tuple[str, bool]] = []
+    pending_count = 0
     seen = 0
     errors = 0
 
@@ -120,7 +121,12 @@ def run_one(
             try:
                 text = " ".join(filter(None, [cand.title, cand.abstract]))
                 match = score_text(text, topic)
-                if not match.passes or match.score < min_score:
+                # Three outcomes per Q12 (DECISIONS.md A12 + Q12 yes):
+                #   - excludes hit OR score == 0 => not stored at all
+                #   - 0 < score < min_score      => stored as 'pending'
+                #     (review queue in the dock)
+                #   - score >= min_score         => stored as 'kept'
+                if not match.passes or match.score <= 0.0:
                     LOGGER.debug(
                         "dropped (%s): %s — %s",
                         cand.canonical_url,
@@ -129,7 +135,17 @@ def run_one(
                     )
                     continue
                 study = _candidate_to_study(cand, match, now=run.started_at)
-                is_new = storage.upsert_study(study)
+                if match.score < min_score:
+                    storage.upsert_study(study, status="pending")
+                    pending_count += 1
+                    LOGGER.info(
+                        "pending (%.2f): %s — %s",
+                        match.score,
+                        cand.title[:80],
+                        cand.canonical_url,
+                    )
+                    continue
+                is_new = storage.upsert_study(study, status="kept")
                 kept_ids.append((study.id, is_new))
                 LOGGER.info(
                     "kept (%.2f): %s — %s",
@@ -145,12 +161,15 @@ def run_one(
                     exc,
                 )
     finally:
+        params_out = dict(run.parameters)
+        params_out["pending"] = pending_count
         run = run.model_copy(
             update={
                 "finished_at": datetime.now(timezone.utc),
                 "candidates_seen": seen,
                 "candidates_kept": len(kept_ids),
                 "errors": errors,
+                "parameters": params_out,
             }
         )
         storage.record_crawl_run(run)

@@ -155,34 +155,76 @@ class PostgresStorage:
     # Studies
     # ------------------------------------------------------------------
 
-    def upsert_study(self, study: Study) -> bool:
+    def upsert_study(self, study: Study, *, status: str = "kept") -> bool:
         """Insert or update a study row.
 
         Returns True if the row was newly inserted, False if it already
         existed (the caller can use this to populate `is_new` on the
         crawl_run_studies junction).
+
+        Status semantics (Q12):
+          - "kept"     — passed the topic threshold; default.
+          - "pending"  — recorded for human review; below threshold.
+          - "rejected" — should only come from `reject_study`, not here.
+
+        Re-discovery rules (sticky human decisions):
+          - existing "kept"     stays "kept" (we don't downgrade).
+          - existing "rejected" stays "rejected" (human said no).
+          - existing "pending" can be promoted to "kept" if the new
+            run brings a `kept` upsert.
         """
+        if status not in {"pending", "kept"}:
+            raise ValueError(
+                f"upsert_study() status must be 'pending' or 'kept'; got {status!r}"
+            )
+
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT 1 FROM {SCHEMA}.studies WHERE id = %s",
+                    f"SELECT status FROM {SCHEMA}.studies WHERE id = %s",
                     (study.id,),
                 )
-                existed = cur.fetchone() is not None
+                existing = cur.fetchone()
+                existed = existing is not None
 
                 payload = self._study_to_row(study)
+                payload["status"] = status
+
                 placeholders = ", ".join(["%s"] * len(payload))
                 columns = ", ".join(payload.keys())
-                # Most columns overwrite on conflict, but accumulate
-                # array fields that grow with each re-discovery
-                # (source_urls, topic_ids) — different sources can
-                # surface the same canonical_url, and the same study can
-                # match multiple topics across runs.
+                # Most columns overwrite on conflict, but:
+                #   - source_urls / topic_ids accumulate (different
+                #     sources may surface the same canonical URL).
+                #   - status is decided by a CASE that respects human
+                #     decisions (see comment above).
+                #   - reviewed_by / reviewed_at / rejected_reason
+                #     are preserved when set; ingest never overrides
+                #     a human review.
                 _MERGE_ARRAY_COLS = {"source_urls", "topic_ids"}
                 _PRESERVE_COLS = {"id", "created_at"}
+                _STICKY_REVIEW_COLS = {
+                    "reviewed_by",
+                    "reviewed_at",
+                    "rejected_reason",
+                }
                 update_parts: List[str] = []
                 for col in payload:
                     if col in _PRESERVE_COLS:
+                        continue
+                    if col == "status":
+                        # rejected stays rejected; kept stays kept;
+                        # pending may be promoted by a kept run.
+                        update_parts.append(
+                            f"status = CASE "
+                            f"WHEN {SCHEMA}.studies.status = 'rejected' THEN 'rejected' "
+                            f"WHEN {SCHEMA}.studies.status = 'kept' THEN 'kept' "
+                            f"ELSE EXCLUDED.status END"
+                        )
+                        continue
+                    if col in _STICKY_REVIEW_COLS:
+                        update_parts.append(
+                            f"{col} = COALESCE({SCHEMA}.studies.{col}, EXCLUDED.{col})"
+                        )
                         continue
                     if col in _MERGE_ARRAY_COLS:
                         update_parts.append(
@@ -219,8 +261,13 @@ class PostgresStorage:
         *,
         topic_id: Optional[str] = None,
         source_id: Optional[str] = None,
+        status: Optional[str] = "kept",
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
+        """List studies. By default returns only `status='kept'` rows;
+        pass `status='pending'` for the review queue, `status='rejected'`
+        for the audit trail, or `status=None` for everything.
+        """
         clauses: List[str] = []
         params: List[Any] = []
         if topic_id is not None:
@@ -229,6 +276,9 @@ class PostgresStorage:
         if source_id is not None:
             clauses.append("source_id = %s")
             params.append(source_id)
+        if status is not None:
+            clauses.append("status = %s")
+            params.append(status)
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         params.append(limit)
         with self.connection() as conn:
@@ -243,6 +293,76 @@ class PostgresStorage:
                     params,
                 )
                 return list(cur.fetchall())
+
+    # ------------------------------------------------------------------
+    # Review queue (Q12)
+    # ------------------------------------------------------------------
+
+    def promote_study(self, study_id: str, *, reviewed_by: str) -> bool:
+        """Move a study from pending → kept. Returns True if a row changed."""
+        return self._set_review_status(
+            study_id,
+            new_status="kept",
+            reviewed_by=reviewed_by,
+            rejected_reason=None,
+            allowed_from={"pending"},
+        )
+
+    def reject_study(
+        self, study_id: str, *, reviewed_by: str, reason: Optional[str] = None
+    ) -> bool:
+        """Move a study to rejected. Returns True if a row changed."""
+        return self._set_review_status(
+            study_id,
+            new_status="rejected",
+            reviewed_by=reviewed_by,
+            rejected_reason=reason,
+            allowed_from={"pending", "kept"},
+        )
+
+    def _set_review_status(
+        self,
+        study_id: str,
+        *,
+        new_status: str,
+        reviewed_by: str,
+        rejected_reason: Optional[str],
+        allowed_from: set,
+    ) -> bool:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.studies
+                       SET status          = %s,
+                           reviewed_by     = %s,
+                           reviewed_at     = now(),
+                           rejected_reason = %s,
+                           updated_at      = now()
+                     WHERE id = %s
+                       AND status = ANY(%s)
+                    """,
+                    (
+                        new_status,
+                        reviewed_by,
+                        rejected_reason,
+                        study_id,
+                        list(allowed_from),
+                    ),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
+    def count_studies_by_status(self) -> Dict[str, int]:
+        """{ status -> n }. Used by status report + dock."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT status, COUNT(*) AS c "
+                    f"FROM {SCHEMA}.studies GROUP BY status"
+                )
+                return {row["status"]: int(row["c"]) for row in cur.fetchall()}
 
     # ------------------------------------------------------------------
     # Crawl runs

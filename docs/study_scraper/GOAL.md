@@ -36,8 +36,13 @@ when designs conflict.
    For each configured topic, the scraper surfaces a high fraction of
    the publicly-available German-context studies on that topic —
    academic, government, think-tank, polling aggregator, civic-society.
-   Not restricted to studies with quantitative data (per A5, qualitative
-   policy papers are kept too with a flag).
+
+   Within the broad set, **studies that contain extractable survey or
+   poll data are the selection emphasis** (they are the core of what
+   step 2 will use). They are flagged via `has_quantitative_data` and
+   surface higher in the dock's review and ranking views. **They are
+   not a filter:** qualitative policy papers are still ingested per
+   A5; the flag is a priority signal, not a binary cut.
 
    Coverage has two faces:
    - **Source coverage** — how many of the publishers / repositories
@@ -91,6 +96,14 @@ when designs conflict.
   not a scope reduction.
 
 ## Success criteria
+
+These are the **project-completion bar** — when is step 1 done so we
+can move on to step 2 (data engineering). They are measured by the
+Phase 7 eval harness running on real ingested data after the sources
+expansion (Phase 5c) lands. They are **not** unit-test thresholds: the
+test suite has its own pass/fail per commit and isn't a moving
+ratchet. The criteria below answer a different question — *"do we
+have enough data to do step 2?"*.
 
 Revised for the coverage-first framing. Old (precision-heavy) thresholds
 move to "secondary".
