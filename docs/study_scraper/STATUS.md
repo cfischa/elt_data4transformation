@@ -44,6 +44,34 @@ Two new open questions raised by the research:
 - **Q18** — microdata: file-only or row-level parsing? **Now moot
   under A14** (everything is payload-stored; row access is a view).
 
+## /goal hit (2026-05-29): real data from 3 sources, both test-case questions answered
+
+`docs/study_scraper/notes/real-data-3-sources-2026-05-29.md`.
+
+Three sources ingest end-to-end against real, current 2025-2026 data
+(harvested live via WebSearch since outbound HTTP from the dev
+sandbox is blocked): SSOAR (6 academic studies), OpenAlex (10
+records including 3 freshly harvested 2025 reports: Deutschland-
+Monitor 2025 FGZ, Ipsos Earth Day 2025, Eurobarometer 538 2025), and
+DAWUM lake (1 YouGov May 2026 Bundestag poll, n=1783, fanned to 8
+typed party-result rows via `dawum_poll_results`).
+
+  $ python -m study_scraper search klimaschutzgesetz
+    80.0%  Eurobarometer 538 2025          —  EU climate priority
+    62.0%  Forsa / Klima-Allianz (n=1009)  —  binding climate-law support
+    44.0%  Sommer/Mattauch/Pahle 2022      —  stricter climate-law support
+
+  $ python -m study_scraper search atomkraft
+    65.0%  Civey longitudinal              —  Kernkraft nutzen (since mid-2022)
+    55.0%  Innofact/Verivox March 2025     —  Wiedereinstieg
+    36.0%  Innofact/Verivox March 2025     —  oppose
+
+  $ python -m study_scraper view dawum_poll_results
+    AfD 28 · Union 22 · SPD 13 · Grüne 13 · Linke 11 · FDP 4 · BSW 4 · Sonst 5
+    (YouGov, fieldwork 2026-05-08 to 2026-05-11, n=1783)
+
+151 tests pass.
+
 ## Lake live (2026-05-29; A14)
 
 `source_records` table (migration 0005), `SourceRecord` model,

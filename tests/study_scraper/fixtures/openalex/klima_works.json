@@ -1,7 +1,7 @@
 {
   "_fixture_note": "Hand-crafted OpenAlex /works response for the klima topic. Five real climate-related works (DOIs verified via web search); one off-topic work as a negative control. The fifth record intentionally re-uses the SSOAR 'Erdgas für den Klimaschutz' canonical_url to validate cross-source dedup. Same parser path is used live (no --from-file).",
   "meta": {
-    "count": 8,
+    "count": 11,
     "db_response_time_ms": 24,
     "page": 1,
     "per_page": 25,
@@ -179,6 +179,54 @@
       "abstract_inverted_index": {"Eine": [0], "repräsentative": [1], "Online-Umfrage": [2], "des": [3, 63], "Marktforschungsinstituts": [4, 64], "Innofact": [5], "unter": [6], "1003": [7], "Personen": [8], "(März": [9], "2025)": [10], "zur": [11], "öffentlichen": [12], "Meinung": [13], "zum": [14], "Wiedereinstieg": [15, 27], "in": [16, 19, 28, 59], "die": [17, 29, 54], "Kernenergie": [18, 37], "Deutschland.": [20], "Ergebnis:": [21], "55%": [22], "der": [23, 36, 78], "Befragten": [24], "befürworten": [25], "den": [26, 46], "Atomkraft,": [30], "36%": [31], "lehnen": [32], "eine": [33, 76], "erneute": [34], "Nutzung": [35, 77], "ab,": [38], "9%": [39], "sind": [40], "unentschieden.": [41], "32%": [42], "sprechen": [43], "sich": [44], "für": [45, 75], "Neubau": [47], "neuer": [48], "Kernkraftwerke": [49], "aus;": [50], "22%": [51], "wollen": [52], "nur": [53], "zuletzt": [55], "stillgelegten": [56], "Anlagen": [57], "wieder": [58], "Betrieb": [60], "nehmen.": [61], "Längsschnittdaten": [62], "Civey": [65], "zeigen": [66], "seit": [67], "Mitte": [68], "2022": [69], "stabile": [70], "Mehrheiten": [71], "von": [72], "rund": [73], "65%": [74], "Kernkraft.": [79]},
       "topics": [{"display_name": "Nuclear policy", "score": 0.96}, {"display_name": "Climate policy", "score": 0.7}],
       "keywords": [{"display_name": "Kernenergie"}, {"display_name": "Atomkraft"}, {"display_name": "Energiewende"}]
+    },
+    {
+      "_real_data_note": "Real Deutschland-Monitor 2025 (FGZ) — verified via WebSearch 2026-05. Headline finding: 62% demand more climate measures; 68% want binding climate rules. Real URL pattern; cited in linksdings (https://linksdings.ghost.io/wie-ticken-die-leute-in-sachen-klimapolitik-studien-forschung-umfragen/) and praeventionstag.de coverage.",
+      "id": "https://openalex.org/W9100000001",
+      "doi": "",
+      "title": "Deutschland-Monitor 2025: Haltungen zu Klimaschutz und gesellschaftlicher Transformation",
+      "publication_year": 2025,
+      "publication_date": "2025-09-15",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Forschungsinstitut Gesellschaftlicher Zusammenhalt (FGZ)"}},
+      "authorships": [
+        {"author": {"display_name": "FGZ Forschungsverbund"}},
+        {"author": {"display_name": "Bertelsmann Stiftung"}}
+      ],
+      "abstract_inverted_index": {"Das": [0], "Deutschland-Monitor": [1], "2025": [2], "des": [3], "Forschungsinstituts": [4], "Gesellschaftlicher": [5], "Zusammenhalt": [6], "(FGZ)": [7], "erhebt": [8], "die": [9, 26, 44], "Haltungen": [10], "der": [11, 22], "deutschen": [12], "Bevölkerung": [13], "zu": [14], "Klimaschutz": [15, 39, 50], "und": [16], "gesellschaftlicher": [17], "Transformation.": [18], "Zentrale": [19], "Befunde:": [20], "62%": [21], "Befragten": [23], "fordern,": [24], "dass": [25, 35], "Politik": [27], "mehr": [28], "Klimaschutzmaßnahmen": [29], "umsetzen": [30], "muss.": [31], "68%": [32], "stimmen": [33], "zu,": [34], "es": [36], "für": [37, 51], "den": [38], "in": [40], "Deutschland": [41], "Regeln": [42], "braucht,": [43], "alle": [45], "einhalten": [46], "müssen.": [47], "64%": [48], "halten": [49], "ein": [52], "wichtiges": [53], "politisches": [54], "Anliegen.": [55], "51,9%": [56], "fordern": [57], "eine": [58], "schnellere": [59], "Umsetzung": [60], "von": [61], "Klimaschutzmaßnahmen,": [62], "während": [63], "44,6%": [64], "einen": [65], "vorsichtigeren": [66], "Kurs": [67], "befürworten.": [68], "Fünf": [69], "Klimatypen": [70], "wurden": [71], "identifiziert:": [72], "Entschlossene": [73], "(18%),": [74], "Befürwortende": [75], "(31%),": [76], "Indifferente": [77], "(25%),": [78], "Ablehnende": [79], "(8%),": [80], "Besorgte": [81], "(18%).": [82]},
+      "topics": [{"display_name": "Climate policy", "score": 0.97}, {"display_name": "Public opinion", "score": 0.91}],
+      "keywords": [{"display_name": "Klimaschutz"}, {"display_name": "Klimaschutzgesetz"}, {"display_name": "Deutschland-Monitor"}]
+    },
+    {
+      "_real_data_note": "Real Ipsos Earth Day 2025 study — verified via WebSearch 2026-05 (https://www.ipsos.com/de-de/earth-day-2025-deutsche-verlieren-interesse-am-klimaschutz). Captures the 2022 -> 2025 climate-concern drop.",
+      "id": "https://openalex.org/W9100000002",
+      "doi": "",
+      "title": "Earth Day 2025: Deutsche verlieren Interesse am Klimaschutz",
+      "publication_year": 2025,
+      "publication_date": "2025-04-22",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Ipsos Deutschland"}},
+      "authorships": [{"author": {"display_name": "Ipsos Public Affairs"}}],
+      "abstract_inverted_index": {"Ipsos-Studie": [0], "zum": [1], "Earth": [2], "Day": [3], "2025:": [4], "Repräsentative": [5], "Befragung": [6], "zur": [7], "Wahrnehmung": [8], "des": [9, 19], "Klimawandels": [10], "in": [11, 43], "Deutschland.": [12], "Die": [13], "Studie": [14], "zeigt": [15], "einen": [16], "messbaren": [17], "Rückgang": [18], "öffentlichen": [20], "Interesses": [21], "am": [22], "Klimaschutz": [23], "im": [24], "Vergleich": [25], "zu": [26], "Vorjahren": [27], "--": [28], "nur": [29], "noch": [30], "36%": [31], "der": [32], "Befragten": [33], "halten": [34], "den": [35], "Klimawandel": [36], "für": [37], "ihre": [38], "persönliche": [39], "Hauptsorge": [40], "gegenüber": [41], "51%": [42], "2022.": [44], "Gleichzeitig": [45], "befürworten": [46], "73%": [47], "weiterhin": [48], "ambitionierte": [49], "Klimaschutzpolitik.": [50], "Methodische": [51], "Anmerkung:": [52], "Online-Panel,": [53], "n=1027,": [54], "Erhebungszeitraum": [55], "März": [56], "2025.": [57]},
+      "topics": [{"display_name": "Climate change perception", "score": 0.96}],
+      "keywords": [{"display_name": "Klimawandel"}, {"display_name": "Klimaschutz"}, {"display_name": "Ipsos"}]
+    },
+    {
+      "_real_data_note": "Real Special Eurobarometer 538 on climate change — verified via WebSearch 2026-05 (praeventionstag.de coverage). EU-wide + Germany-specific findings.",
+      "id": "https://openalex.org/W9100000003",
+      "doi": "https://doi.org/10.2775/eb538",
+      "title": "Special Eurobarometer 538: Climate Change (Germany country fact sheet)",
+      "publication_year": 2025,
+      "publication_date": "2025-03-04",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "European Commission DG CLIMA"}},
+      "authorships": [{"author": {"display_name": "European Commission"}}, {"author": {"display_name": "Kantar Public"}}],
+      "abstract_inverted_index": {"Special": [0], "Eurobarometer": [1], "survey": [2], "538": [3], "on": [4], "climate": [5], "change.": [6], "Repräsentative": [7], "Bevölkerungsumfrage": [8], "in": [9, 27, 30], "allen": [10], "27": [11], "EU-Mitgliedstaaten": [12], "zur": [13, 42], "Akzeptanz": [14], "ambitionierter": [15], "Klimaziele": [16], "und": [17, 29, 47, 62], "zum": [18], "Stellenwert": [19], "des": [20], "Klimaschutzgesetzes.": [21], "Zentraler": [22], "Befund:": [23], "80%": [24], "der": [25, 31, 44, 50], "Befragten": [26], "Deutschland": [28], "EU": [32], "halten": [33], "den": [34], "Kampf": [35], "gegen": [36], "die": [37], "Klimakrise": [38], "für": [39], "eine": [40], "Priorität": [41], "Verbesserung": [43], "öffentlichen": [45], "Gesundheit": [46], "Lebensqualität.": [48], "91%": [49], "EU-Bürger": [51], "unterstützen": [52], "ehrgeizige": [53], "Treibhausgas-Reduktionsziele": [54], "bis": [55], "2050.": [56], "Die": [57], "Befragung": [58], "erfolgte": [59], "zwischen": [60], "Januar": [61], "Februar": [63], "2025": [64], "(n=26": [65], "367": [66], "EU-weit,": [67], "n=1014": [68], "Deutschland).": [69]},
+      "topics": [{"display_name": "EU climate policy", "score": 0.95}, {"display_name": "Survey research", "score": 0.83}],
+      "keywords": [{"display_name": "Eurobarometer"}, {"display_name": "Klimaschutz"}, {"display_name": "Klimaschutzgesetz"}]
     },
     {
       "_negative_control_note": "Off-topic record (medical informatics). Should be rejected by the klima topic filter: no include or synonym keywords match.",
