@@ -26,6 +26,23 @@ Implications, now written into the roadmap:
 - **New schema work:** a `datasets` notion sits alongside `studies`.
   See `DECISIONS.md` Q16.
 
+## Source research (2026-05-28)
+
+A full inventory of structured-data sources for German political
+topics — ranked by direct yield for the example questions ("how many
+Germans want X") — lives in
+[`notes/structured-data-sources-2026-05-28.md`](notes/structured-data-sources-2026-05-28.md).
+
+Headline finding: **GESIS** is the gold mine for issue-poll microdata
+(Politbarometer 1977-2023, UBA Umweltbewusstsein 2018/20/22, ALLBUS,
+GLES, ESS, EVS — all with structured downloads). **DAWUM** is the
+gold mine for party polling. Statistical-office APIs (Destatis,
+Eurostat) deliver indicators, not opinions.
+
+Two new open questions raised by the research:
+- **Q17** — GESIS auth handling (env vars; opt-in).
+- **Q18** — microdata: file-only or row-level parsing?
+
 ## Example-question measurement (2026-05-28)
 
 Per maintainer: "Goal of the project is to answer political questions
