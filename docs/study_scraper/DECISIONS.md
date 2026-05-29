@@ -111,6 +111,40 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A14. Lake-style storage for structured-data sources (resolves Q16-v2)
+- **Date:** 2026-05-29
+- **Decision:** Structured-data sources land in **one universal
+  `source_records` table** (not one table per source). Payload is
+  captured as-is (`payload jsonb` for JSON/CSV/small structured,
+  `payload_uri` for binary). Per-source typed access is provided via
+  **SQL views over `source_records`**, added when an access pattern
+  needs them — not pre-built per source.
+- **Rationale:** Maintainer Q16-v2: "Collect the data as they are
+  first. We can later think about how to process them." Pattern A
+  (table per source) locks code to per-source schemas and forces a
+  migration on every upstream change. Lake-then-view delays
+  structural decisions until they pay off.
+- **Concrete shape (migration 0005):**
+  - `source_records (id, source_id, source_record_id, canonical_url,
+     format, content_type, content_hash, payload jsonb, payload_uri,
+     topic_ids, doi, license, fetched_at, discovery_run_id, status,
+     reviewed_*, provenance jsonb, created_at, updated_at)`.
+  - `id = sha256(source_id || '|' || canonical_url)` — idempotent
+    across re-fetches, different across sources for the same URL.
+  - CHECK constraint: exactly one of `payload` / `payload_uri` set.
+  - Q12 review queue applies here too (`status` column).
+- **`claims` table extended** with optional `source_record_id` FK and
+  a CHECK that exactly one of `study_id` / `source_record_id` is set.
+  Phase 6 claim extraction will write against either kind of target.
+- **First view shipped (proof of pattern):** `dawum_polls` and
+  `dawum_poll_results` over the DAWUM lake rows. Maintainer can run
+  `SELECT party_shortcut, AVG(percentage) FROM
+  study_scraper.dawum_poll_results GROUP BY party_shortcut` directly.
+- **Q18 (file-only vs row-level) goes away** under this decision:
+  everything is payload-stored; row-level access is a view, not an
+  ingest-time choice. Q17 (GESIS auth) still open.
+- **Supersedes:** Q16 (original "dedicated `datasets` table" proposal).
+
 ### A13. Structured data first; PDF full-text extraction deferred
 - **Date:** 2026-05-28
 - **Decision:** Prioritise sources that deliver **structured data**
@@ -236,7 +270,13 @@ measurable once Q8 (gold set) is resolved.
 are published in English (academic ones especially).
 **Override needed?** Only if you want to add or drop languages.
 
-### Q16. How does a "dataset" sit alongside a "study"? (new, A13 follow-on)
+### Q16. [SUPERSEDED by A14] How does a "dataset" sit alongside a "study"? (new, A13 follow-on)
+Maintainer 2026-05-28 rejected the "table per source" pattern this
+question was building toward: "Collect the data as they are first. We
+can later think about how to process them." Resolved by A14
+(lake-style `source_records` + views).
+
+### Q16-v2. [RESOLVED by A14] Lake `source_records` design
 **Context:** Structured sources (DAWUM, GENESIS, Eurostat) deliver
 *data*, not just metadata + abstract. A DAWUM poll has columns
 `(date, party, percentage, institute, n)`. A GENESIS table has rows

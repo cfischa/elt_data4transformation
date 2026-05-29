@@ -41,7 +41,32 @@ Eurostat) deliver indicators, not opinions.
 
 Two new open questions raised by the research:
 - **Q17** — GESIS auth handling (env vars; opt-in).
-- **Q18** — microdata: file-only or row-level parsing?
+- **Q18** — microdata: file-only or row-level parsing? **Now moot
+  under A14** (everything is payload-stored; row access is a view).
+
+## Lake live (2026-05-29; A14)
+
+`source_records` table (migration 0005), `SourceRecord` model,
+`study_scraper/sources/` namespace, lake ingest orchestrator
+(`ingest.py`), DAWUM source, `ingest` and `view` CLI commands all
+shipped. End-to-end smoke against real Postgres:
+
+  $ python -m study_scraper ingest --source dawum --from-file <fix>
+  lake run …: source=dawum seen=5 new=5 errors=0
+
+  $ psql -c "SELECT party_shortcut, AVG(percentage)
+             FROM   study_scraper.dawum_poll_results
+             WHERE  parliament_name = 'Bundestag'
+             GROUP  BY party_shortcut ORDER BY 2 DESC"
+   party_shortcut | avg_pct
+   ---------------+---------
+    Union         |   30.25
+    SPD           |   16.50
+    Grüne         |   14.00
+    AfD           |   12.38
+    …
+
+151 tests pass.
 
 ## Example-question measurement (2026-05-28)
 

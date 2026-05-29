@@ -139,3 +139,89 @@ class CrawlRun(BaseModel):
     errors: int = 0
     parameters: Dict[str, Any] = Field(default_factory=dict)
     notes: Optional[str] = None
+
+
+def source_record_id_for(source_id: str, canonical_url: str) -> str:
+    """Stable id for a `SourceRecord` -- deterministic across re-fetches.
+
+    The same canonical_url under a different `source_id` gets a different
+    id, so two sources independently surfacing the same URL collide
+    intentionally (then the DOI dedup pre-check in storage handles it).
+    """
+    if not source_id or not canonical_url:
+        raise ValueError("source_id and canonical_url are required for record id")
+    key = f"{source_id}|{canonical_url}"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+class SourceRecord(BaseModel):
+    """One raw structured-data record captured as-is from a source.
+
+    The contract is intentionally narrow: the payload (or storage URI
+    when binary) is whatever the source returned. Typed columns exist
+    only for finding, filtering, and dedup. Source-specific structured
+    queries become views on top of `source_records` -- see
+    `study_scraper/migrations/0005_source_records.sql`.
+    """
+
+    id: str = Field(min_length=64, max_length=64)
+    source_id: str
+    source_record_id: Optional[str] = None
+    canonical_url: str
+    format: str
+    content_type: Optional[str] = None
+    content_hash: str
+    payload: Optional[Any] = None       # any JSON-serialisable structure
+    payload_uri: Optional[str] = None
+    topic_ids: List[str] = Field(default_factory=list)
+    doi: Optional[str] = None
+    license: Optional[str] = None
+    fetched_at: datetime
+    discovery_run_id: str
+    provenance: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("fetched_at")
+    @classmethod
+    def _ensure_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    @field_validator("canonical_url")
+    @classmethod
+    def _strip_url(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("canonical_url must be non-empty")
+        return stripped
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        source_id: str,
+        canonical_url: str,
+        format: str,
+        content_hash: str,
+        fetched_at: datetime,
+        discovery_run_id: str,
+        payload: Any = None,
+        payload_uri: Optional[str] = None,
+        **extra: Any,
+    ) -> "SourceRecord":
+        if (payload is None) == (payload_uri is None):
+            raise ValueError(
+                "exactly one of `payload` / `payload_uri` must be set"
+            )
+        return cls(
+            id=source_record_id_for(source_id, canonical_url),
+            source_id=source_id,
+            canonical_url=canonical_url,
+            format=format,
+            content_hash=content_hash,
+            fetched_at=fetched_at,
+            discovery_run_id=discovery_run_id,
+            payload=payload,
+            payload_uri=payload_uri,
+            **extra,
+        )

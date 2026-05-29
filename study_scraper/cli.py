@@ -15,6 +15,8 @@ from study_scraper import __version__
 from study_scraper.config import get_settings
 from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
+from study_scraper.ingest import run_lake_ingest
+from study_scraper.sources.dawum import DAWUMSource
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage, StorageError, resolve_database_url
 from study_scraper.topics import Topic, load_topics
@@ -236,6 +238,86 @@ def search(
             snippet = snippet[:157] + "..."
         typer.echo(f"          \"{snippet}\"")
         typer.echo(f"          {row.get('canonical_url')}")
+
+
+@app.command()
+def ingest(
+    source: str = typer.Option(..., "--source", help="Lake source id."),
+    limit: Optional[int] = typer.Option(
+        None, "--limit", help="Max records to ingest."
+    ),
+    from_file: Optional[Path] = typer.Option(
+        None,
+        "--from-file",
+        help="Read the source response from a local file instead of "
+             "hitting the live endpoint. Same parser path either way.",
+    ),
+    topic: Optional[str] = typer.Option(
+        None, "--topic",
+        help="Optional operator tag applied to every record this run "
+             "captures. Lake sources don't topic-filter; this is just "
+             "metadata for downstream views.",
+    ),
+) -> None:
+    """Ingest a structured-data source into the lake (`source_records`).
+
+    The payload is captured as-is. Per-source typed projections are
+    queryable via the `view` command and via SQL views (see migration
+    0005 for `dawum_polls` / `dawum_poll_results`).
+    """
+    if source == "dawum":
+        src = DAWUMSource(from_file=from_file)
+    else:
+        raise typer.BadParameter(
+            f"unknown lake source {source!r}; supported: dawum"
+        )
+    storage = _storage_from_settings()
+    topic_ids = [topic] if topic else None
+    with src as s:
+        run = run_lake_ingest(
+            source=s, storage=storage, limit=limit, topic_ids=topic_ids
+        )
+    typer.echo(
+        f"lake run {run.id}: source={run.source_id} "
+        f"seen={run.candidates_seen} new={run.candidates_kept} "
+        f"errors={run.errors}"
+    )
+
+
+@app.command()
+def view(
+    name: str = typer.Argument(
+        ..., help="View name in the study_scraper schema (e.g. dawum_polls)."
+    ),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """Read N rows from a SQL view over `source_records`.
+
+    Per-source projections are SQL views (migration 0005) -- not Python
+    code. New view -> add to a future migration -> visible here.
+    """
+    storage = _storage_from_settings()
+    try:
+        rows = storage.query_view(name, limit=limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if not rows:
+        typer.echo("(no rows)")
+        return
+    keys = list(rows[0].keys())
+    typer.echo("  ".join(keys))
+    for row in rows:
+        cells = []
+        for k in keys:
+            v = row[k]
+            if v is None:
+                cells.append("—")
+            else:
+                cells.append(str(v))
+        line = "  ".join(cells)
+        if len(line) > 200:
+            line = line[:197] + "..."
+        typer.echo(line)
 
 
 review_app = typer.Typer(

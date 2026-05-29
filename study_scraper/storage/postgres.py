@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - dependency gate
     psycopg = None  # type: ignore[assignment]
     dict_row = None  # type: ignore[assignment]
 
-from study_scraper.models import CrawlRun, Study
+from study_scraper.models import CrawlRun, SourceRecord, Study
 
 
 LOGGER = logging.getLogger(__name__)
@@ -526,6 +526,165 @@ class PostgresStorage:
             with conn.cursor() as cur:
                 cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.claims")
                 return int(cur.fetchone()["c"])
+
+    # ------------------------------------------------------------------
+    # Source records (Q16-v2 lake; structured-data sources land here)
+    # ------------------------------------------------------------------
+
+    def upsert_source_record(
+        self, record: SourceRecord, *, status: str = "kept"
+    ) -> bool:
+        """Insert or update a `source_records` row. Same status rules as
+        `upsert_study` (Q12 still applies): existing 'rejected' and
+        'kept' are sticky; only 'pending' can be promoted by a 'kept'
+        upsert."""
+        if status not in {"pending", "kept"}:
+            raise ValueError(
+                f"upsert_source_record(): status must be 'pending' or 'kept'; got {status!r}"
+            )
+        payload_json: Optional[str] = (
+            json.dumps(record.payload, ensure_ascii=False)
+            if record.payload is not None else None
+        )
+        provenance_json = json.dumps(record.provenance, ensure_ascii=False)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT 1 FROM {SCHEMA}.source_records WHERE id = %s",
+                    (record.id,),
+                )
+                existed = cur.fetchone() is not None
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.source_records (
+                        id, source_id, source_record_id, canonical_url,
+                        format, content_type, content_hash,
+                        payload, payload_uri,
+                        topic_ids, doi, license,
+                        fetched_at, discovery_run_id,
+                        status, provenance
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s,
+                            %s::jsonb, %s,
+                            %s, %s, %s,
+                            %s, %s,
+                            %s, %s::jsonb)
+                    ON CONFLICT (id) DO UPDATE SET
+                        source_record_id = EXCLUDED.source_record_id,
+                        format          = EXCLUDED.format,
+                        content_type    = EXCLUDED.content_type,
+                        content_hash    = EXCLUDED.content_hash,
+                        payload         = EXCLUDED.payload,
+                        payload_uri     = EXCLUDED.payload_uri,
+                        topic_ids = (SELECT ARRAY(SELECT DISTINCT unnest(
+                                {SCHEMA}.source_records.topic_ids || EXCLUDED.topic_ids))),
+                        doi             = COALESCE({SCHEMA}.source_records.doi, EXCLUDED.doi),
+                        license         = COALESCE({SCHEMA}.source_records.license, EXCLUDED.license),
+                        fetched_at      = EXCLUDED.fetched_at,
+                        discovery_run_id = EXCLUDED.discovery_run_id,
+                        status = CASE
+                            WHEN {SCHEMA}.source_records.status = 'rejected' THEN 'rejected'
+                            WHEN {SCHEMA}.source_records.status = 'kept'     THEN 'kept'
+                            ELSE EXCLUDED.status
+                        END,
+                        provenance      = EXCLUDED.provenance,
+                        updated_at      = now()
+                    """,
+                    (
+                        record.id,
+                        record.source_id,
+                        record.source_record_id,
+                        record.canonical_url,
+                        record.format,
+                        record.content_type,
+                        record.content_hash,
+                        payload_json,
+                        record.payload_uri,
+                        record.topic_ids,
+                        record.doi,
+                        record.license,
+                        record.fetched_at,
+                        record.discovery_run_id,
+                        status,
+                        provenance_json,
+                    ),
+                )
+            conn.commit()
+        return not existed
+
+    def count_source_records(self, *, source_id: Optional[str] = None) -> int:
+        clauses: List[str] = []
+        params: List[Any] = []
+        if source_id is not None:
+            clauses.append("source_id = %s")
+            params.append(source_id)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT COUNT(*) AS c FROM {SCHEMA}.source_records {where}",
+                    params,
+                )
+                return int(cur.fetchone()["c"])
+
+    def list_source_records(
+        self,
+        *,
+        source_id: Optional[str] = None,
+        topic_id: Optional[str] = None,
+        format: Optional[str] = None,
+        status: Optional[str] = "kept",
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        clauses: List[str] = []
+        params: List[Any] = []
+        if source_id is not None:
+            clauses.append("source_id = %s")
+            params.append(source_id)
+        if topic_id is not None:
+            clauses.append("%s = ANY(topic_ids)")
+            params.append(topic_id)
+        if format is not None:
+            clauses.append("format = %s")
+            params.append(format)
+        if status is not None:
+            clauses.append("status = %s")
+            params.append(status)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, source_id, source_record_id, canonical_url,
+                           format, content_hash, topic_ids, license,
+                           fetched_at, status
+                    FROM   {SCHEMA}.source_records
+                    {where}
+                    ORDER  BY fetched_at DESC
+                    LIMIT  %s
+                    """,
+                    params,
+                )
+                return list(cur.fetchall())
+
+    def query_view(
+        self, view_name: str, *, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Read N rows from a SQL view inside the schema.
+
+        Limited to view names that look like identifiers so a caller
+        typo can't smuggle SQL through; views live in the
+        `study_scraper` schema only.
+        """
+        if not view_name.replace("_", "").isalnum():
+            raise ValueError(f"invalid view name: {view_name!r}")
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT * FROM {SCHEMA}.{view_name} LIMIT %s", (limit,)
+                )
+                return list(cur.fetchall())
 
     # ------------------------------------------------------------------
     # Crawl runs

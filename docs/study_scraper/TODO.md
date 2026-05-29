@@ -118,24 +118,25 @@ Per A13, structured-data sources come first. Unstructured (PDF /
 HTML) sources drop in priority — they need PDF extraction to be
 useful, which is itself deferred per A13.
 
-### Tier 1: Structured data (databases, JSON / CSV / RDF / XLSX) — DO FIRST
+### Tier 1: Structured data — lake-style ingestion (A14)
 
-- [ ] **DAWUM** — JSON polling API. Port the legacy
-      `connectors/dawum_connector.py` behind `DiscoverySource`.
-      Highest yield for "% of Germans want X" type political
-      questions. Already in the legacy code; mostly a refactor pass.
-      Q16 follow-on: emits `datasets`, not `studies`.
-- [ ] **Destatis GENESIS** — REST API. Statistical tables. Port the
-      legacy connector. Population, economy, climate-indicator
-      structured data. Emits `datasets`.
-- [ ] **Eurostat** — REST API. EU statistical comparator. Port the
-      legacy connector. Emits `datasets`.
-- [ ] **GESIS DBK** (Datenbestandskatalog) — SPARQL endpoint. Datasets
-      with codebooks (survey microdata metadata). Port from the legacy
-      GESIS connector. Emits `datasets`.
+All tier-1 sources land in `source_records` (one universal table, raw
+payload as-is). Per-source typed access via SQL views over the lake —
+added when the access pattern demands, not pre-built.
+
+- [x] **DAWUM** — JSON polling API. `study_scraper/sources/dawum.py`
+      shipped 2026-05-29; first lake source. Two views shipped
+      (`dawum_polls`, `dawum_poll_results`). Free, no auth, ODC-ODbL.
+- [ ] **Destatis GENESIS** — REST API. Port the legacy connector
+      behind the `LakeSource` protocol. Free auth (registration).
+      Format: `destatis_table_csv` (CSV bodies + JSON metadata).
+- [ ] **Eurostat** — REST API. No auth. Format:
+      `eurostat_jsonstat` (cube model). Port legacy connector.
+- [ ] **GESIS DBK** — SPARQL endpoint. Q17 (auth) gates this.
+      Format: `gesis_metadata_json` for the catalogue,
+      `gesis_sav` (or `payload_uri`) for the actual microdata files.
 - [ ] **BAMF migration statistics** — Excel + CSV downloads from
-      bamf.de/Forschungsdaten. Structured; the schema is stable per
-      release.
+      bamf.de/Forschungsdaten. Format: `bamf_xlsx`.
 - [ ] **UBA Klimabilanz** / **Umweltbundesamt structured downloads**
       — XLSX / CSV emission inventories.
 
