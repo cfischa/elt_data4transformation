@@ -1,8 +1,30 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-28 (Q12 review queue + Phase 6-mini claim
-extraction; both example questions now answerable end-to-end with
-real numbers)._
+_Last updated: 2026-05-28 (paradigm refocus per A13: structured-data
+sources first, PDF extraction deferred. Phase 5b DOI cross-source dedup
+shipped. Phase 5c reordered; next iteration targets DAWUM + GENESIS +
+Eurostat as `datasets` alongside `studies`.)._
+
+## Paradigm refocus (2026-05-28, A13)
+
+Maintainer: **"We should not focus on pdf study extraction first.
+Future task. We want to focus on database data / structured data like
+files and db."**
+
+Implications, now written into the roadmap:
+
+- **Phase 5c sources expansion reorders** to put structured-data
+  sources first: DAWUM (JSON polling), Destatis GENESIS (statistical
+  tables), Eurostat, GESIS DBK, BAMF data files, UBA Klimabilanz.
+- **Polling-press-release source dropped** — those publish HTML / PDF;
+  not structured. The same questions are answerable from DAWUM where
+  available.
+- **Think-tank SitemapSource dropped to tier 3** (deferred). Without
+  PDF extraction, wiring discovery there just inflates catalog counts.
+- **Phase 6-full PDF extraction stays on the roadmap but marked
+  "future".**
+- **New schema work:** a `datasets` notion sits alongside `studies`.
+  See `DECISIONS.md` Q16.
 
 ## Example-question measurement (2026-05-28)
 

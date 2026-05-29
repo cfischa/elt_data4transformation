@@ -111,6 +111,38 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A13. Structured data first; PDF full-text extraction deferred
+- **Date:** 2026-05-28
+- **Decision:** Prioritise sources that deliver **structured data**
+  (databases, JSON / CSV / RDF / XLSX downloads, statistical-office APIs)
+  over sources that publish unstructured prose (think-tank PDFs, news
+  HTML). Phase 6-full (PDF text + claim re-extraction) is **future
+  work**, not the next phase.
+- **Rationale:** Maintainer 2026-05-28: "We should not focus on pdf
+  study extraction first. Future task. We want to focus on database
+  data / structured data like files and db." The 2026-05-28 example-
+  question measurement showed the *mechanism* works (regex over
+  abstracts produced 62 % / 55 % answers); what's missing is *volume*.
+  Volume from structured sources comes cheaper, with better provenance,
+  and without PDF-extraction quality risk.
+- **Consequences:**
+  1. **Sources expansion (Phase 5c) reorders** — structured sources
+     first: DAWUM (JSON polling API), GESIS DBK (datasets + codebooks),
+     Destatis GENESIS (statistical tables), Eurostat (statistical
+     tables), BAMF migration data, UBA Klimabilanz / Umweltbundesamt
+     structured downloads. Think-tank SitemapSource (HTML / PDF) drops
+     in priority.
+  2. **Polling-press-release source** is *not* what we build next —
+     those publish HTML/PDF. The same questions are answerable from
+     DAWUM (party polling) and from issue-poll datasets where they
+     exist as structured files.
+  3. **PDF fetching, OCR, full-text claim extraction** stay on the
+     roadmap but explicitly **future work** — not before the
+     structured sources land.
+  4. **Schema impact** — a `datasets` notion is needed alongside
+     `studies`. A study points at a publication; a dataset points at
+     queryable rows. Q16 (new open question) below.
+
 ### A12. Coverage is the primary metric (paradigm sharpened)
 - **Date:** 2026-05-28
 - **Decision:** Coverage — the breadth of studies we have ingested
@@ -203,6 +235,30 @@ measurable once Q8 (gold set) is resolved.
 **Default (in effect):** German + English. Many German-society studies
 are published in English (academic ones especially).
 **Override needed?** Only if you want to add or drop languages.
+
+### Q16. How does a "dataset" sit alongside a "study"? (new, A13 follow-on)
+**Context:** Structured sources (DAWUM, GENESIS, Eurostat) deliver
+*data*, not just metadata + abstract. A DAWUM poll has columns
+`(date, party, percentage, institute, n)`. A GENESIS table has rows
+indexed by `(year, region, indicator)`. These don't fit the `studies`
+shape — they're not papers.
+**Proposal:** Add a `datasets` table that lives alongside `studies`:
+  - `dataset` = a structured publication (poll, statistical table, codebook).
+  - Same metadata as `studies` (id, canonical_url, source_id, topic_ids,
+    title, publisher, publication_date, provenance) PLUS:
+    - `format` text ('json' | 'csv' | 'xlsx' | 'rdf' | 'genesis-table' | …),
+    - `schema_summary` jsonb describing columns / variables,
+    - `row_count` int (when applicable),
+    - `download_url` text (separate from canonical_url; where the bytes
+      actually live).
+  - `dataset_rows` table holds the actual rows for small / curated
+    datasets where we want to query the data directly. Large datasets
+    stay file-only and we just record the metadata.
+  - `claims` table stays — claims now reference either a `study_id` OR
+    a `dataset_id` via a discriminator column. Or, simpler: two claim
+    tables, `study_claims` and `dataset_claims`.
+**Need from you:** Endorse this shape, or send a different one.
+(My rec: this shape; small fan-out, claims stays the answer surface.)
 
 ### Q11. Supabase provisioning (new — follow-up to A7)
 **Default (in effect):** Code is being written behind a config interface

@@ -167,6 +167,18 @@ class SSOARSource:
         if not canonical_url:
             return None
 
+        # Some SSOAR records carry a DOI alongside the handle URL; pull
+        # it out so the storage layer can dedup against OpenAlex.
+        doi = next(
+            (
+                u
+                for u in identifiers
+                if "doi.org/" in u or u.lower().startswith("doi:")
+                or u.startswith("10.")
+            ),
+            None,
+        )
+
         authors = self._dc_texts(dc, "creator")
         publishers = self._dc_texts(dc, "publisher")
         publisher = publishers[0] if publishers else None
@@ -184,6 +196,7 @@ class SSOARSource:
             publication_date=publication_date,
             language=language,
             abstract=abstract,
+            doi=doi,
             discovery_query=topic.id,
             raw={
                 "subjects": self._dc_texts(dc, "subject"),

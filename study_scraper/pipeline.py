@@ -84,6 +84,7 @@ def _candidate_to_study(
         publisher=cand.publisher,
         publication_date=cand.publication_date,
         language=cand.language,
+        doi=_normalize_doi(cand.doi),
         topic_ids=[match.topic_id],
         topic_scores={match.topic_id: round(match.score, 3)},
         has_quantitative_data=_has_quantitative_signal(text),
@@ -92,6 +93,25 @@ def _candidate_to_study(
         source_id=cand.source_id,
         provenance=provenance,
     )
+
+
+def _normalize_doi(value: Optional[str]) -> Optional[str]:
+    """Normalize different DOI surface forms to a bare `10.xxx/yyy`.
+
+    Inputs we see: "https://doi.org/10.1515/pwp-2023-0031",
+    "doi:10.1515/pwp-2023-0031", "10.1515/pwp-2023-0031".
+    """
+    if not value:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    lower = stripped.lower()
+    for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+        if lower.startswith(prefix):
+            stripped = stripped[len(prefix):]
+            break
+    return stripped or None
 
 
 def run_one(

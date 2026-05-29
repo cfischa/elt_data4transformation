@@ -66,6 +66,7 @@ class Study(BaseModel):
     publisher: Optional[str] = None
     publication_date: Optional[date] = None
     language: Optional[str] = None
+    doi: Optional[str] = None
     topic_ids: List[str] = Field(default_factory=list)
     topic_scores: Dict[str, float] = Field(default_factory=dict)
     has_quantitative_data: bool = False

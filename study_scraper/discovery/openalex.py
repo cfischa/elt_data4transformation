@@ -149,6 +149,10 @@ class OpenAlexSource:
 
         openalex_id = (work.get("id") or "").strip()
         doi = (work.get("doi") or "").strip()
+        # canonical_url stays preferring DOI -> openalex_id for backwards
+        # compat with already-ingested rows; `doi` is also surfaced as
+        # its own Candidate field so the storage layer can dedup across
+        # sources that don't share canonical URLs.
         canonical_url = doi or openalex_id
         if not canonical_url:
             return None
@@ -201,6 +205,7 @@ class OpenAlexSource:
             publication_date=pub_date,
             language=language,
             abstract=abstract,
+            doi=doi or None,
             discovery_query=topic.id,
             raw={
                 "openalex_id": openalex_id,

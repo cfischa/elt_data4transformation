@@ -22,6 +22,7 @@ class Candidate(BaseModel):
     publication_date: Optional[date] = None
     language: Optional[str] = None
     abstract: Optional[str] = None
+    doi: Optional[str] = None  # cross-source dedup key when present
     discovery_query: Optional[str] = None
     raw: Dict[str, Any] = Field(default_factory=dict)
 

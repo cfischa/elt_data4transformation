@@ -180,6 +180,58 @@ class PostgresStorage:
 
         with self.connection() as conn:
             with conn.cursor() as cur:
+                # DOI dedup short-circuit: if a row with the same DOI
+                # exists under a different id (same study, different
+                # source), the existing row is the canonical one. We
+                # only append the new URL to `source_urls` and the new
+                # topic to `topic_ids`; all other fields stay frozen so
+                # the first-recorded version of the metadata wins.
+                # Claims, status, and audit fields are owned by the
+                # existing row.
+                if study.doi:
+                    cur.execute(
+                        f"SELECT id FROM {SCHEMA}.studies "
+                        f"WHERE doi = %s AND id <> %s",
+                        (study.doi, study.id),
+                    )
+                    dup = cur.fetchone()
+                    if dup is not None:
+                        target_id = dup["id"]
+                        LOGGER.info(
+                            "doi dedup: %s -> %s (doi=%s)",
+                            study.id[:12],
+                            target_id[:12],
+                            study.doi,
+                        )
+                        cur.execute(
+                            f"""
+                            UPDATE {SCHEMA}.studies
+                               SET source_urls = (
+                                       SELECT ARRAY(SELECT DISTINCT unnest(
+                                           source_urls || %s::text[]))
+                                   ),
+                                   topic_ids   = (
+                                       SELECT ARRAY(SELECT DISTINCT unnest(
+                                           topic_ids   || %s::text[]))
+                                   ),
+                                   topic_scores = topic_scores || %s::jsonb,
+                                   updated_at   = now()
+                             WHERE id = %s
+                            """,
+                            (
+                                study.source_urls or [study.canonical_url],
+                                study.topic_ids,
+                                json.dumps(study.topic_scores),
+                                target_id,
+                            ),
+                        )
+                        conn.commit()
+                        # Reflect the rename so the caller can use
+                        # `study.id` consistently downstream (claim
+                        # extraction, crawl_run_studies attach).
+                        study.id = target_id  # pydantic v2: validate_assignment defaults False
+                        return False  # not new
+
                 cur.execute(
                     f"SELECT status FROM {SCHEMA}.studies WHERE id = %s",
                     (study.id,),
@@ -556,6 +608,7 @@ class PostgresStorage:
             "publisher": study.publisher,
             "publication_date": study.publication_date,
             "language": study.language,
+            "doi": study.doi,
             "topic_ids": study.topic_ids,
             "topic_scores": json.dumps(study.topic_scores),
             "has_quantitative_data": study.has_quantitative_data,

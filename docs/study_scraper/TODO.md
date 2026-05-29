@@ -112,53 +112,62 @@ before they start.
       topic run: the same Erdgas study appeared as 2 rows under SSOAR
       and OpenAlex. Pre-req for fair source-coverage counts.
 
-## Phase 5c — Sources expansion (primary metric is coverage; A12)
+## Phase 5c — Sources expansion (REORDERED 2026-05-28 per A13: structured data first)
 
-A12 reframed: more sources = more coverage. The earlier "pull DAWUM
-only if a gap shows up" is overturned. Plan: wire **every source on
-this list** behind the `DiscoverySource` interface. Order is
-effort-ascending; each entry has a one-line live-mode plan + a
-fixture for sandbox dev.
+Per A13, structured-data sources come first. Unstructured (PDF /
+HTML) sources drop in priority — they need PDF extraction to be
+useful, which is itself deferred per A13.
 
-Academic / repository (lowest-friction, highest yield):
-- [ ] **DAWUM** — port the legacy `connectors/dawum_connector.py`
-      behind `DiscoverySource`. Polling-aggregator-shaped data;
-      especially valuable for topical surveys (klima, migration,
-      steuern).
-- [ ] **BASE** (Bielefeld Academic Search Engine) — OAI-PMH
-      compatible; same parser shape as SSOAR.
-- [ ] **CORE** — REST API, free key, broad academic coverage.
-- [ ] **GESIS DBK** (Datenbestandskatalog, the wider GESIS catalog
-      beyond SSOAR) — likely SPARQL via the existing legacy GESIS
-      connector; port behind interface.
+### Tier 1: Structured data (databases, JSON / CSV / RDF / XLSX) — DO FIRST
 
-Government:
+- [ ] **DAWUM** — JSON polling API. Port the legacy
+      `connectors/dawum_connector.py` behind `DiscoverySource`.
+      Highest yield for "% of Germans want X" type political
+      questions. Already in the legacy code; mostly a refactor pass.
+      Q16 follow-on: emits `datasets`, not `studies`.
+- [ ] **Destatis GENESIS** — REST API. Statistical tables. Port the
+      legacy connector. Population, economy, climate-indicator
+      structured data. Emits `datasets`.
+- [ ] **Eurostat** — REST API. EU statistical comparator. Port the
+      legacy connector. Emits `datasets`.
+- [ ] **GESIS DBK** (Datenbestandskatalog) — SPARQL endpoint. Datasets
+      with codebooks (survey microdata metadata). Port from the legacy
+      GESIS connector. Emits `datasets`.
+- [ ] **BAMF migration statistics** — Excel + CSV downloads from
+      bamf.de/Forschungsdaten. Structured; the schema is stable per
+      release.
+- [ ] **UBA Klimabilanz** / **Umweltbundesamt structured downloads**
+      — XLSX / CSV emission inventories.
+
+### Tier 2: Academic indexes (mostly structured metadata about
+unstructured artefacts)
+
+These pull metadata structured enough to ingest as `studies`. They do
+NOT carry full text. Useful for the catalog, less useful for the data
+question.
+
+- [ ] **BASE** — OAI-PMH; same parser as SSOAR.
+- [ ] **CORE** — REST API.
 - [ ] **Bundestag DIP** — REST API at
       `https://search.dip.bundestag.de/api/v1/`, free key by email.
-      Drucksachen, Sachstandsberichte, Vorgänge.
-- [ ] **Destatis GENESIS** — port the existing legacy connector.
-- [ ] **Umweltbundesamt (UBA)** — has a structured publications list
-      (HTML + RSS). Climate-heavy.
-- [ ] **BAMF Forschungszentrum** — Migration / Integration. Has a
-      publications page with a sitemap.
+      Some Drucksachen carry structured indicators; most are PDF
+      attachments and thus tier-3 utility.
 
-Think tanks (heterogeneous; one source class can cover several with a
-config-driven scraper):
-- [ ] **SWP** (Stiftung Wissenschaft und Politik) — RSS + sitemap.
-- [ ] **DIW Berlin** — RSS + publications page.
-- [ ] **Ifo** — RSS.
-- [ ] **Bertelsmann Stiftung** — sitemap.
-- [ ] **FES** (Friedrich-Ebert-Stiftung) — sitemap.
-- [ ] **KAS** (Konrad-Adenauer-Stiftung) — sitemap.
-- [ ] **Sachverständigenrat** — publications page.
+### Tier 3: Unstructured sources (PDF / HTML) — DEFERRED per A13
 
-Civic society / data:
-- [ ] **wahlrecht.de** — long-running election + polling site.
+These all need PDF / HTML extraction to deliver claims; per A13 that
+extraction work is deferred. Wiring discovery without extraction
+would just inflate study counts without adding answers.
 
-Implementation note: rather than 12 bespoke classes, group think tanks
-behind one **sitemap/RSS source** parameterised by per-publisher YAML
-config. The interface stays the same; the operator adds new think
-tanks by editing config, not Python.
+- [ ] (deferred) Think tanks: SWP, DIW, Ifo, Bertelsmann, FES, KAS,
+      Sachverständigenrat.
+- [ ] (deferred) Polling-firm press releases (Forsa, Innofact, Civey,
+      Allensbach, Infratest dimap) — these publish HTML + PDF.
+- [ ] (deferred) wahlrecht.de.
+
+When PDF extraction lands (future Phase 6-full), this tier becomes a
+single config-driven `SitemapSource` parameterised by per-publisher
+YAML; nothing about the design changes.
 
 ## Phase 5d — New-source discovery (per A12)
 
@@ -203,10 +212,12 @@ weren't enough, so claim extraction lands.
       unit, snippet, study_id, extractor='regex-v1')`. Pipeline calls
       `extract_claims` after every upsert. Search CLI:
       `python -m study_scraper search <keyword>`.
-- [ ] **Phase 6-full** — extend claim extraction over full-text PDF
-      after Phase 5c's PDF fetching is in place. 5×–10× more claims per
-      study. Extractor id `regex-v2` or similar; schema is already
-      ready.
+- [ ] **Phase 6-full** — extend claim extraction over full-text PDF.
+      **DEFERRED to future work per A13.** Reorders behind Phase 5c
+      (structured sources). The 2026-05-28 example-question
+      measurement showed the mechanism works against abstracts; the
+      next volume win is structured data, not better extraction from
+      prose.
 - [ ] **LLM-based extractor** — replace / supplement `regex-v1` with
       an LLM pass that disambiguates the *referent* of each %. New
       extractor id `llm-v1`. Cost considered; only fire on studies
