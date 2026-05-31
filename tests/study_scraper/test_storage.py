@@ -119,22 +119,41 @@ class TestUpsertStudy:
 
 class TestListStudies:
     def test_filter_by_topic(self, storage: PostgresStorage) -> None:
+        # Distinct titles so the migration 0006 title-near-dup doesn't
+        # collapse them into one row.
         storage.upsert_study(
-            _study(url="https://example.org/a", topic_ids=["klima"])
+            _study(
+                url="https://example.org/a",
+                title="Klima study about urban policy",
+                topic_ids=["klima"],
+            )
         )
         storage.upsert_study(
-            _study(url="https://example.org/b", topic_ids=["steuern"])
+            _study(
+                url="https://example.org/b",
+                title="Tax study on corporate revenue",
+                topic_ids=["steuern"],
+            )
         )
         klima = storage.list_studies(topic_id="klima")
         assert len(klima) == 1
         assert klima[0]["canonical_url"] == "https://example.org/a"
 
     def test_filter_by_source(self, storage: PostgresStorage) -> None:
+        # Distinct titles so title-near-dup doesn't merge across sources.
         storage.upsert_study(
-            _study(url="https://example.org/a", source_id="ssoar")
+            _study(
+                url="https://example.org/a",
+                title="SSOAR climate paper",
+                source_id="ssoar",
+            )
         )
         storage.upsert_study(
-            _study(url="https://example.org/b", source_id="openalex")
+            _study(
+                url="https://example.org/b",
+                title="OpenAlex migration article",
+                source_id="openalex",
+            )
         )
         rows = storage.list_studies(source_id="openalex")
         assert len(rows) == 1

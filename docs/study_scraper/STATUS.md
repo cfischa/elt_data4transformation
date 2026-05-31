@@ -1,9 +1,56 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-28 (paradigm refocus per A13: structured-data
-sources first, PDF extraction deferred. Phase 5b DOI cross-source dedup
-shipped. Phase 5c reordered; next iteration targets DAWUM + GENESIS +
-Eurostat as `datasets` alongside `studies`.)._
+_Last updated: 2026-05-31 (clean+build pass: scrapy scaffold deleted,
+dead env vars removed, GESIS catalog source shipped (A15), title-near-
+dup dedup shipped closing Phase 5b (A16), status report enhanced with
+lake counters, crawl4ai evaluated and declined for now (A17).
+**183 tests pass.**)._
+
+## Clean + build pass (2026-05-31)
+
+Cleanup:
+- Deleted `scraping/` (broken Scrapy scaffold, never extended per A3).
+- Removed `GESIS_API_KEY` / `SOEP_API_KEY` from `.env.example` and
+  `docker-compose.yml` (dead config: declared but never read).
+- Removed `scrapy` and `selenium` from `pyproject.toml`; left `bs4`
+  for the legacy ELT.
+- Added `SPARQLWrapper` for the GESIS catalog source.
+- Root `README.md` rewritten to point at `study_scraper/` as the
+  active project; legacy ELT clearly labelled frozen.
+
+Build:
+- **GESIS Knowledge Graph SPARQL source** (A15) —
+  `study_scraper/sources/gesis.py`. Public endpoint, no auth. Lake-
+  style; emits one `SourceRecord` per `schema:Dataset` URI with
+  payload preserving sorted triples. CLI: `python -m study_scraper
+  ingest --source gesis [...]`. Fixture has real ZA-numbers + DOIs
+  (Politbarometer 1977-2024 ZA2391, UBA Umweltbewusstsein 2022
+  ZA8829, UBA Umweltbewusstsein 2018 ZA7493, + negative control).
+- **Title-near-duplicate dedup (Phase 5b finished)** (A16) —
+  migration 0006 + `find_title_dup()` Postgres function + fallback
+  pass in `upsert_study()`. The Erdgas study now correctly collapses
+  to one row across SSOAR + OpenAlex.
+- **Status report enhanced** with lake counters: total source_records
+  kept, per-source breakdown, per-format breakdown.
+
+Cleanly running end-to-end ingest across **four sources**:
+
+  $ python -m study_scraper run    --source ssoar    --topic klima
+  $ python -m study_scraper run    --source openalex --topic klima
+  $ python -m study_scraper ingest --source dawum    --topic klima
+  $ python -m study_scraper ingest --source gesis    --topic klima
+
+  studies (kept/pending/rejected): 15 / 0 / 0
+  candidates seen / kept         : 23 / 21 (91.3%)
+  studies per source (catalog)   : openalex 9, ssoar 6
+  lake (source_records, kept)    : 5
+    gesis 4, dawum 1
+  lake per format                : gesis_kg_sparql_json 4,
+                                   dawum_survey_json    1
+
+## Older paradigm refocus (2026-05-28, A13)
+
+Maintainer: **"We should not focus on pdf study extraction first.
 
 ## Paradigm refocus (2026-05-28, A13)
 

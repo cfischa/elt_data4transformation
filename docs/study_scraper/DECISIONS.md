@@ -111,6 +111,78 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A17. crawl4ai NOT adopted for the next iteration (evaluated 2026-05-31)
+- **Date:** 2026-05-31
+- **Decision:** Do not pull in
+  [crawl4ai](https://github.com/unclecode/crawl4ai) for the next
+  iteration. Re-evaluate when the A13 T3-tier (think-tank pages,
+  polling-firm press releases) is unblocked.
+- **Rationale:** crawl4ai is a real, mature tool (Python + Playwright
+  + async; clean Markdown / JSON / PDF output; LLM-driven extraction
+  optional). But:
+  1. **Wrong tier:** our T1 sources (DAWUM, GESIS SPARQL, Destatis,
+     Eurostat) all have structured APIs we already hit directly. No
+     HTML rendering needed. crawl4ai would not improve them.
+  2. **A13 deferred unstructured/PDF work** — adopting crawl4ai now
+     would invite scope creep on the deferred tier.
+  3. **A14 lake principle conflicts with LLM-pre-processed payloads**
+     — we want raw payloads stored, not pre-summarised Markdown.
+     crawl4ai's "clean Markdown" output filters content; the lake
+     principle says preserve as-is, transform later via views.
+  4. **Playwright weight:** Chromium runtime dependency adds 200+MB
+     and complicates the operator environment.
+- **When to reconsider:** when we wire the T3 tier (think-tank
+  sitemaps, polling-firm press releases). crawl4ai then becomes a
+  candidate alongside plain BeautifulSoup; pick by per-source need.
+
+### A16. Title-near-duplicate dedup via pg_trgm (closes Phase 5b)
+- **Date:** 2026-05-31
+- **Decision:** When DOI dedup misses, fall back to a pg_trgm
+  similarity lookup over `lower(title)`. Threshold 0.85, scoped to
+  the same `publication_year` (or NULL on either side).
+- **Rationale:** Many press-release-style records carry no DOI; the
+  Erdgas-für-den-Klimaschutz study had been appearing twice in the
+  catalog (once via SSOAR's handle URL, once via OpenAlex's openalex
+  id). Title-near-dup collapses these without changing the data model.
+- **Concrete shape (migration 0006):**
+  - `CREATE EXTENSION pg_trgm WITH SCHEMA public` (explicit schema so
+    `public.similarity` / `OPERATOR(public.%)` resolve regardless of
+    session search_path).
+  - GIN trigram index on `lower(title)`.
+  - SQL function `find_title_dup(candidate_id, candidate_title,
+    candidate_year, min_similarity=0.85)` returning the existing
+    study to merge into, if any.
+  - `upsert_study()` calls it as the fallback after DOI dedup.
+- **Consequences:**
+  - DOI dedup runs first; title dedup is the fallback. Both merge
+    into the existing row; the new URL accumulates in `source_urls`
+    and the new topic into `topic_ids`.
+  - When the existing row has no DOI and the new candidate brings
+    one, the DOI gets promoted into the existing row via COALESCE.
+  - First-recorded `title` / `publisher` / `publication_date` /
+    `abstract` stay frozen on dedup (lake principle).
+  - Tests `test_dedup.py` cover identical-title, near-identical-
+    title, different-titles, different-publication-year (no merge),
+    DOI-before-title precedence, and DOI promotion on dedup.
+
+### A15. GESIS Knowledge Graph SPARQL source — no auth (resolves Q17 catalog half)
+- **Date:** 2026-05-31
+- **Decision:** Ingest GESIS catalog metadata via the public SPARQL
+  endpoint at `data.gesis.org/gesiskg/sparql`. **No authentication.**
+  The legacy connector's `GESIS_API_KEY` env var was declared but
+  never read; removed from `.env.example` and `docker-compose.yml`.
+- **Rationale:** Q17 investigation 2026-05-29: the GESIS Knowledge
+  Graph is public; the legacy `GESIS_API_KEY` slot was leftover from
+  a different design intent. Same applies to `SOEP_API_KEY` (also
+  unused; SOEP microdata uses account login, not an API key).
+- **Implementation:** `study_scraper/sources/gesis.py` (lake source;
+  emits `SourceRecord` per `schema:Dataset` URI; payload preserves
+  the SPARQL SELECT result triples sorted for stable hashing). DOI is
+  surfaced as a typed column when present in the triples.
+- **Q17 microdata half (`search.gesis.org` post-login flow for
+  SPSS/Stata/CSV bytes)** remains open as Q19 — deferred until we
+  need bytes, not metadata.
+
 ### A14. Lake-style storage for structured-data sources (resolves Q16-v2)
 - **Date:** 2026-05-29
 - **Decision:** Structured-data sources land in **one universal

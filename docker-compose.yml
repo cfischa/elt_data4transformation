@@ -22,12 +22,12 @@ x-airflow-common: &airflow-common
     CLICKHOUSE_USER: ${CLICKHOUSE_USER}
     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE}
-    # API Keys from .env file
+    # API Keys from .env file (legacy ELT)
     DESTATIS_API_KEY: ${DESTATIS_API_KEY}
     DAWUM_API_KEY: ${DAWUM_API_KEY}
     EUROSTAT_API_KEY: ${EUROSTAT_API_KEY}
-    GESIS_API_KEY: ${GESIS_API_KEY}
-    SOEP_API_KEY: ${SOEP_API_KEY}
+    # GESIS_API_KEY / SOEP_API_KEY removed 2026-05-29 -- never read by
+    # any source. GESIS SPARQL is public; SOEP uses account login.
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs

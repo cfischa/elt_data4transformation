@@ -232,6 +232,59 @@ class PostgresStorage:
                         study.id = target_id  # pydantic v2: validate_assignment defaults False
                         return False  # not new
 
+                # Title-near-duplicate dedup (Phase 5b follow-on,
+                # migration 0006). Fallback when DOI dedup didn't fire
+                # -- same study published under different URLs, often
+                # without a DOI on at least one side. pg_trgm similarity
+                # >= 0.85 with matching publication_year.
+                if study.title:
+                    cand_year = (
+                        study.publication_date.year
+                        if study.publication_date else None
+                    )
+                    cur.execute(
+                        f"SELECT * FROM {SCHEMA}.find_title_dup("
+                        f"%s, %s, %s)",
+                        (study.id, study.title, cand_year),
+                    )
+                    title_dup = cur.fetchone()
+                    if title_dup is not None and title_dup.get("id"):
+                        target_id = title_dup["id"]
+                        LOGGER.info(
+                            "title dedup: %s -> %s (sim=%.2f, '%s')",
+                            study.id[:12],
+                            target_id[:12],
+                            float(title_dup.get("sim") or 0.0),
+                            (study.title or "")[:60],
+                        )
+                        cur.execute(
+                            f"""
+                            UPDATE {SCHEMA}.studies
+                               SET source_urls = (
+                                       SELECT ARRAY(SELECT DISTINCT unnest(
+                                           source_urls || %s::text[]))
+                                   ),
+                                   topic_ids   = (
+                                       SELECT ARRAY(SELECT DISTINCT unnest(
+                                           topic_ids   || %s::text[]))
+                                   ),
+                                   topic_scores = topic_scores || %s::jsonb,
+                                   doi = COALESCE(doi, %s),
+                                   updated_at  = now()
+                             WHERE id = %s
+                            """,
+                            (
+                                study.source_urls or [study.canonical_url],
+                                study.topic_ids,
+                                json.dumps(study.topic_scores),
+                                study.doi,
+                                target_id,
+                            ),
+                        )
+                        conn.commit()
+                        study.id = target_id
+                        return False
+
                 cur.execute(
                     f"SELECT status FROM {SCHEMA}.studies WHERE id = %s",
                     (study.id,),

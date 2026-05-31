@@ -29,6 +29,11 @@ class StatusReport:
     studies_per_topic: Dict[str, int]
     studies_per_source: Dict[str, int]
     studies_per_topic_source: List[Dict[str, Any]]
+    # Lake-side (source_records) counters added per A14 + cleanup
+    # 2026-05-31 -- so `status` reports both catalog and lake coverage.
+    total_source_records: int
+    source_records_per_source: Dict[str, int]
+    source_records_per_format: Dict[str, int]
     total_runs: int
     successful_runs: int
     failed_runs: int
@@ -151,6 +156,37 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                 # Ensure JSON-friendly id and timestamps.
                 row["id"] = str(row["id"])
 
+            # Lake (source_records) counts -- A14.
+            cur.execute(
+                f"SELECT COUNT(*) AS c FROM {SCHEMA}.source_records "
+                f"WHERE status = 'kept'"
+            )
+            total_source_records = int(cur.fetchone()["c"])
+            cur.execute(
+                f"""
+                SELECT source_id, COUNT(*) AS c
+                FROM   {SCHEMA}.source_records
+                WHERE  status = 'kept'
+                GROUP  BY source_id
+                ORDER  BY c DESC
+                """
+            )
+            source_records_per_source = {
+                row["source_id"]: int(row["c"]) for row in cur.fetchall()
+            }
+            cur.execute(
+                f"""
+                SELECT format, COUNT(*) AS c
+                FROM   {SCHEMA}.source_records
+                WHERE  status = 'kept'
+                GROUP  BY format
+                ORDER  BY c DESC
+                """
+            )
+            source_records_per_format = {
+                row["format"]: int(row["c"]) for row in cur.fetchall()
+            }
+
     return StatusReport(
         generated_at=datetime.now(timezone.utc),
         total_studies=total_studies,
@@ -159,6 +195,9 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         studies_per_topic=studies_per_topic,
         studies_per_source=studies_per_source,
         studies_per_topic_source=studies_per_topic_source,
+        total_source_records=total_source_records,
+        source_records_per_source=source_records_per_source,
+        source_records_per_format=source_records_per_format,
         total_runs=int(run_row["total"]),
         successful_runs=int(run_row["successful"]),
         failed_runs=int(run_row["failed"]),
@@ -193,10 +232,25 @@ def format_text(report: StatusReport) -> str:
     else:
         lines.append("    (none)")
     lines.append("")
-    lines.append("  studies per source:")
+    lines.append("  studies per source (catalog):")
     if report.studies_per_source:
         for source_id, n in report.studies_per_source.items():
             lines.append(f"    {source_id:<28} {n}")
+    else:
+        lines.append("    (none)")
+    lines.append("")
+    lines.append(
+        f"  lake (source_records, kept): {report.total_source_records}"
+    )
+    if report.source_records_per_source:
+        for source_id, n in report.source_records_per_source.items():
+            fmt = report.source_records_per_format
+            lines.append(f"    {source_id:<28} {n}")
+        # Per-format breakdown (mostly useful when a single source
+        # emits multiple formats; e.g. dawum_survey_json today).
+        lines.append("  lake per format:")
+        for fmt_name, n in report.source_records_per_format.items():
+            lines.append(f"    {fmt_name:<28} {n}")
     else:
         lines.append("    (none)")
     lines.append("")

@@ -8,7 +8,6 @@ readme = "README.md"
 packages = [
     {include = "connectors"},
     {include = "elt"},
-    {include = "scraping"},
     {include = "pipeline"},
     {include = "study_scraper"},
 ]
@@ -43,10 +42,14 @@ apache-airflow = "^2.9.1"
 apache-airflow-providers-postgres = "^5.10.0"
 apache-airflow-providers-http = "^4.10.0"
 
-# Web Scraping
-scrapy = "^2.11.0"
+# Web parsing (study_scraper doesn't use these yet; bs4 kept for the
+# legacy ELT and any future T3-tier HTML extraction.)
 beautifulsoup4 = "^4.12.0"
-selenium = "^4.17.0"
+# scrapy / selenium removed 2026-05-29 -- scraping/ scaffold deleted;
+# study_scraper does not use them.
+
+# study_scraper: GESIS Knowledge Graph SPARQL (public, no auth)
+SPARQLWrapper = "^2.0.0"
 
 # Monitoring & Logging
 prometheus-client = "^0.19.0"
@@ -161,8 +164,8 @@ warn_return_any = true
 
 [[tool.mypy.overrides]]
 module = [
-    "scrapy.*",
     "clickhouse_driver.*",
+    "SPARQLWrapper.*",
     "clickhouse_connect.*",
     "testcontainers.*",
 ]

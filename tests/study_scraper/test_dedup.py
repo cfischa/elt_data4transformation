@@ -201,12 +201,152 @@ def test_dedup_merges_topic_ids_and_scores(storage: PostgresStorage) -> None:
     assert row["topic_scores"]["migration_einwanderung"] == 0.4
 
 
-def test_no_doi_no_dedup(storage: PostgresStorage) -> None:
-    """Without a DOI the canonical_url-derived id is the only dedup key."""
-    a = _study(canonical_url="https://a.example/x", doi=None, source_id="ssoar")
-    b = _study(canonical_url="https://b.example/x", doi=None, source_id="openalex")
+def test_no_doi_no_title_match_no_dedup(storage: PostgresStorage) -> None:
+    """Without a DOI AND with different titles, no dedup -- both rows kept."""
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="A study about taxes",
+    )
+    b = _study(
+        canonical_url="https://b.example/x", doi=None, source_id="openalex",
+        title="A wholly different study about migration",
+    )
     storage.upsert_study(a)
     storage.upsert_study(b)
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS c FROM study_scraper.studies")
+            assert cur.fetchone()["c"] == 2
+
+
+# --------------------------------------------------------------------------
+# Title-near-duplicate dedup (Phase 5b follow-on, migration 0006)
+# --------------------------------------------------------------------------
+
+
+def test_identical_title_no_doi_merges(storage: PostgresStorage) -> None:
+    """Without DOIs, identical titles + same publication_year merge."""
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="Akzeptanz der Energiewende in Deutschland",
+    )
+    b = _study(
+        canonical_url="https://b.example/x", doi=None, source_id="openalex",
+        title="Akzeptanz der Energiewende in Deutschland",
+    )
+    storage.upsert_study(a)
+    is_new = storage.upsert_study(b)
+    assert is_new is False  # merged
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS c FROM study_scraper.studies")
+            assert cur.fetchone()["c"] == 1
+
+
+def test_near_identical_title_merges_above_threshold(
+    storage: PostgresStorage,
+) -> None:
+    """Near-identical titles (e.g. plural / case difference) merge."""
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="Erdgas für den Klimaschutz? Chancen und Risiken einer verstärkten Gasnutzung in Europa",
+    )
+    b = _study(
+        canonical_url="https://b.example/y", doi=None, source_id="openalex",
+        # Very small wording variant; should still match at sim >= 0.85.
+        title="Erdgas für den Klimaschutz - Chancen und Risiken einer verstärkten Gasnutzung in Europa",
+    )
+    storage.upsert_study(a)
+    is_new = storage.upsert_study(b)
+    assert is_new is False
+    row = storage.get_study(a.id)
+    # Both URLs now in source_urls.
+    assert "https://a.example/x" in row["source_urls"]
+    assert "https://b.example/y" in row["source_urls"]
+
+
+def test_different_titles_do_not_merge(storage: PostgresStorage) -> None:
+    """Two genuinely different titles do NOT merge even at same year."""
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="Kommunaler Klimaschutz in Deutschland",
+    )
+    b = _study(
+        canonical_url="https://b.example/y", doi=None, source_id="openalex",
+        title="Akzeptanz der Energiewende in Deutschland",
+    )
+    storage.upsert_study(a)
+    is_new = storage.upsert_study(b)
+    assert is_new is True
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS c FROM study_scraper.studies")
+            assert cur.fetchone()["c"] == 2
+
+
+def test_doi_dedup_runs_before_title_dedup(storage: PostgresStorage) -> None:
+    """DOI match short-circuits before title lookup -- DOI is the
+    authoritative identifier when present."""
+    a = _study(
+        canonical_url="https://a.example/x",
+        doi="10.1111/abc",
+        source_id="ssoar",
+        title="Study title v1",
+    )
+    b = _study(
+        canonical_url="https://b.example/y",
+        doi="10.1111/abc",
+        source_id="openalex",
+        title="Totally different title that wouldn't trigger trigram",
+    )
+    storage.upsert_study(a)
+    is_new = storage.upsert_study(b)
+    assert is_new is False
+    row = storage.get_study(a.id)
+    # DOI dedup wins -- title stays the FIRST one (a's).
+    assert row["title"] == "Study title v1"
+    assert "https://b.example/y" in row["source_urls"]
+
+
+def test_title_dedup_promotes_doi_into_existing_row(
+    storage: PostgresStorage,
+) -> None:
+    """When the existing row has no DOI but the new candidate brings
+    one, the DOI gets promoted into the existing row via COALESCE."""
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="Akzeptanz der Energiewende in Deutschland",
+    )
+    storage.upsert_study(a)
+    b = _study(
+        canonical_url="https://b.example/y",
+        doi="10.1007/s11578-021-0099-2",
+        source_id="openalex",
+        title="Akzeptanz der Energiewende in Deutschland",
+    )
+    storage.upsert_study(b)
+    row = storage.get_study(a.id)
+    assert row["doi"] == "10.1007/s11578-021-0099-2"
+
+
+def test_title_dedup_skipped_when_different_publication_year(
+    storage: PostgresStorage,
+) -> None:
+    """Same title published in different years stays separate."""
+    from datetime import date
+    a = _study(
+        canonical_url="https://a.example/x", doi=None, source_id="ssoar",
+        title="Politbarometer-Kumulation",
+    )
+    a.publication_date = date(2019, 1, 1)
+    b = _study(
+        canonical_url="https://b.example/y", doi=None, source_id="openalex",
+        title="Politbarometer-Kumulation",
+    )
+    b.publication_date = date(2024, 1, 1)
+    storage.upsert_study(a)
+    is_new = storage.upsert_study(b)
+    assert is_new is True  # different years -> separate rows
     with storage.connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) AS c FROM study_scraper.studies")

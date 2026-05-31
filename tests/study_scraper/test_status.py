@@ -95,5 +95,36 @@ def test_format_text_includes_key_sections(
     assert "study scraper status" in text
     assert "studies per topic" in text
     assert "studies per source" in text
+    assert "lake (source_records" in text
     assert "recent runs" in text
     assert "ssoar" in text
+
+
+def test_status_counts_lake_records(
+    storage: PostgresStorage, topics_list
+) -> None:
+    """A14: source_records / lake counters surface in the status report."""
+    from pathlib import Path as _P
+    from study_scraper.ingest import run_lake_ingest
+    from study_scraper.sources.dawum import DAWUMSource
+    from study_scraper.sources.gesis import GESISSource
+
+    with DAWUMSource(
+        from_file=_P(__file__).resolve().parent / "fixtures" / "dawum" / "sample.json"
+    ) as src:
+        run_lake_ingest(source=src, storage=storage)
+    with GESISSource(
+        from_file=_P(__file__).resolve().parent / "fixtures" / "gesis" / "sample.json"
+    ) as src:
+        run_lake_ingest(source=src, storage=storage)
+
+    report = build_status(storage)
+    assert report.total_source_records >= 5
+    assert report.source_records_per_source.get("dawum", 0) >= 1
+    assert report.source_records_per_source.get("gesis", 0) >= 1
+    assert "gesis_kg_sparql_json" in report.source_records_per_format
+    assert "dawum_survey_json" in report.source_records_per_format
+
+    text = format_text(report)
+    assert "lake per format" in text
+    assert "gesis_kg_sparql_json" in text
