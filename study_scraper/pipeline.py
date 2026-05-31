@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from study_scraper.claims import extract_claims
 from study_scraper.discovery.base import Candidate, DiscoverySource
@@ -71,10 +71,19 @@ def _candidate_to_study(
     now: datetime,
 ) -> Study:
     text = " ".join(filter(None, [cand.title, cand.abstract])).strip()
+    provenance_extras: Dict[str, Any] = {}
+    # Phase 5d step 1: propagate citation-graph IDs from raw into
+    # provenance so they're addressable via SQL on `studies.provenance`.
+    if cand.raw:
+        for key in ("referenced_works", "related_works"):
+            value = cand.raw.get(key)
+            if value:
+                provenance_extras[key] = value
     provenance = Provenance(
         discovery_source=cand.source_id,
         discovery_query=cand.discovery_query,
         extractor_version="phase4-v1",
+        **provenance_extras,
     )
     return Study.build(
         canonical_url=cand.canonical_url,

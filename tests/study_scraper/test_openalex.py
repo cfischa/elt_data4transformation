@@ -106,6 +106,19 @@ class TestOpenAlexFromFile:
         assert any("Climate policy" in t["display_name"] for t in co2.raw["topics"])
         assert "CO2 pricing" in co2.raw["keywords"]
 
+    def test_raw_captures_referenced_and_related_works(self, klima) -> None:
+        """Phase 5d step 1: citation-graph IDs end up in raw."""
+        with OpenAlexSource(from_file=FIXTURE) as src:
+            cands = list(src.iter_candidates(klima))
+        forsa = next(c for c in cands if "Forsa-Umfrage" in c.title)
+        assert "referenced_works" in forsa.raw
+        assert "related_works" in forsa.raw
+        assert len(forsa.raw["referenced_works"]) >= 2
+        # Other records without these fields default to empty lists.
+        for c in cands:
+            assert isinstance(c.raw.get("referenced_works", []), list)
+            assert isinstance(c.raw.get("related_works", []), list)
+
     def test_limit_truncates(self, klima) -> None:
         with OpenAlexSource(from_file=FIXTURE) as src:
             cands = list(src.iter_candidates(klima, limit=2))

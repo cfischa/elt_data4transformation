@@ -111,6 +111,38 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A19. Eurostat lake source (additive)
+- **Date:** 2026-05-31
+- **Decision:** Add Eurostat as a lake source via the public
+  dissemination API at
+  `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/{code}`.
+  No auth. Operator picks dataset codes per ingest run
+  (`ingest --source eurostat --code env_air_gge --code nrg_bal_s`).
+- **Rationale:** Per the A13 / A14 priority on structured-data
+  sources, Eurostat is the lowest-friction T1 source after DAWUM and
+  GESIS. JSON-stat 2.0 payloads preserve cleanly into `source_records`;
+  per-table typed views (e.g. `eurostat_ghg`) can land later when an
+  access pattern needs them.
+- **Implementation:** `study_scraper/sources/eurostat.py`. Two modes
+  (live + from_file), like DAWUM/GESIS. License recorded per record
+  (CC BY 4.0). Fixture has real codes (`env_air_gge`, `nrg_bal_s`)
+  in the JSON-stat 2.0 shape.
+
+### A18. Phase 5d step 1 — capture OpenAlex citation graph in provenance
+- **Date:** 2026-05-31
+- **Decision:** When the OpenAlex source ingests a Work, capture its
+  `referenced_works[]` and `related_works[]` arrays in two places:
+  (a) `Candidate.raw` for downstream debugging; (b) `Study.provenance`
+  (allowed-extras dict) so the IDs are queryable via SQL
+  (`provenance->'referenced_works'`). Cap at 200 IDs per side to avoid
+  bloating rows on long bibliographies.
+- **Rationale:** Foundation for the Phase 5d reference-follower. The
+  active fetcher (which materializes referenced IDs as new candidates)
+  lands later; this commit makes the data available so the follower
+  has somewhere to start.
+- **No new schema:** uses the existing `provenance jsonb` column; no
+  migration needed.
+
 ### A17. crawl4ai NOT adopted for the next iteration (evaluated 2026-05-31)
 - **Date:** 2026-05-31
 - **Decision:** Do not pull in

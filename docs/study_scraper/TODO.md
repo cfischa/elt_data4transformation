@@ -4,6 +4,64 @@ Work flows top-to-bottom. **Do not skip ahead** without updating this file
 and `STATUS.md`. Items marked **[BLOCKED]** require a `DECISIONS.md` answer
 before they start.
 
+## Next steps (priority order, updated 2026-05-31)
+
+Everything sandbox-safe has been built. The items below either need
+live HTTP from the maintainer's machine, account credentials, or
+larger blocks of work that didn't fit a single pass.
+
+### Need live HTTP (run once from a network-enabled machine)
+1. **First live run across all 5 sources.** Drop `--from-file` and
+   confirm each source talks to its live endpoint:
+   ```bash
+   python -m study_scraper run    --source ssoar    --topic klima --limit 100
+   python -m study_scraper run    --source openalex --topic klima --limit 100
+   python -m study_scraper ingest --source dawum    --topic klima
+   python -m study_scraper ingest --source gesis    --topic klima --limit 200
+   python -m study_scraper ingest --source eurostat --topic klima \
+         --code env_air_gge --code nrg_bal_s --code demo_pjan
+   ```
+2. **Provision Supabase** (Q11). Until then `POSTGRES_URL` against
+   the local docker-compose Postgres works fine.
+
+### Highest yield-per-effort, sandbox-buildable
+3. **OpenAlex reference follower (Phase 5d step 2)** — A18 captured
+   `referenced_works[]`/`related_works[]` in provenance. Step 2 is
+   a small daemon that walks those IDs, checks which we don't yet
+   have, and queues them as candidates for the next OpenAlex run.
+   Uses the existing source; no new ingestion code.
+4. **Destatis GENESIS lake source.** Legacy `connectors/destatis_connector.py`
+   has the REST shape. Free email-registered auth. Format
+   `destatis_table_csv`.
+5. **UBA Klimabilanz / Umweltbundesamt downloads.** XLSX / CSV
+   emission inventories — direct hit on the climate test case.
+6. **Per-table SQL views** as access patterns surface — e.g.
+   `eurostat_ghg_emissions` over `env_air_gge`; `gesis_datasets`
+   over GESIS records.
+
+### Medium yield
+7. **Phase 5b is done** (A16: title-near-dup). Author-near-dup is
+   not on the roadmap; revisit if it surfaces real false negatives.
+8. **`status --json` output** for cron / scripting consumers.
+9. **Dock: Sources page** (Phase 5d follow-on) — per-source
+   coverage table, last-run summary, error count.
+10. **Eval harness scaffolding (Phase 7)** — once a gold set lands,
+    we'll measure recall/precision per topic. Currently no gold set.
+
+### Deferred (per A13 / A17)
+11. **PDF / full-text extraction.** A13 deferred. Phase 6-full.
+12. **Think-tank SitemapSource.** A13 T3, depends on PDF extraction.
+13. **Polling-firm press-release scraper.** A13 T3.
+14. **crawl4ai adoption.** A17 declined for the current tier;
+    reconsider when T3 is unblocked.
+
+### Awaiting maintainer call
+15. **Q13** — ratify the success-criteria thresholds in `GOAL.md`.
+16. **Q19** — GESIS microdata download path (account login). Defer
+    until we want SPSS bytes, not metadata.
+
+---
+
 ## Phase 0 — Knowledge base bootstrap
 
 - [x] Create `docs/study_scraper/` and write `README.md`, `GOAL.md`,
@@ -127,14 +185,19 @@ added when the access pattern demands, not pre-built.
 - [x] **DAWUM** — JSON polling API. `study_scraper/sources/dawum.py`
       shipped 2026-05-29; first lake source. Two views shipped
       (`dawum_polls`, `dawum_poll_results`). Free, no auth, ODC-ODbL.
+- [x] **GESIS Knowledge Graph (catalog)** — SPARQL endpoint, no auth
+      (A15, 2026-05-31). `study_scraper/sources/gesis.py`. Fixture
+      with real ZA-numbers (Politbarometer ZA2391, UBA
+      Umweltbewusstsein 2022 ZA8829 / 2018 ZA7493).
+- [x] **Eurostat dissemination API** (A19, 2026-05-31).
+      `study_scraper/sources/eurostat.py`. JSON-stat 2.0, no auth, CC
+      BY 4.0. Operator picks dataset codes per ingest run.
 - [ ] **Destatis GENESIS** — REST API. Port the legacy connector
       behind the `LakeSource` protocol. Free auth (registration).
       Format: `destatis_table_csv` (CSV bodies + JSON metadata).
-- [ ] **Eurostat** — REST API. No auth. Format:
-      `eurostat_jsonstat` (cube model). Port legacy connector.
-- [ ] **GESIS DBK** — SPARQL endpoint. Q17 (auth) gates this.
-      Format: `gesis_metadata_json` for the catalogue,
-      `gesis_sav` (or `payload_uri`) for the actual microdata files.
+- [ ] **GESIS microdata downloads (Q19)** — `search.gesis.org` post-
+      login flow for SPSS/Stata/CSV bodies. Q19 deferred until we want
+      bytes, not metadata.
 - [ ] **BAMF migration statistics** — Excel + CSV downloads from
       bamf.de/Forschungsdaten. Format: `bamf_xlsx`.
 - [ ] **UBA Klimabilanz** / **Umweltbundesamt structured downloads**
@@ -179,11 +242,15 @@ the tool must keep finding new sources too.
 
 Three mechanisms, ranked by yield / effort:
 
-- [ ] **Reference / related-works follower** — when we ingest an
-      OpenAlex Work, follow `referenced_works[]` and `related_works[]`
-      one hop. Each becomes a candidate `Study`. Cheap recall booster.
-      We already capture these IDs (need to expand the OpenAlex source
-      to write them to `provenance`).
+- [x] **Step 1: capture** referenced_works / related_works IDs from
+      OpenAlex into `Candidate.raw` and `Study.provenance` (A18,
+      shipped 2026-05-31). Cap at 200 IDs per side. Queryable via
+      `provenance->'referenced_works'`.
+- [ ] **Step 2: follower** — periodic job that walks every OpenAlex
+      study, takes its referenced_works one hop, checks which IDs we
+      don't have yet, and queues them as candidates for the
+      OpenAlex source's next run. Cheap recall booster, no new
+      ingestion code; uses the existing OpenAlex source.
 - [ ] **Domain audit** — periodic WebSearch (or, on the maintainer's
       machine, real web search) for `<topic include keyword> studie
       Deutschland`, capture result URLs, group by domain. Domains we

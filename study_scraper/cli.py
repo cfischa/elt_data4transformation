@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import typer
 
@@ -17,6 +17,7 @@ from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.ingest import run_lake_ingest
 from study_scraper.sources.dawum import DAWUMSource
+from study_scraper.sources.eurostat import EurostatSource
 from study_scraper.sources.gesis import GESISSource
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage, StorageError, resolve_database_url
@@ -259,6 +260,11 @@ def ingest(
              "captures. Lake sources don't topic-filter; this is just "
              "metadata for downstream views.",
     ),
+    code: List[str] = typer.Option(
+        [], "--code",
+        help="Eurostat-only: dataset code(s) to fetch (repeatable). "
+             "Example: --code env_air_gge --code nrg_cb_e.",
+    ),
 ) -> None:
     """Ingest a structured-data source into the lake (`source_records`).
 
@@ -270,9 +276,17 @@ def ingest(
         src = DAWUMSource(from_file=from_file)
     elif source == "gesis":
         src = GESISSource(from_file=from_file)
+    elif source == "eurostat":
+        if not from_file and not code:
+            raise typer.BadParameter(
+                "eurostat requires --code <dataset_code> (repeatable) "
+                "or --from-file PATH."
+            )
+        src = EurostatSource(codes=code, from_file=from_file)
     else:
         raise typer.BadParameter(
-            f"unknown lake source {source!r}; supported: dawum, gesis"
+            f"unknown lake source {source!r}; "
+            f"supported: dawum, gesis, eurostat"
         )
     storage = _storage_from_settings()
     topic_ids = [topic] if topic else None

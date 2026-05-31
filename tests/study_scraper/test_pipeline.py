@@ -132,3 +132,36 @@ def test_topic_scores_populated(
     for row in rows:
         assert "klima" in row["topic_scores"]
         assert 0.0 < row["topic_scores"]["klima"] <= 1.0
+
+
+def test_openalex_citation_graph_propagated_to_provenance(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """Phase 5d step 1: OpenAlex referenced_works / related_works land
+    in studies.provenance so the future reference-follower has data."""
+    from study_scraper.discovery.openalex import OpenAlexSource
+
+    oa_fixture = (
+        FIXTURE.parent.parent / "openalex" / "klima_works.json"
+    )
+    with OpenAlexSource(from_file=oa_fixture) as src:
+        run_one(source=src, topic=klima_topic, storage=storage)
+
+    # Use a JSONB query to find any study with referenced_works set.
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, "
+                "       jsonb_array_length(provenance->'referenced_works') AS n_ref, "
+                "       jsonb_array_length(provenance->'related_works')    AS n_rel "
+                "FROM   study_scraper.studies "
+                "WHERE  provenance ? 'referenced_works' "
+                "ORDER  BY n_ref DESC NULLS LAST "
+                "LIMIT  5"
+            )
+            rows = cur.fetchall()
+    assert rows, "no studies carried referenced_works through to provenance"
+    # The Forsa fixture record has 2 referenced + 3 related.
+    forsa = next(r for r in rows if "Forsa-Umfrage" in r["title"])
+    assert forsa["n_ref"] == 2
+    assert forsa["n_rel"] == 3

@@ -195,6 +195,17 @@ class OpenAlexSource:
             if isinstance(kw, dict) and kw.get("display_name"):
                 keywords_raw.append(kw["display_name"])
 
+        # Phase 5d step 1: capture citation-graph IDs. The actual
+        # reference-follower (which fetches these IDs as new candidates)
+        # lands later; for now we just preserve them in `raw` so the
+        # operator can query them and the follower has a foundation.
+        referenced_works: List[str] = [
+            r for r in (work.get("referenced_works") or []) if isinstance(r, str)
+        ]
+        related_works: List[str] = [
+            r for r in (work.get("related_works") or []) if isinstance(r, str)
+        ]
+
         return Candidate(
             source_id=self.source_id,
             external_id=external_id or canonical_url,
@@ -213,6 +224,11 @@ class OpenAlexSource:
                 "type": work.get("type"),
                 "topics": topics_raw,
                 "keywords": keywords_raw,
+                # Phase 5d foundation -- citation graph for the future
+                # reference-follower. Cap at 200 per side so we don't
+                # bloat the row when a paper cites a long bibliography.
+                "referenced_works": referenced_works[:200],
+                "related_works": related_works[:200],
             },
         )
 

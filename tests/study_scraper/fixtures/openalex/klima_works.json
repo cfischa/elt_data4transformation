@@ -163,7 +163,16 @@
       ],
       "abstract_inverted_index": {"Im": [0], "Auftrag": [1], "der": [2, 25, 39, 58, 61], "Klima-Allianz": [3], "Deutschland": [4], "führte": [5], "das": [6, 64], "Meinungsforschungsinstitut": [7], "Forsa": [8], "eine": [9], "repräsentative": [10], "Umfrage": [11], "zur": [12], "Akzeptanz": [13], "eines": [14], "verbindlichen": [15], "Klimaschutzgesetzes": [16], "durch": [17], "(n=1009,": [18], "Wahlberechtigte": [19], "ab": [20], "18": [21], "Jahren).": [22], "Ergebnis:": [23], "62%": [24], "Befragten": [26, 59], "halten": [27], "ein": [28], "verbindliches": [29], "Klimaschutzgesetz": [30], "mit": [31], "klaren": [32], "Treibhausgas-Reduktionszielen": [33], "für": [34], "nötig.": [35], "Eine": [36], "deutliche": [37], "Mehrheit": [38], "Wählerinnen": [40], "und": [41, 50, 54], "Wähler": [42], "unterstützt": [43], "strengere": [44], "Vorgaben": [45], "beim": [46], "Klimaschutz,": [47], "einschließlich": [48], "Anhängerinnen": [49], "Anhängern": [51], "von": [52], "CDU/CSU": [53], "SPD.": [55], "Nur": [56], "13%": [57], "trauen": [60], "Bundesregierung": [62], "zu,": [63], "2030er": [65], "Klimaziel": [66], "zu": [67], "erreichen.": [68]},
       "topics": [{"display_name": "Climate policy", "score": 0.95}],
-      "keywords": [{"display_name": "Klimaschutzgesetz"}, {"display_name": "Forsa"}]
+      "keywords": [{"display_name": "Klimaschutzgesetz"}, {"display_name": "Forsa"}],
+      "referenced_works": [
+        "https://openalex.org/W4391234567",
+        "https://openalex.org/W4385678901"
+      ],
+      "related_works": [
+        "https://openalex.org/W4310249875",
+        "https://openalex.org/W4287634982",
+        "https://openalex.org/W9100000001"
+      ]
     },
     {
       "_polling_report_note": "Innofact (March 2025) + Civey longitudinal survey on nuclear-energy support. Same caveat as above.",

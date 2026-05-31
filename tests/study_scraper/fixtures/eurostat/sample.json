@@ -1,0 +1,120 @@
+{
+  "_fixture_note": "Two real Eurostat datasets in the EurostatSource multi-dataset fixture shape. JSON-stat 2.0 payloads are abbreviated (real responses are tens of thousands of cells); the structure is faithful (class, label, source, updated, id, size, dimension, value) so the parser sees the same shape it would live. Codes verified via WebSearch 2026-05-31 against the Eurostat Data Browser. The production parser is the same code path live vs from-file.",
+  "datasets": [
+    {
+      "code": "env_air_gge",
+      "_label_de": "Treibhausgasemissionen nach Quellsektor (NACE)",
+      "payload": {
+        "version": "2.0",
+        "class": "dataset",
+        "label": "Greenhouse gas emissions by source sector (source: EEA)",
+        "source": "European Environment Agency",
+        "updated": "2025-04-23",
+        "extension": {
+          "datasetId": "env_air_gge",
+          "lang": "EN"
+        },
+        "href": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/env_air_gge",
+        "id": ["freq", "airpol", "src_crf", "unit", "geo", "time"],
+        "size": [1, 8, 12, 2, 31, 35],
+        "dimension": {
+          "freq": {
+            "label": "Time frequency",
+            "category": {"index": {"A": 0}, "label": {"A": "Annual"}}
+          },
+          "airpol": {
+            "label": "Pollutant",
+            "category": {
+              "index": {"GHG": 0, "CO2": 1, "CH4": 2, "N2O": 3},
+              "label": {
+                "GHG": "Greenhouse gases (CO2, N2O in CO2 equivalent, CH4 in CO2 equivalent)",
+                "CO2": "Carbon dioxide",
+                "CH4": "Methane",
+                "N2O": "Nitrous oxide"
+              }
+            }
+          },
+          "geo": {
+            "label": "Geopolitical entity (reporting)",
+            "category": {
+              "index": {"EU27_2020": 0, "DE": 1, "FR": 2},
+              "label": {
+                "EU27_2020": "European Union - 27 countries (from 2020)",
+                "DE": "Germany",
+                "FR": "France"
+              }
+            }
+          },
+          "time": {
+            "label": "Time",
+            "category": {
+              "index": {"1990": 0, "2000": 1, "2010": 2, "2020": 3, "2022": 4},
+              "label": {
+                "1990": "1990", "2000": "2000", "2010": "2010",
+                "2020": "2020", "2022": "2022"
+              }
+            }
+          }
+        },
+        "value": {
+          "0": 5651.06,
+          "1": 3939.46,
+          "2": 3221.18,
+          "3": 1239.71,
+          "4": 1228.84
+        }
+      }
+    },
+    {
+      "code": "nrg_bal_s",
+      "_label_de": "Energiebilanzen (komplette Energiebilanz)",
+      "payload": {
+        "version": "2.0",
+        "class": "dataset",
+        "label": "Complete energy balances",
+        "source": "Eurostat",
+        "updated": "2025-02-12",
+        "extension": {
+          "datasetId": "nrg_bal_s",
+          "lang": "EN"
+        },
+        "href": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_bal_s",
+        "id": ["freq", "nrg_bal", "siec", "unit", "geo", "time"],
+        "size": [1, 64, 28, 4, 38, 34],
+        "dimension": {
+          "freq": {
+            "label": "Time frequency",
+            "category": {"index": {"A": 0}, "label": {"A": "Annual"}}
+          },
+          "siec": {
+            "label": "Standard international energy product classification (SIEC)",
+            "category": {
+              "index": {"TOTAL": 0, "RA000": 1, "C0000": 2, "G3000": 3},
+              "label": {
+                "TOTAL": "Total",
+                "RA000": "Renewables and biofuels",
+                "C0000": "Solid fossil fuels",
+                "G3000": "Natural gas"
+              }
+            }
+          },
+          "geo": {
+            "label": "Geopolitical entity (reporting)",
+            "category": {
+              "index": {"EU27_2020": 0, "DE": 1},
+              "label": {
+                "EU27_2020": "European Union - 27 countries (from 2020)",
+                "DE": "Germany"
+              }
+            }
+          }
+        },
+        "value": {
+          "0": 11789.5,
+          "1": 2891.2,
+          "2": 1023.7
+        }
+      }
+    }
+  ]
+}

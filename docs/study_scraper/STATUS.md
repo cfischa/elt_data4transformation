@@ -1,10 +1,47 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-31 (clean+build pass: scrapy scaffold deleted,
-dead env vars removed, GESIS catalog source shipped (A15), title-near-
-dup dedup shipped closing Phase 5b (A16), status report enhanced with
-lake counters, crawl4ai evaluated and declined for now (A17).
-**183 tests pass.**)._
+_Last updated: 2026-05-31 (second clean+build pass: Eurostat source
+shipped (A19), OpenAlex citation graph captured in provenance for the
+future reference-follower (A18), dock Lake browser page (3_Lake.py).
+**198 tests pass; 5 sources ingest end-to-end.**)._
+
+## Second clean+build pass (2026-05-31, late)
+
+Three things shipped this pass:
+
+1. **Eurostat lake source** (A19) — `study_scraper/sources/eurostat.py`.
+   Public dissemination API; JSON-stat 2.0 payloads land in
+   `source_records` as-is. CLI: `ingest --source eurostat --code
+   env_air_gge --code nrg_bal_s`. Fixture covers real codes
+   (env_air_gge GHG emissions; nrg_bal_s energy balances).
+2. **OpenAlex citation graph capture** (A18, Phase 5d step 1) —
+   `referenced_works[]` / `related_works[]` IDs from each Work end up
+   in `Candidate.raw` and in `Study.provenance`. Queryable via
+   `provenance->'referenced_works'`. Foundation for the active
+   reference-follower (Phase 5d step 2, future).
+3. **Dock Lake browser** — `study_scraper/console/pages/3_Lake.py`.
+   Filter by source / format / topic / status; expand a row to inspect
+   its raw JSONB payload; metric tiles for the current filter.
+
+End-to-end across **five sources** now runs:
+
+  $ python -m study_scraper run    --source ssoar    --topic klima
+  $ python -m study_scraper run    --source openalex --topic klima
+  $ python -m study_scraper ingest --source dawum    --topic klima
+  $ python -m study_scraper ingest --source gesis    --topic klima
+  $ python -m study_scraper ingest --source eurostat --topic klima \
+        --code env_air_gge --code nrg_bal_s
+
+  studies (kept/pending/rejected): 15 / 0 / 0
+  candidates seen / kept         : 25 / 23 (92.0%)
+  studies per source (catalog)   : openalex 9, ssoar 6
+  lake (source_records, kept)    : 7
+    gesis 4, eurostat 2, dawum 1
+  lake per format                : gesis_kg_sparql_json 4,
+                                   eurostat_jsonstat    2,
+                                   dawum_survey_json    1
+
+## First clean + build pass (2026-05-31)
 
 ## Clean + build pass (2026-05-31)
 
