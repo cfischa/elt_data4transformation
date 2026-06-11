@@ -57,11 +57,18 @@ class OpenAlexSource:
         timeout: float = 30.0,
         user_agent: str = "study-scraper/0.0.1 (+https://github.com/cfischa/elt_data4transformation)",
         per_page: int = DEFAULT_PER_PAGE,
+        work_ids: Optional[List[str]] = None,
     ) -> None:
         self._base_url = base_url
         self._from_file = from_file
         self._mailto = mailto  # Joining the "polite pool" gets better rate limits
         self._per_page = min(per_page, MAX_PER_PAGE)
+        # Reference-follower mode (Phase 5d): fetch these specific works
+        # instead of running a keyword search. IDs are openalex.org URLs
+        # or bare W-ids; up to ~50 per request (OpenAlex OR-filter cap).
+        self._work_ids = [
+            w.rsplit("/", 1)[-1] for w in (work_ids or []) if w
+        ]
         self._owns_client = client is None
         self._client = client or httpx.Client(
             timeout=timeout,
@@ -91,14 +98,19 @@ class OpenAlexSource:
             yield from self._parse_payload(payload, topic=topic, limit=limit)
             return
 
-        search_query = _build_search_query(topic)
-        languages = sorted({loc for loc in topic.locales} & {"de", "en"})
-        params: Dict[str, str] = {
-            "search": search_query,
-            "per-page": str(self._per_page),
-        }
-        if languages:
-            params["filter"] = "language:" + "|".join(languages)
+        params: Dict[str, str] = {"per-page": str(self._per_page)}
+        if self._work_ids:
+            # Reference-follower mode: fetch exactly these works.
+            # NOTE for first live run: verify the filter attribute —
+            # `ids.openalex:` per OpenAlex docs; fall back to
+            # `openalex:` if the API rejects it.
+            params["filter"] = "ids.openalex:" + "|".join(self._work_ids)
+        else:
+            search_query = _build_search_query(topic)
+            languages = sorted({loc for loc in topic.locales} & {"de", "en"})
+            params["search"] = search_query
+            if languages:
+                params["filter"] = "language:" + "|".join(languages)
         if self._mailto:
             params["mailto"] = self._mailto
 

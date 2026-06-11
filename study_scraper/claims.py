@@ -1,4 +1,4 @@
-"""Phase-6-mini: extract numerical claims from study title + abstract.
+"""Claim extraction: numerical findings from study text.
 
 Why this exists: the 2026-05-28 measurement against the maintainer's
 example questions ("how many Germans want stricter climate laws / want
@@ -6,21 +6,27 @@ nuclear back?") showed that we have a *catalog* of studies but not the
 *answers* the studies contain. The answers ("62 % support …", "55 %
 favour …") sit in the body of polling reports.
 
-This module is the smallest viable bridge: a regex pass over what we
-already have (title + abstract) that captures `<number> <unit>` tokens
-with a short surrounding context window. Output goes to the `claims`
-table, queryable by the `search` CLI and the dock.
+Two extraction passes share the same regex machinery:
 
-Limitations (intentional, documented for next iteration):
+  - `extract_claims(title, abstract)` — Phase 6-mini (extractor id
+    `regex-v1`): runs over the metadata we get at discovery time.
+  - `extract_claims_from_text(text)` — Phase 6-full / A20 (extractor
+    id `regex-v2`): runs over a full document body (extracted PDF
+    text, HTML body text). Wired through `study_scraper/fulltext.py`.
+
+Output goes to the `claims` table, queryable by the `search` CLI and
+the dock. The two extractor ids coexist per study: re-running one
+extractor replaces only its own claims (see storage.upsert_claims).
+
+Limitations (intentional, documented):
   - Regex-only. No language-model pass. False positives on year tokens
     are filtered out heuristically; the rest is up to the human reading
     the snippet.
-  - Title + abstract only. Full-text PDF extraction is its own phase.
   - Single-language (DE/EN keyword bracketing); no semantic
     disambiguation of WHAT the % refers to.
 
 The schema (`claims`) is wide enough that an LLM-based extractor can
-replace `extractor='regex-v1'` later without a migration.
+be added as `extractor='llm-v1'` later without a migration.
 """
 
 from __future__ import annotations
@@ -53,7 +59,7 @@ _PERCENT_RE = re.compile(
 # "n=1024", "n = 1024", "(n=1009," — sample-size cues, kept as a claim
 # type so the dock can show "based on a sample of X".
 _SAMPLE_RE = re.compile(
-    r"\bn\s*=\s*(?P<value>\d+(?:[\. ]\d{3})*(?:[.,]\d+)?)\b",
+    r"\bn\s*=\s*(?P<value>\d+(?:[\. ]\d{3})*(?:[.,]\d+)?)\b",
     re.IGNORECASE,
 )
 
@@ -69,7 +75,7 @@ class ExtractedClaim:
     claim_text: str
     numeric_value: Optional[float]
     unit: Optional[str]
-    source_field: str  # 'title' | 'abstract'
+    source_field: str  # 'title' | 'abstract' | 'fulltext'
 
     @property
     def id(self) -> str:
@@ -127,6 +133,62 @@ def _value_to_float(token: str) -> Optional[float]:
         return None
 
 
+def _extract_from_field(
+    *,
+    study_id: str,
+    text: str,
+    source_field: str,
+    seen: set,
+    out: List[ExtractedClaim],
+) -> None:
+    """Append claims found in one text field to `out` (shared dedup set)."""
+    # Percent matches
+    for m in _PERCENT_RE.finditer(text):
+        value = _value_to_float(m.group("value"))
+        if value is None:
+            continue
+        # Optional sanity: a percent of >120 is almost always not a
+        # poll figure; suppress those.
+        if value > 120.0:
+            continue
+        snippet = _trim_snippet(text, m.start(), m.end())
+        # Dedup includes the match span so overlapping matches that
+        # produce the same snippet still count as distinct claims.
+        key = (source_field, m.start(), value)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            ExtractedClaim(
+                study_id=study_id,
+                claim_text=snippet,
+                numeric_value=value,
+                unit="%",
+                source_field=source_field,
+            )
+        )
+
+    # Sample-size cues. Useful for the dock to show "n=…" alongside.
+    for m in _SAMPLE_RE.finditer(text):
+        value = _value_to_float(m.group("value").replace(" ", ""))
+        if value is None:
+            continue
+        snippet = _trim_snippet(text, m.start(), m.end())
+        key = (source_field, m.start(), value)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            ExtractedClaim(
+                study_id=study_id,
+                claim_text=snippet,
+                numeric_value=value,
+                unit="n",  # sample size
+                source_field=source_field,
+            )
+        )
+
+
 def extract_claims(
     *, study_id: str, title: Optional[str], abstract: Optional[str]
 ) -> List[ExtractedClaim]:
@@ -136,56 +198,30 @@ def extract_claims(
     "62 %" twice produces one claim).
     """
     out: List[ExtractedClaim] = []
-    seen: set[tuple[str, str]] = set()
-
+    seen: set = set()
     for source_field, text in (("title", title or ""), ("abstract", abstract or "")):
-        if not text:
-            continue
-
-        # Percent matches
-        for m in _PERCENT_RE.finditer(text):
-            value = _value_to_float(m.group("value"))
-            if value is None:
-                continue
-            # Optional sanity: a percent of >120 is almost always not a
-            # poll figure; suppress those.
-            if value > 120.0:
-                continue
-            snippet = _trim_snippet(text, m.start(), m.end())
-            # Dedup includes the match span so overlapping matches that
-            # produce the same snippet still count as distinct claims.
-            key = (source_field, m.start(), value)
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(
-                ExtractedClaim(
-                    study_id=study_id,
-                    claim_text=snippet,
-                    numeric_value=value,
-                    unit="%",
-                    source_field=source_field,
-                )
+        if text:
+            _extract_from_field(
+                study_id=study_id, text=text,
+                source_field=source_field, seen=seen, out=out,
             )
+    return out
 
-        # Sample-size cues. Useful for the dock to show "n=…" alongside.
-        for m in _SAMPLE_RE.finditer(text):
-            value = _value_to_float(m.group("value").replace(" ", ""))
-            if value is None:
-                continue
-            snippet = _trim_snippet(text, m.start(), m.end())
-            key = (source_field, m.start(), value)
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(
-                ExtractedClaim(
-                    study_id=study_id,
-                    claim_text=snippet,
-                    numeric_value=value,
-                    unit="n",  # sample size
-                    source_field=source_field,
-                )
-            )
 
+def extract_claims_from_text(
+    *, study_id: str, text: str, source_field: str = "fulltext"
+) -> List[ExtractedClaim]:
+    """Full-document variant (A20): same extractors over an arbitrary
+    text body — extracted PDF text, HTML body text, etc.
+
+    Stored under `source_field='fulltext'` and (by the fulltext
+    pipeline) `extractor='regex-v2'`, so abstract-level claims survive
+    independently.
+    """
+    out: List[ExtractedClaim] = []
+    if text:
+        _extract_from_field(
+            study_id=study_id, text=text,
+            source_field=source_field, seen=set(), out=out,
+        )
     return out

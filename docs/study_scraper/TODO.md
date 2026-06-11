@@ -4,61 +4,53 @@ Work flows top-to-bottom. **Do not skip ahead** without updating this file
 and `STATUS.md`. Items marked **[BLOCKED]** require a `DECISIONS.md` answer
 before they start.
 
-## Next steps (priority order, updated 2026-05-31)
+## Next steps (priority order, updated 2026-06-11 — production pass)
 
-Everything sandbox-safe has been built. The items below either need
-live HTTP from the maintainer's machine, account credentials, or
-larger blocks of work that didn't fit a single pass.
+**The authoritative machine-only checklist now lives in
+[`RUNBOOK.md`](RUNBOOK.md).** Summary:
 
-### Need live HTTP (run once from a network-enabled machine)
-1. **First live run across all 5 sources.** Drop `--from-file` and
-   confirm each source talks to its live endpoint:
-   ```bash
-   python -m study_scraper run    --source ssoar    --topic klima --limit 100
-   python -m study_scraper run    --source openalex --topic klima --limit 100
-   python -m study_scraper ingest --source dawum    --topic klima
-   python -m study_scraper ingest --source gesis    --topic klima --limit 200
-   python -m study_scraper ingest --source eurostat --topic klima \
-         --code env_air_gge --code nrg_bal_s --code demo_pjan
-   ```
-2. **Provision Supabase** (Q11). Until then `POSTGRES_URL` against
-   the local docker-compose Postgres works fine.
+### Machine-bound (your computer; RUNBOOK §1–4)
+1. **Database** — local docker-compose Postgres OR Supabase project;
+   if Supabase, add repo secret `SCRAPER_POSTGRES_URL` to activate
+   the scheduled GitHub Action (`.github/workflows/scrape.yml`).
+2. **First live crawl across all 5 sources** (RUNBOOK §2, with the
+   known-unknowns list: SSOAR pagination, OpenAlex `ids.openalex`
+   filter attribute, GESIS throughput, Eurostat payload sizes).
+3. **First live `fulltext` run** (RUNBOOK §3) — fetches documents,
+   extracts statistics from full text, populates the reading list.
+4. **Operator routine** (RUNBOOK §5) — dock review, topics tuning,
+   reading list.
 
-### Highest yield-per-effort, sandbox-buildable
-3. **OpenAlex reference follower (Phase 5d step 2)** — A18 captured
-   `referenced_works[]`/`related_works[]` in provenance. Step 2 is
-   a small daemon that walks those IDs, checks which we don't yet
-   have, and queues them as candidates for the next OpenAlex run.
-   Uses the existing source; no new ingestion code.
-4. **Destatis GENESIS lake source.** Legacy `connectors/destatis_connector.py`
-   has the REST shape. Free email-registered auth. Format
-   `destatis_table_csv`.
-5. **UBA Klimabilanz / Umweltbundesamt downloads.** XLSX / CSV
-   emission inventories — direct hit on the climate test case.
-6. **Per-table SQL views** as access patterns surface — e.g.
-   `eurostat_ghg_emissions` over `env_air_gge`; `gesis_datasets`
-   over GESIS records.
+### Done in the production pass (2026-06-11, A20)
+- [x] Full-document fetch + extraction (`fulltext.py`, regex-v2).
+- [x] `reading_list` view + CLI (hybrid model: stats + read queue).
+- [x] Reference follower step 2 (`follow.py` + CLI + work_ids mode).
+- [x] `status --json`.
+- [x] Scheduled GitHub Action with status artifact.
+- [x] RUNBOOK.md.
 
-### Medium yield
-7. **Phase 5b is done** (A16: title-near-dup). Author-near-dup is
-   not on the roadmap; revisit if it surfaces real false negatives.
-8. **`status --json` output** for cron / scripting consumers.
-9. **Dock: Sources page** (Phase 5d follow-on) — per-source
-   coverage table, last-run summary, error count.
-10. **Eval harness scaffolding (Phase 7)** — once a gold set lands,
-    we'll measure recall/precision per topic. Currently no gold set.
+### Next build items (sandbox-buildable, in order of yield)
+5. **Landing-page → PDF resolver** — many canonical_urls are HTML
+   landing pages linking the actual PDF (SSOAR handles especially).
+   Build after the first live `fulltext` run shows the hit rate
+   (RUNBOOK §3 flags this as the expected top gap).
+6. **LLM claim extractor (`llm-v1`)** — disambiguate WHAT each %
+   refers to; turns claims into (question, answer, %) triples — the
+   real shape of an issue-polling system. Schema ready (extractor
+   column); needs API-key + cost decision from maintainer.
+7. **Destatis GENESIS lake source** (free registration needed).
+8. **UBA / BAMF structured downloads** (XLSX/CSV lake sources).
+9. **Per-table SQL views** as access patterns surface.
+10. **Dock: Sources page** — per-source coverage, last-run, errors.
+11. **Eval harness (Phase 7)** — needs maintainer-curated gold set.
 
-### Deferred (per A13 / A17)
-11. **PDF / full-text extraction.** A13 deferred. Phase 6-full.
-12. **Think-tank SitemapSource.** A13 T3, depends on PDF extraction.
-13. **Polling-firm press-release scraper.** A13 T3.
-14. **crawl4ai adoption.** A17 declined for the current tier;
-    reconsider when T3 is unblocked.
-
-### Awaiting maintainer call
-15. **Q13** — ratify the success-criteria thresholds in `GOAL.md`.
-16. **Q19** — GESIS microdata download path (account login). Defer
-    until we want SPSS bytes, not metadata.
+### Deferred / awaiting maintainer call
+12. **Think-tank SitemapSource + polling-firm press releases** (A13
+    T3) — now unblocked by A20's extraction machinery; schedule after
+    the resolver (item 5) proves the fetch path.
+13. **crawl4ai** (A17) — reconsider together with item 12.
+14. **Q13** — ratify success thresholds in `GOAL.md`.
+15. **Q19** — GESIS microdata (.sav) downloads (account + licences).
 
 ---
 

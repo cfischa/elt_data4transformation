@@ -1,9 +1,50 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-05-31 (second clean+build pass: Eurostat source
-shipped (A19), OpenAlex citation graph captured in provenance for the
-future reference-follower (A18), dock Lake browser page (3_Lake.py).
-**198 tests pass; 5 sources ingest end-to-end.**)._
+_Last updated: 2026-06-11 (production pass per A20: full-document
+statistics extraction, reading-list, reference follower, scheduled
+GitHub Action, RUNBOOK. **214 tests pass.** Everything sandbox-
+buildable is built; remaining work is machine-bound and enumerated in
+[`RUNBOOK.md`](RUNBOOK.md).)._
+
+## Production pass (2026-06-11, A20)
+
+Maintainer: bring the product to production; the goal is full-document
+statistics ("not just abstracts"), packaged so only machine-bound
+steps remain.
+
+Shipped:
+
+1. **Full-document extraction pipeline** (`study_scraper/fulltext.py`,
+   A20) — fetch each kept study's `canonical_url` (PDF or HTML),
+   extract the full text (pypdf / BeautifulSoup), run the claim
+   extractor over the whole body (`extractor='regex-v2'`), store the
+   raw artifact on disk with `studies.raw_artifact_ref`. Abstract
+   claims (regex-v1) and full-text claims (regex-v2) coexist; each
+   extractor re-runs idempotently. CLI: `study_scraper fulltext
+   [--limit N] [--study-id ID] [--refetch]`.
+2. **Reading list** (migration 0007) — the hybrid model's second
+   track: kept studies with zero claims, with reason `no_artifact`
+   (fetch pending) or `no_claims` (human must read). CLI:
+   `study_scraper reading-list`.
+3. **Reference follower step 2** (`study_scraper/follow.py`) —
+   `study_scraper follow` lists OpenAlex works cited by our studies
+   but not yet ingested; `--fetch --topic <id>` ingests them through
+   the normal pipeline (batched ID-filter queries; dedup makes
+   over-fetching safe). OpenAlexSource gained `work_ids` mode.
+4. **Scheduled crawl** — `.github/workflows/scrape.yml`: Mon+Thu
+   crawl of all 5 sources + follower + fulltext + status artifact.
+   Activates when the `SCRAPER_POSTGRES_URL` repo secret exists;
+   exits green otherwise.
+5. **`status --json`** for cron/CI consumers.
+6. **[`RUNBOOK.md`](RUNBOOK.md)** — the machine-only checklist: DB
+   provisioning, first live crawl (with known-unknowns to watch),
+   scheduling, operator routine, honest not-done list.
+
+Verified end-to-end in sandbox: ingest → fulltext over a real PDF
+(5 claims extracted from document body) → claims searchable → reading
+list shows the right reasons → status --json well-formed.
+
+## Second clean+build pass (2026-05-31, late)
 
 ## Second clean+build pass (2026-05-31, late)
 

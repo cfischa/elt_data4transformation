@@ -75,7 +75,9 @@ def _candidate_to_study(
     # Phase 5d step 1: propagate citation-graph IDs from raw into
     # provenance so they're addressable via SQL on `studies.provenance`.
     if cand.raw:
-        for key in ("referenced_works", "related_works"):
+        # own openalex_id included so the reference-follower can match
+        # "already ingested" works whose canonical_url is a DOI.
+        for key in ("openalex_id", "referenced_works", "related_works"):
             value = cand.raw.get(key)
             if value:
                 provenance_extras[key] = value

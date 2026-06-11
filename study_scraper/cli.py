@@ -147,13 +147,124 @@ def run(
 
 
 @app.command()
-def status() -> None:
+def status(
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON (for cron / CI)."
+    ),
+) -> None:
     """Print a coverage / health overview to stdout (cron-friendly)."""
+    import dataclasses
+    import json as _json
+
     from study_scraper.status import build_status, format_text
 
     storage = _storage_from_settings()
     report = build_status(storage)
-    typer.echo(format_text(report))
+    if as_json:
+        payload = dataclasses.asdict(report)
+        typer.echo(_json.dumps(payload, default=str, ensure_ascii=False))
+    else:
+        typer.echo(format_text(report))
+
+
+@app.command()
+def fulltext(
+    limit: int = typer.Option(
+        20, "--limit", help="Max studies to fetch documents for."
+    ),
+    study_id: Optional[str] = typer.Option(
+        None, "--study-id", help="Process exactly one study by id."
+    ),
+    refetch: bool = typer.Option(
+        False, "--refetch",
+        help="Also re-process studies that already have an artifact "
+             "(use after extractor upgrades).",
+    ),
+) -> None:
+    """Fetch full documents (PDF/HTML) for kept studies and extract
+    statistics from the FULL text (extractor regex-v2, A20).
+
+    Network required — run from a machine with outbound HTTP. Claims
+    land in the same `claims` table as the abstract pass; studies that
+    still yield no claims appear on the `reading-list`.
+    """
+    from study_scraper.fulltext import run_fulltext
+
+    storage = _storage_from_settings()
+    results = run_fulltext(
+        storage=storage, limit=limit, study_id=study_id, refetch=refetch,
+    )
+    if not results:
+        typer.echo("(nothing queued — all kept studies have artifacts)")
+        return
+    ok = sum(1 for r in results if r["status"] == "ok")
+    claims = sum(r.get("claims", 0) for r in results)
+    for r in results:
+        typer.echo(
+            f"{r['study_id'][:12]}  {r['status']:<24} "
+            f"claims={r.get('claims', 0):>3}  {r.get('canonical_url', '')}"
+        )
+    typer.echo(f"-- {ok}/{len(results)} ok, {claims} full-text claims extracted")
+
+
+@app.command("reading-list")
+def reading_list(
+    limit: int = typer.Option(25, "--limit"),
+) -> None:
+    """Kept studies with NO extracted claims — the human-reading track
+    of the A20 hybrid model (quantitative stats + studies to read)."""
+    storage = _storage_from_settings()
+    rows = storage.query_view("reading_list", limit=limit)
+    if not rows:
+        typer.echo("(reading list empty — every kept study has claims)")
+        return
+    for row in rows:
+        title = (row.get("title") or "").replace("\n", " ")
+        if len(title) > 70:
+            title = title[:67] + "..."
+        typer.echo(
+            f"{row['id'][:12]}  [{row['reason']:<11}]  {title}"
+        )
+        typer.echo(f"{'':14}  {row['canonical_url']}")
+
+
+@app.command()
+def follow(
+    fetch: bool = typer.Option(
+        False, "--fetch",
+        help="Actually fetch pending works via the OpenAlex API "
+             "(network required). Without it: dry-run listing.",
+    ),
+    topic: Optional[str] = typer.Option(
+        None, "--topic",
+        help="Topic to filter fetched works against (required with --fetch).",
+    ),
+    limit: int = typer.Option(100, "--limit"),
+) -> None:
+    """Reference follower (Phase 5d): walk the citation graph captured
+    from OpenAlex and ingest referenced works we don't have yet."""
+    from study_scraper.follow import fetch_references, pending_references
+
+    storage = _storage_from_settings()
+    if not fetch:
+        ids = pending_references(storage, limit=limit)
+        if not ids:
+            typer.echo("(no pending references)")
+            return
+        for work_id in ids:
+            typer.echo(work_id)
+        typer.echo(f"-- {len(ids)} pending; run with --fetch --topic <id> to ingest")
+        return
+
+    if not topic:
+        raise typer.BadParameter("--fetch requires --topic <id>")
+    topic_obj = _load_topic(topic)
+    runs = fetch_references(
+        storage=storage, topic=topic_obj, limit=limit,
+    )
+    seen = sum(r.candidates_seen for r in runs)
+    kept = sum(r.candidates_kept for r in runs)
+    typer.echo(f"follower: {len(runs)} batch(es), seen={seen} kept={kept}")
 
 
 @app.command("list")

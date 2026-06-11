@@ -470,6 +470,51 @@ class PostgresStorage:
                 return {row["status"]: int(row["c"]) for row in cur.fetchall()}
 
     # ------------------------------------------------------------------
+    # Full-text processing support (Phase 6-full, A20)
+    # ------------------------------------------------------------------
+
+    def set_artifact_ref(self, study_id: str, ref: str) -> bool:
+        """Record where the raw fetched document lives. True if updated."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET raw_artifact_ref = %s, updated_at = now() "
+                    f" WHERE id = %s",
+                    (ref, study_id),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
+    def list_studies_for_fulltext(
+        self, *, limit: int = 20, include_done: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Kept studies queued for document fetching.
+
+        Default: only those without a raw artifact yet. With
+        `include_done=True`, also re-queue already-processed ones
+        (e.g. after an extractor upgrade).
+        """
+        artifact_clause = (
+            "" if include_done else "AND raw_artifact_ref IS NULL"
+        )
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, canonical_url, title, raw_artifact_ref
+                    FROM   {SCHEMA}.studies
+                    WHERE  status = 'kept'
+                      {artifact_clause}
+                    ORDER  BY fetched_at DESC
+                    LIMIT  %s
+                    """,
+                    (limit,),
+                )
+                return list(cur.fetchall())
+
+    # ------------------------------------------------------------------
     # Claims (Phase 6-mini)
     # ------------------------------------------------------------------
 

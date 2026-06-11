@@ -54,6 +54,7 @@ streamlit run study_scraper/console/Home.py
 
 | File | Purpose |
 | --- | --- |
+| [`docs/study_scraper/RUNBOOK.md`](docs/study_scraper/RUNBOOK.md) | **Production runbook — start here when returning.** |
 | [`study_scraper/README.md`](study_scraper/README.md) | Package overview + hard rules. |
 | [`docs/study_scraper/GOAL.md`](docs/study_scraper/GOAL.md) | What we're building and what "done" looks like. |
 | [`docs/study_scraper/STATUS.md`](docs/study_scraper/STATUS.md) | Current state. |

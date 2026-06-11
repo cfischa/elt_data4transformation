@@ -111,6 +111,37 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A20. Full-document statistics extraction unblocked (supersedes A13's deferral)
+- **Date:** 2026-06-11
+- **Decision:** Full-document scanning is now IN scope and built.
+  Maintainer: "lots of relevant data scraped … does not mean to read
+  just abstracts, rather than scanning a lot of documents, or even
+  better, have all the statistics and quantitative connections for
+  all the studies which are relevant. We could also think about
+  having quantitative statistics plus studies we need to read."
+- **What changed vs A13:** A13 deferred PDF extraction in favour of
+  structured sources first. The structured-source tier-1 is now built
+  (DAWUM, GESIS, Eurostat + SSOAR/OpenAlex catalog), so the deferral
+  has served its purpose; A20 lifts it.
+- **The hybrid model, as built:**
+  1. **Quantitative track** — `study_scraper fulltext` fetches each
+     kept study's document (PDF or HTML), extracts the FULL text, and
+     runs the claim extractor over the whole body
+     (`extractor='regex-v2'`, `source_field='fulltext'`). Coexists
+     with abstract claims (`regex-v1`); each extractor's re-run
+     replaces only its own rows.
+  2. **Reading track** — kept studies with zero claims surface on the
+     `reading_list` view (migration 0007) with a reason:
+     `no_artifact` (fetch pending) or `no_claims` (fetched, but
+     nothing quantitative — a human reads it).
+- **Raw artifacts** are stored on disk under
+  `settings.artifact_local_dir/<study_id>.<pdf|html>` and referenced
+  via `studies.raw_artifact_ref` (provenance, re-extraction).
+- **Still future:** LLM-based claim extractor (`llm-v1`) to
+  disambiguate WHAT each percentage refers to; landing-page → PDF
+  link resolution (waits for live hit-rate data; RUNBOOK §3); A17's
+  crawl4ai stance is unchanged (re-evaluate with the T3 tier).
+
 ### A19. Eurostat lake source (additive)
 - **Date:** 2026-05-31
 - **Decision:** Add Eurostat as a lake source via the public
