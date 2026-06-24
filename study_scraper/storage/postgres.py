@@ -626,6 +626,109 @@ class PostgresStorage:
                 return int(cur.fetchone()["c"])
 
     # ------------------------------------------------------------------
+    # Attributions (Option A / A21: llm-v1 structured triples)
+    # ------------------------------------------------------------------
+
+    def upsert_attributions(
+        self,
+        study_id: str,
+        attributions: Iterable[Any],
+        *,
+        model: str = "llm-v1",
+    ) -> int:
+        """Replace this study's attributions for the given `model`.
+
+        Idempotent per (study, model): delete existing rows from this
+        model, re-insert. Other models' attributions are untouched, so
+        an llm-v1 re-run doesn't disturb a future llm-v2 pass.
+        """
+        rows = [
+            (
+                a.id,
+                a.study_id,
+                a.question,
+                a.position,
+                a.percentage,
+                a.population,
+                a.confidence,
+                model,
+                json.dumps(a.raw, ensure_ascii=False),
+            )
+            for a in attributions
+        ]
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"DELETE FROM {SCHEMA}.attributions "
+                    f"WHERE study_id = %s AND model = %s",
+                    (study_id, model),
+                )
+                if rows:
+                    cur.executemany(
+                        f"""
+                        INSERT INTO {SCHEMA}.attributions (
+                            id, study_id, question, position, percentage,
+                            population, confidence, model, raw
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        ON CONFLICT (id) DO NOTHING
+                        """,
+                        rows,
+                    )
+            conn.commit()
+        return len(rows)
+
+    def search_attributions(
+        self, *, query: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """ILIKE search over attribution questions; joins study context."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage, a.population,
+                           a.confidence, a.model,
+                           s.title, s.canonical_url, s.source_id,
+                           s.publication_date
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    WHERE  lower(a.question) LIKE %s
+                      AND  s.status <> 'rejected'
+                    ORDER  BY a.percentage DESC NULLS LAST,
+                              s.publication_date DESC NULLS LAST
+                    LIMIT  %s
+                    """,
+                    (f"%{query.lower()}%", limit),
+                )
+                return list(cur.fetchall())
+
+    def count_attributions(self) -> int:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attributions")
+                return int(cur.fetchone()["c"])
+
+    def get_study_for_attribution(self, study_id: str) -> Optional[Dict[str, Any]]:
+        """Study + its claim snippets, for feeding the llm-v1 extractor."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT id, title, abstract FROM {SCHEMA}.studies "
+                    f"WHERE id = %s",
+                    (study_id,),
+                )
+                study = cur.fetchone()
+                if study is None:
+                    return None
+                cur.execute(
+                    f"SELECT claim_text FROM {SCHEMA}.claims "
+                    f"WHERE study_id = %s ORDER BY source_field, numeric_value DESC",
+                    (study_id,),
+                )
+                study = dict(study)
+                study["claim_snippets"] = [r["claim_text"] for r in cur.fetchall()]
+                return study
+
+    # ------------------------------------------------------------------
     # Source records (Q16-v2 lake; structured-data sources land here)
     # ------------------------------------------------------------------
 

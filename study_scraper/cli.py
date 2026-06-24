@@ -354,6 +354,141 @@ def search(
 
 
 @app.command()
+def ask(
+    query: str = typer.Argument(
+        ..., help="Keyword(s) to look for inside attribution questions."
+    ),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """Query structured attributions (question, position, %) — the
+    llm-v1 answer layer (A21). Richer than `search`: each hit names the
+    question, the stance, and the figure.
+    """
+    storage = _storage_from_settings()
+    rows = storage.search_attributions(query=query, limit=limit)
+    if not rows:
+        typer.echo("(no attributions matched — run `attribute` first?)")
+        return
+    for row in rows:
+        pct = row.get("percentage")
+        pct_str = f"{float(pct):>5.1f}%" if pct is not None else "   — "
+        pos = (row.get("position") or "").ljust(11)
+        q = (row.get("question") or "").replace("\n", " ")
+        typer.echo(f"{pct_str}  {pos}  {q}")
+        title = (row.get("title") or "").replace("\n", " ")
+        if len(title) > 70:
+            title = title[:67] + "..."
+        typer.echo(f"          [{row.get('source_id')}] {title}")
+        typer.echo(f"          {row.get('canonical_url')}")
+
+
+@app.command()
+def attribute(
+    limit: int = typer.Option(
+        20, "--limit", help="Max queued studies to attribute."
+    ),
+    study_id: Optional[str] = typer.Option(
+        None, "--study-id", help="Attribute exactly one study."
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model",
+        help="Override the LLM model (default: $STUDY_SCRAPER_LLM_MODEL "
+             "or claude-opus-4-8). Use claude-haiku-4-5 for cheap bulk runs.",
+    ),
+) -> None:
+    """LIVE Option A: run the llm-v1 extractor over the attribution
+    queue via the Anthropic API. Requires ANTHROPIC_API_KEY (metered).
+
+    For the zero-extra-cost path, use `attribute-prompts` +
+    `attribute-apply` with a Cowork session instead.
+    """
+    from study_scraper.attribute import run_attribute
+
+    storage = _storage_from_settings()
+    results = run_attribute(
+        storage=storage, limit=limit, study_id=study_id, model=model
+    )
+    if not results:
+        typer.echo("(attribution queue empty — every kept study with claims is attributed)")
+        return
+    ok = sum(1 for r in results if r["status"] == "ok")
+    total = sum(r.get("attributions", 0) for r in results)
+    for r in results:
+        typer.echo(f"{r['study_id'][:12]}  {r['status']:<22}  triples={r.get('attributions', 0)}")
+    typer.echo(f"-- {ok}/{len(results)} ok, {total} attributions extracted")
+
+
+@app.command("attribute-prompts")
+def attribute_prompts(
+    limit: int = typer.Option(20, "--limit"),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write JSONL {study_id, prompt} here (else stdout)."
+    ),
+) -> None:
+    """OFFLINE step 1 (zero extra API cost): dump the llm-v1 prompts for
+    queued studies so a Cowork session can answer them. The shared
+    system prompt is printed first, then one user prompt per study.
+    """
+    import json as _json
+
+    from study_scraper.attribute import dump_prompts
+    from study_scraper.extractors.llm_v1 import SYSTEM_PROMPT
+
+    storage = _storage_from_settings()
+    items = dump_prompts(storage=storage, limit=limit)
+    if not items:
+        typer.echo("(attribution queue empty)")
+        return
+    if out is not None:
+        with out.open("w", encoding="utf-8") as fh:
+            for item in items:
+                fh.write(_json.dumps(item, ensure_ascii=False) + "\n")
+        typer.echo(f"wrote {len(items)} prompt(s) to {out}")
+        typer.echo("SYSTEM PROMPT (apply to every item):")
+        typer.echo(SYSTEM_PROMPT)
+    else:
+        typer.echo("=== SYSTEM PROMPT (apply to every item) ===")
+        typer.echo(SYSTEM_PROMPT)
+        for item in items:
+            typer.echo(f"\n=== study {item['study_id']} ===")
+            typer.echo(item["prompt"])
+
+
+@app.command("attribute-apply")
+def attribute_apply(
+    responses_file: Path = typer.Argument(
+        ..., help="JSONL of {study_id, response} — model outputs to apply."
+    ),
+) -> None:
+    """OFFLINE step 2 (zero extra API cost): apply captured model
+    responses (e.g. from a Cowork session) to the attributions table.
+    No API key needed — uses the pure llm-v1 parser.
+    """
+    import json as _json
+
+    from study_scraper.attribute import apply_responses
+
+    storage = _storage_from_settings()
+    responses: dict = {}
+    with responses_file.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            obj = _json.loads(line)
+            sid = obj.get("study_id")
+            text = obj.get("response") or obj.get("text") or ""
+            if sid:
+                responses[sid] = text
+    if not responses:
+        typer.echo("(no responses found in file)")
+        return
+    results = apply_responses(storage=storage, responses=responses)
+    total = sum(r.get("attributions", 0) for r in results)
+    typer.echo(f"applied {len(results)} response(s), {total} attributions stored")
+
+
+@app.command()
 def ingest(
     source: str = typer.Option(..., "--source", help="Lake source id."),
     limit: Optional[int] = typer.Option(
