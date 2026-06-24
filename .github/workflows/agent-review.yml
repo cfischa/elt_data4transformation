@@ -1,0 +1,64 @@
+# Challenger agent: adversarially reviews every agent:review PR, runs the
+# tests itself, and merges only when the change is sound AND green.
+# Sweeps on a schedule (bot-authored PRs don't trigger pull_request via
+# GITHUB_TOKEN, so we don't depend on event chaining).
+
+name: agent-review
+
+on:
+  schedule:
+    - cron: "19 */4 * * *"   # every 4 hours
+  workflow_dispatch: {}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write          # merge
+      pull-requests: write     # review, label, merge
+      issues: write            # close linked issues
+      checks: read
+      id-token: write
+    env:
+      POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install pytest httpx pydantic pydantic-settings typer PyYAML \
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+      - name: Gate on token
+        id: gate
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          [ -z "$TOKEN" ] && echo "enabled=false" >> "$GITHUB_OUTPUT" || echo "enabled=true" >> "$GITHUB_OUTPUT"
+          [ -z "$TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN not set; skipping." || true
+      - name: Run challenger agent
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill"'
+          prompt: |
+            You are the CHALLENGER agent for the study-scraper project.
+            Use the project skill `.claude/skills/challenge-changes/SKILL.md`
+            and follow it strictly. In short: for every OPEN pull request
+            labeled `agent:review`, check out its branch and run
+            `python -m pytest tests/study_scraper -o addopts="" -q`. Review
+            the diff adversarially: correctness, does it break the live
+            pipeline, are the tests real (not weakened to pass), is scope
+            limited to study_scraper/**, tests/**, docs/study_scraper/**.
+            HARD RULE: if a PR touches .github/**, .claude/**, or secrets,
+            never merge — label `needs-human` and comment. MERGE (squash,
+            delete branch) ONLY when: tests pass AND the review is clean AND
+            scope is safe; then comment a summary and ensure the linked
+            issue closes. Otherwise add `agent:changes-requested` and a
+            comment listing exactly what must change. Default to NOT merging
+            when uncertain.

@@ -1,0 +1,59 @@
+# Developer agent: turns agent:task issues (and self-proposed backlog
+# items) into pull requests. Never merges; never touches its own guards.
+
+name: agent-develop
+
+on:
+  schedule:
+    - cron: "37 12 * * *"    # daily 12:37 UTC
+  workflow_dispatch: {}
+
+jobs:
+  develop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write          # push the feature branch
+      pull-requests: write     # open the PR
+      issues: write            # link/close issues
+      id-token: write
+    env:
+      POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install pytest httpx pydantic pydantic-settings typer PyYAML \
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+      - name: Gate on token
+        id: gate
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          [ -z "$TOKEN" ] && echo "enabled=false" >> "$GITHUB_OUTPUT" || echo "enabled=true" >> "$GITHUB_OUTPUT"
+          [ -z "$TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN not set; skipping." || true
+      - name: Run developer agent
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill"'
+          prompt: |
+            You are the DEVELOPER agent for the study-scraper project.
+            Use the project skill `.claude/skills/develop-feature/SKILL.md`
+            and follow it strictly. In short: pick the highest-priority open
+            issue labeled `agent:task` (priority:high first); if there are
+            none, self-propose ONE small improvement from docs/study_scraper/
+            ROADMAP.md or TODO.md. Implement the smallest correct change on a
+            new branch `agent/<slug>`. You may ONLY edit study_scraper/**,
+            tests/**, and docs/study_scraper/**. You must NEVER edit
+            .github/**, .claude/**, or anything secret-related — if a task
+            needs that, label the issue `needs-human` and stop. Add/keep
+            tests; run `python -m pytest tests/study_scraper -o addopts="" -q`
+            until green. Open ONE PR labeled `agent:review`, body
+            "Closes #<n>" when from an issue. DO NOT merge. One task per run.
