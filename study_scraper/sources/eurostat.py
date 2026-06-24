@@ -16,6 +16,16 @@ Per A14 we preserve the raw JSON-stat payload as-is. Per-table typed
 projections happen later via SQL views (e.g. `eurostat_ghg` would
 explode the env_air_gge payload into typed rows).
 
+**Filtering (A14.1, 2026-06-24).** Eurostat datasets are dimensioned by
+country × category × year. Unfiltered, a table like `nrg_bal_s`
+(Simplified energy balances) is ~69 MB / 1.6M data points and blows up
+`json.loads` into a MemoryError. Since this is a German scraper we
+filter to `geo=DE` by default, which both shrinks the payload by ~30x
+and makes it relevant. A `max_bytes` guard skips any response that is
+still pathologically large (logged, not fatal — coverage-first stays
+resilient). Datasets without a `geo` dimension return HTTP 400 to the
+filtered request; we transparently retry unfiltered (under the guard).
+
 License: Eurostat re-use policy (CC BY 4.0 with attribution). Captured
 on every emitted SourceRecord.
 """
@@ -43,6 +53,12 @@ EUROSTAT_LICENSE = "Eurostat re-use policy (CC BY 4.0)"
 RECORD_FORMAT = "eurostat_jsonstat"
 VIEWER_URL = "https://ec.europa.eu/eurostat/databrowser/view/{code}"
 
+# German scraper: default to Germany so payloads stay small + relevant.
+DEFAULT_FILTERS: Dict[str, str] = {"geo": "DE"}
+# Skip (don't crash on) any single response bigger than this. With
+# geo=DE real tables are well under 1 MB; 25 MB is a generous backstop.
+DEFAULT_MAX_BYTES = 25_000_000
+
 
 class EurostatSource:
     """Lake source for the Eurostat dissemination API."""
@@ -59,6 +75,8 @@ class EurostatSource:
         timeout: float = 60.0,
         user_agent: str = "study-scraper/0.0.1 (+https://github.com/cfischa/elt_data4transformation)",
         lang: str = "en",
+        filters: Optional[Dict[str, str]] = None,
+        max_bytes: int = DEFAULT_MAX_BYTES,
     ) -> None:
         # In `from_file` mode the dataset code is taken from each
         # record in the file (see _iter_from_file). Live mode requires
@@ -67,6 +85,10 @@ class EurostatSource:
         self._base_url = base_url.rstrip("/")
         self._from_file = from_file
         self._lang = lang
+        # filters=None -> default geo=DE; pass filters={} to fetch
+        # everything (rarely wanted — see the MemoryError this guards).
+        self._filters = DEFAULT_FILTERS if filters is None else dict(filters)
+        self._max_bytes = max_bytes
         self._owns_client = client is None
         self._client = client or httpx.Client(
             timeout=timeout,
@@ -106,11 +128,9 @@ class EurostatSource:
         now = datetime.now(timezone.utc)
         yielded = 0
         for code in self._codes:
-            url = f"{self._base_url}/{code}?format=json&lang={self._lang}"
-            LOGGER.info("eurostat GET %s", url)
-            resp = self._client.get(url)
-            resp.raise_for_status()
-            payload = resp.json()
+            payload = self._fetch_payload(code)
+            if payload is None:
+                continue
             record = self._build_record(
                 code=code, payload=payload, now=now, run_id=run_id,
             )
@@ -120,6 +140,52 @@ class EurostatSource:
             yielded += 1
             if limit is not None and yielded >= limit:
                 return
+
+    # ------------------------------------------------------------------
+    # Live fetch (filtered + size-guarded)
+    # ------------------------------------------------------------------
+
+    def _params(self, *, with_filters: bool) -> Dict[str, str]:
+        params: Dict[str, str] = {"format": "json", "lang": self._lang}
+        if with_filters:
+            params.update(self._filters)
+        return params
+
+    def _fetch_payload(self, code: str) -> Optional[Dict[str, Any]]:
+        """GET one dataset as JSON-stat, applying the geo filter and the
+        size guard. Returns None (with a warning) rather than raising on
+        an over-size payload, so one bad table can't abort the run.
+
+        Datasets without the filtered dimension answer 400; we retry once
+        unfiltered (still under the size guard)."""
+        with_filters = bool(self._filters)
+        resp = self._get(code, with_filters=with_filters)
+        if (
+            with_filters
+            and resp.status_code == 400
+        ):
+            LOGGER.info(
+                "eurostat %s: 400 on filtered request (likely no %s "
+                "dimension); retrying unfiltered",
+                code, ",".join(self._filters),
+            )
+            resp = self._get(code, with_filters=False)
+        resp.raise_for_status()
+        content = resp.content
+        if len(content) > self._max_bytes:
+            LOGGER.warning(
+                "eurostat %s: payload %d bytes exceeds max_bytes %d; "
+                "skipping (narrow it with filters, e.g. geo=DE)",
+                code, len(content), self._max_bytes,
+            )
+            return None
+        return json.loads(content)
+
+    def _get(self, code: str, *, with_filters: bool) -> httpx.Response:
+        url = f"{self._base_url}/{code}"
+        params = self._params(with_filters=with_filters)
+        LOGGER.info("eurostat GET %s params=%s", url, params)
+        return self._client.get(url, params=params)
 
     # ------------------------------------------------------------------
     # Fixture path
@@ -219,5 +285,6 @@ class EurostatSource:
                 "title_hint": title_hint,
                 "updated": updated,
                 "size": size,
+                "filters": dict(self._filters),
             },
         )

@@ -24,10 +24,16 @@ docker compose -f study_scraper/docker-compose.yml up -d
 
 # 0c. Point the tools at it
 export POSTGRES_URL=postgresql://postgres:postgres@localhost:5544/study_scraper
+#   PowerShell instead of the line above:
+#     $env:POSTGRES_URL = "postgresql://postgres:postgres@localhost:5544/study_scraper"
+#   ...and to make it stick across new windows:
+#     [Environment]::SetEnvironmentVariable("POSTGRES_URL","postgresql://postgres:postgres@localhost:5544/study_scraper","User")
 
-# 0d. Install dependencies
+# 0d. Install dependencies (streamlit + anthropic are NOT pulled by
+#     `pip install -e .` — streamlit is a dev-group dep, so list them)
 pip install httpx pydantic pydantic-settings typer PyYAML \
-            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 anthropic
+            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 \
+            anthropic streamlit
 #   (env quirk: if pypdf import fails with "_cffi_backend", run: pip install --upgrade cffi)
 
 # 0e. Create the schema (applies migrations 1..8)
@@ -39,6 +45,9 @@ python -m study_scraper run    --source openalex --topic klima --limit 50
 python -m study_scraper ingest --source dawum
 python -m study_scraper ingest --source gesis  --limit 100
 python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_bal_s
+#   eurostat filters to geo=DE by default (A14.1) — without it, tables like
+#   nrg_bal_s are ~69 MB and crash json parsing. Override with --geo FR, or
+#   --geo "" for all countries (huge tables are skipped by the size guard).
 
 # 0g. Pull full documents + extract statistics from the full text
 python -m study_scraper fulltext --limit 50
@@ -85,7 +94,8 @@ export POSTGRES_URL=postgresql://postgres:postgres@localhost:5544/study_scraper
 
 ```bash
 pip install httpx pydantic pydantic-settings typer PyYAML \
-            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 anthropic
+            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 \
+            anthropic streamlit
 python -m study_scraper migrate          # applies migrations 1..8
 ```
 **Verify:** prints `applied 8 migration(s)` (or "up to date").

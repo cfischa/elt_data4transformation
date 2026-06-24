@@ -192,6 +192,28 @@ This document tracks design decisions for the study scraper. Two sections:
   (CC BY 4.0). Fixture has real codes (`env_air_gge`, `nrg_bal_s`)
   in the JSON-stat 2.0 shape.
 
+### A14.1 / A19.1. Eurostat fetch filters to geo=DE + size guard
+- **Date:** 2026-06-24
+- **Trigger:** First live run crashed with `MemoryError` on `nrg_bal_s`
+  (Simplified energy balances): unfiltered it is ~69 MB / 1.6M data
+  points, and `json.loads` exploded it into hundreds of MB of Python
+  objects.
+- **Decision:** The live Eurostat fetch now (a) applies `geo=DE` by
+  default — this is a German scraper, so Germany is the relevant slice
+  and it shrinks payloads ~30x; (b) guards every response with
+  `max_bytes` (25 MB default) and *skips with a warning* rather than
+  crashing; (c) on HTTP 400 to the filtered request (dataset has no
+  `geo` dimension) retries once unfiltered, still under the guard.
+  CLI: `--geo DE` (default), `--geo FR`, or `--geo ""` for all
+  countries. The applied filter is recorded in `provenance.filters`.
+- **Rationale:** Coverage-first must stay resilient — one pathological
+  table can't be allowed to abort an otherwise-good run, and the
+  default should fetch relevant, tractable data without operator
+  tuning.
+- **Tests:** `tests/study_scraper/test_eurostat_fetch.py` (DB-free,
+  httpx MockTransport): default geo, custom geo, opt-out, size-skip,
+  400→unfiltered retry, payload round-trip.
+
 ### A18. Phase 5d step 1 — capture OpenAlex citation graph in provenance
 - **Date:** 2026-05-31
 - **Decision:** When the OpenAlex source ingests a Work, capture its

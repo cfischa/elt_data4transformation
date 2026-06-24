@@ -52,6 +52,8 @@ beautifulsoup4 = "^4.12.0"
 SPARQLWrapper = "^2.0.0"
 # study_scraper: full-document text extraction (Phase 6-full, A20)
 pypdf = "^4.0.0"
+# study_scraper: LLM attribution extractor, live path (Option A, A21)
+anthropic = "^0.40.0"
 
 # Monitoring & Logging
 prometheus-client = "^0.19.0"

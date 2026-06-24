@@ -511,6 +511,12 @@ def ingest(
         help="Eurostat-only: dataset code(s) to fetch (repeatable). "
              "Example: --code env_air_gge --code nrg_cb_e.",
     ),
+    geo: str = typer.Option(
+        "DE", "--geo",
+        help="Eurostat-only: country filter (default DE). Use '' to "
+             "fetch all countries — WARNING: some tables are >60 MB "
+             "unfiltered and will be skipped by the size guard.",
+    ),
 ) -> None:
     """Ingest a structured-data source into the lake (`source_records`).
 
@@ -528,7 +534,11 @@ def ingest(
                 "eurostat requires --code <dataset_code> (repeatable) "
                 "or --from-file PATH."
             )
-        src = EurostatSource(codes=code, from_file=from_file)
+        src = EurostatSource(
+            codes=code,
+            from_file=from_file,
+            filters={"geo": geo} if geo else {},
+        )
     else:
         raise typer.BadParameter(
             f"unknown lake source {source!r}; "
