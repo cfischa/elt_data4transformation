@@ -28,6 +28,10 @@ jobs:
   attribute:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # claude-code-action authenticates GitHub via OIDC — needs id-token: write.
+    permissions:
+      contents: read
+      id-token: write
     env:
       POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
     steps:
