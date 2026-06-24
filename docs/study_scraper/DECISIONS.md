@@ -111,6 +111,39 @@ This document tracks design decisions for the study scraper. Two sections:
 - **Rationale:** Maintainer accepted Q7. Local-only inference avoids API
   cost and external-call dependency.
 
+### A21. LLM attribution extractor (Option A): structured (question, position, %) triples
+- **Date:** 2026-06-15
+- **Decision:** Add `llm-v1`, an Anthropic-API extractor that turns a
+  study's text + regex claims into structured
+  `(question, position, percentage)` attributions — the answer shape an
+  issue-polling system needs. Maintainer chose **Option A** (a thin
+  API-calling module) over Option B (a Cowork agent doing the
+  reasoning).
+- **Cost note (honest):** Option A meters tokens against the operator's
+  `ANTHROPIC_API_KEY`. To honour the maintainer's "no extra API cost
+  for now" intent, the same module also ships an **offline path**
+  (`attribute-prompts` → answer in a Cowork session → `attribute-apply`)
+  that runs the identical pure parser with zero API spend. Live and
+  offline produce identical rows. Model defaults to `claude-opus-4-8`
+  (skill default); `STUDY_SCRAPER_LLM_MODEL` overrides it for cheap bulk
+  runs (e.g. `claude-haiku-4-5`) — the operator's cost call, not ours.
+- **Implementation:** `study_scraper/extractors/llm_v1.py` (pure prompt
+  build / response parse / JSON schema + lazy-SDK `extract_live`),
+  `study_scraper/attribute.py` (orchestrator: live, dump-prompts,
+  apply-responses), migration 0008 (`attributions` table +
+  `attribution_queue` view), storage helpers, CLI `attribute` /
+  `attribute-prompts` / `attribute-apply` / `ask`.
+- **Design conformance (claude-api skill):** prompt caching on the
+  frozen system prompt (per-study text is volatile, sent after the
+  cached prefix); `output_config.format` structured output; lazy
+  `import anthropic` so tests + offline path need neither SDK nor key.
+- **Where it sits in the pipeline:** regex-v1 (abstract) and regex-v2
+  (full text) find numbers; llm-v1 attributes them. Queue =
+  `attribution_queue` (kept studies with claims, no attribution yet).
+- **Still future:** dual-target attribution on `source_record`s (table
+  supports it; orchestrator currently targets studies); confidence-
+  weighted dedup of the same finding across studies.
+
 ### A20. Full-document statistics extraction unblocked (supersedes A13's deferral)
 - **Date:** 2026-06-11
 - **Decision:** Full-document scanning is now IN scope and built.

@@ -4,12 +4,12 @@ Work flows top-to-bottom. **Do not skip ahead** without updating this file
 and `STATUS.md`. Items marked **[BLOCKED]** require a `DECISIONS.md` answer
 before they start.
 
-## Next steps (priority order, updated 2026-06-11 — production pass)
+## Next steps (priority order, updated 2026-06-15 — A21 attribution)
 
 **The authoritative machine-only checklist now lives in
-[`RUNBOOK.md`](RUNBOOK.md).** Summary:
+[`RUNBOOK.md`](RUNBOOK.md) — start with §0 (copy-paste block).** Summary:
 
-### Machine-bound (your computer; RUNBOOK §1–4)
+### Machine-bound (your computer; RUNBOOK §0–5)
 1. **Database** — local docker-compose Postgres OR Supabase project;
    if Supabase, add repo secret `SCRAPER_POSTGRES_URL` to activate
    the scheduled GitHub Action (`.github/workflows/scrape.yml`).
@@ -18,8 +18,26 @@ before they start.
    filter attribute, GESIS throughput, Eurostat payload sizes).
 3. **First live `fulltext` run** (RUNBOOK §3) — fetches documents,
    extracts statistics from full text, populates the reading list.
-4. **Operator routine** (RUNBOOK §5) — dock review, topics tuning,
-   reading list.
+4. **Attribution** (RUNBOOK §3.5) — Option A live (`attribute`,
+   needs `ANTHROPIC_API_KEY`) OR the zero-cost Cowork path
+   (`attribute-prompts` → Cowork → `attribute-apply`).
+5. **Operator routine** (RUNBOOK §5) — dock review, topics tuning,
+   reading list, `ask`.
+
+### Done in the attribution pass (2026-06-15, A21)
+- [x] `llm-v1` extractor (`extractors/llm_v1.py`) — prompt caching,
+      structured JSON, lazy SDK import.
+- [x] `attributions` table + `attribution_queue` view (migration 0008).
+- [x] Orchestrator (`attribute.py`): live / dump-prompts / apply.
+- [x] CLI: `attribute`, `attribute-prompts`, `attribute-apply`, `ask`.
+- [x] Offline Cowork path (zero extra API cost) sharing the live parser.
+- [x] 19 tests; 233 total.
+
+### Attribution follow-ups (sandbox-buildable)
+- [ ] Dual-target attribution on `source_record`s (table already
+      supports it; orchestrator currently studies-only).
+- [ ] Cross-study dedup of the same finding (confidence-weighted).
+- [ ] Dock: an Attributions page (browse / filter triples).
 
 ### Done in the production pass (2026-06-11, A20)
 - [x] Full-document fetch + extraction (`fulltext.py`, regex-v2).

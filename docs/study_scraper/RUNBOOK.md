@@ -1,9 +1,64 @@
 # RUNBOOK — going to production
 
 This is the **machine-only checklist**. Everything buildable from the
-dev sandbox has been built and tested (214 tests). What remains needs
+dev sandbox has been built and tested (233 tests). What remains needs
 either outbound network access, credentials, or a human eyeball — i.e.
 your computer. Work top to bottom; each step says how to verify it.
+
+---
+
+## 0. TL;DR — the concrete moves to run on your computer now
+
+Copy-paste these in order. Stop at the first one that errors and tell me
+the output. (Full detail + verification for each is in the numbered
+sections below.)
+
+```bash
+# 0a. Get the latest code
+git fetch origin
+git checkout claude/find-obsidian-research-task-VOj97
+git pull
+
+# 0b. Start a local Postgres for the scraper (Docker)
+docker compose -f study_scraper/docker-compose.yml up -d
+
+# 0c. Point the tools at it
+export POSTGRES_URL=postgresql://postgres:postgres@localhost:5544/study_scraper
+
+# 0d. Install dependencies
+pip install httpx pydantic pydantic-settings typer PyYAML \
+            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 anthropic
+#   (env quirk: if pypdf import fails with "_cffi_backend", run: pip install --upgrade cffi)
+
+# 0e. Create the schema (applies migrations 1..8)
+python -m study_scraper migrate
+
+# 0f. First REAL crawl — drop --from-file so it hits live endpoints
+python -m study_scraper run    --source ssoar    --topic klima --limit 50
+python -m study_scraper run    --source openalex --topic klima --limit 50
+python -m study_scraper ingest --source dawum
+python -m study_scraper ingest --source gesis  --limit 100
+python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_bal_s
+
+# 0g. Pull full documents + extract statistics from the full text
+python -m study_scraper fulltext --limit 50
+
+# 0h. See where you stand
+python -m study_scraper status
+python -m study_scraper search klimaschutzgesetz
+python -m study_scraper search atomkraft
+
+# 0i. Operator dock (browser UI)
+streamlit run study_scraper/console/Home.py
+```
+
+**Then tell me what `status` printed** and I continue from real numbers.
+
+**Two decisions only you can make** (each has its own section below):
+- **Database location** — local Docker (0b above) vs hosted Supabase
+  (needed for the scheduled GitHub Action). → §1.1
+- **LLM attribution** — Option A live (costs API tokens, §3.5a) vs the
+  zero-extra-cost Cowork path (§3.5b). Both produce the same data.
 
 ---
 
@@ -30,10 +85,12 @@ export POSTGRES_URL=postgresql://postgres:postgres@localhost:5544/study_scraper
 
 ```bash
 pip install httpx pydantic pydantic-settings typer PyYAML \
-            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
-python -m study_scraper migrate          # applies migrations 1..7
+            "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 anthropic
+python -m study_scraper migrate          # applies migrations 1..8
 ```
-**Verify:** prints `applied 7 migration(s)` (or "up to date").
+**Verify:** prints `applied 8 migration(s)` (or "up to date").
+(`anthropic` is only needed for live LLM attribution — §3.5a. Skip it
+if you'll use the Cowork offline path in §3.5b.)
 
 > Env quirk seen in dev: a broken system `cryptography` package makes
 > `pypdf` fail at import (`_cffi_backend` missing). Fix: `pip install
@@ -87,6 +144,54 @@ not direct PDFs (SSOAR handles resolve to HTML pages that link the
 PDF). The fetcher stores whatever it gets; HTML landing pages often
 still contain abstract + stats. A landing-page→PDF-link resolver is
 the top backlog item after the first real run shows the hit rate.
+
+## 3.5 LLM attribution (A21) — the answer layer
+
+`search` finds a number with its sentence; **attribution** turns it
+into a structured `(question, position, percentage)` triple you can
+query directly. Studies with claims but no attribution sit in the
+`attribution_queue`. Two ways to process it — both write the same
+`attributions` table; pick by your cost preference.
+
+### 3.5a Option A — live API (you chose this)
+
+Costs Anthropic tokens against your `ANTHROPIC_API_KEY`.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+# Optional cost lever — default is claude-opus-4-8; for bulk use cheaper:
+# export STUDY_SCRAPER_LLM_MODEL=claude-haiku-4-5
+python -m study_scraper attribute --limit 20
+python -m study_scraper ask "klimaschutzgesetz"
+python -m study_scraper ask "atomkraft"
+```
+
+`ask` prints, e.g., `62.0%  support  Stricter climate laws` with the
+source link.
+
+### 3.5b Zero-extra-cost path — answer in a Cowork session
+
+Same result, no API bill: dump the prompts, paste them into a Cowork
+chat (which runs on your existing plan), save its JSON replies, apply
+them.
+
+```bash
+# 1. Dump the queue's prompts (system prompt + one block per study)
+python -m study_scraper attribute-prompts --limit 20 --out prompts.jsonl
+
+# 2. In a Cowork session: paste the SYSTEM PROMPT, then for each study
+#    paste its prompt and have the agent return ONLY the JSON object.
+#    Save the replies as JSONL, one per line:
+#       {"study_id": "<id from prompts.jsonl>", "response": "<the JSON>"}
+#    into responses.jsonl
+
+# 3. Apply them (pure parser; no API key needed)
+python -m study_scraper attribute-apply responses.jsonl
+python -m study_scraper ask "atomkraft"
+```
+
+You can switch between 3.5a and 3.5b freely — re-running either for the
+same study just replaces that study's `llm-v1` rows.
 
 ## 4. Schedule it
 

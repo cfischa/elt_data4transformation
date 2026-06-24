@@ -1,10 +1,30 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-06-11 (production pass per A20: full-document
-statistics extraction, reading-list, reference follower, scheduled
-GitHub Action, RUNBOOK. **214 tests pass.** Everything sandbox-
-buildable is built; remaining work is machine-bound and enumerated in
-[`RUNBOOK.md`](RUNBOOK.md).)._
+_Last updated: 2026-06-15 (A21: llm-v1 attribution extractor — the
+answer layer turning claims into (question, position, %) triples, with
+a live Option-A path and a zero-cost Cowork offline path. **233 tests
+pass.** Remaining work is machine-bound; the exact local steps are in
+[`RUNBOOK.md`](RUNBOOK.md) §0.)._
+
+## Attribution pass (2026-06-15, A21)
+
+Maintainer chose **Option A** for the LLM attribution layer. Shipped:
+`study_scraper/extractors/llm_v1.py` (Anthropic API, prompt caching,
+structured JSON, lazy import), `study_scraper/attribute.py`
+(orchestrator), migration 0008 (`attributions` + `attribution_queue`),
+storage helpers, and CLI `attribute` / `attribute-prompts` /
+`attribute-apply` / `ask`.
+
+Because Option A meters the operator's API key, the same module also
+ships the **offline Cowork path** (`attribute-prompts` → answer in a
+Cowork session → `attribute-apply`) — identical rows, zero extra API
+spend. Model defaults to `claude-opus-4-8`; `STUDY_SCRAPER_LLM_MODEL`
+overrides for cheap bulk. End-to-end offline smoke verified:
+`ask "climate"` → `62.0% support  Stricter climate laws`.
+
+**Maintainer's next move: run [`RUNBOOK.md`](RUNBOOK.md) §0 on a
+networked machine** (DB up, first live crawl, fulltext, status), then
+report the `status` numbers so the next iteration works from real data.
 
 ## Production pass (2026-06-11, A20)
 
