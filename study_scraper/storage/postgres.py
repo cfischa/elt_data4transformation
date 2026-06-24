@@ -60,11 +60,18 @@ def resolve_database_url(
         return postgres_url
 
     if supabase_url and supabase_service_key:
-        # Supabase project URL looks like https://<ref>.supabase.co
-        # Postgres host is db.<ref>.supabase.co on port 5432, user
-        # `postgres`, database `postgres`, password = service key
-        # (or anon key for limited access). The service key is the
-        # intended choice for backend ingestion.
+        # NOTE (2026-06-24): For a hosted Supabase project the RELIABLE
+        # path is to set POSTGRES_URL to the connection string from
+        # Project Settings -> Database -> Connection string -> "Session
+        # pooler" (it already contains the DB password). Prefer that.
+        #
+        # This derived path is kept for backwards compatibility but is
+        # fragile: (a) the password is the DB password you chose at
+        # project creation, NOT the API/service key; (b) the direct host
+        # db.<ref>.supabase.co is IPv6-only on new projects and often
+        # unreachable from GitHub Actions. So treat supabase_service_key
+        # here as "the DB password" and expect to fall back to
+        # POSTGRES_URL if the direct host won't resolve.
         parsed = urlparse(supabase_url)
         if not parsed.hostname or not parsed.hostname.endswith(".supabase.co"):
             raise StorageError(
@@ -77,10 +84,14 @@ def resolve_database_url(
         )
 
     raise StorageError(
-        "No database configured. Set POSTGRES_URL for local development "
-        "(see study_scraper/docker-compose.yml) or SUPABASE_URL + "
-        "SUPABASE_SERVICE_KEY for a hosted Supabase project. "
-        "See docs/study_scraper/DECISIONS.md A7."
+        "No database configured. Set POSTGRES_URL — for local dev see "
+        "study_scraper/docker-compose.yml; for hosted Supabase use the "
+        "Session-pooler connection string (Project Settings -> Database "
+        "-> Connection string -> Session pooler), e.g. postgresql://"
+        "postgres.<ref>:<db-password>@aws-0-<region>.pooler.supabase.com"
+        ":5432/postgres . The publishable/anon API key will NOT work — "
+        "this connects directly to Postgres. See docs/study_scraper/"
+        "DECISIONS.md A7."
     )
 
 
