@@ -1,0 +1,105 @@
+# Scheduled LLM attribution for the study scraper (subscription path).
+#
+# Pairs with scrape.yml: the crawl fills `studies` + `claims`; this job
+# fills `attributions` by running Claude over the attribution_queue. It
+# authenticates with a Claude Code OAuth token (your Pro/Max
+# subscription) instead of an API key, so it does NOT meter per-call API
+# cost. (DECISIONS A21; RUNBOOK §3.5b; skill .claude/skills/attribute-queue.)
+#
+# Activation checklist (maintainer, one-time):
+#   1. Database secret SCRAPER_POSTGRES_URL must already be set (see
+#      scrape.yml) — the Supabase Session-pooler connection string.
+#   2. Generate a subscription OAuth token locally:
+#        claude setup-token
+#      Copy the token it prints.
+#   3. Repo Settings -> Secrets and variables -> Actions -> new secret
+#        CLAUDE_CODE_OAUTH_TOKEN = <that token>
+#
+# Without BOTH secrets the workflow exits early and green.
+
+name: scheduled-attribute
+
+on:
+  schedule:
+    - cron: "17 6 * * 2,5"   # Tue + Fri 06:17 UTC — a day after each crawl
+  workflow_dispatch: {}       # manual trigger from the Actions tab
+
+jobs:
+  attribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime dependencies
+        run: |
+          pip install httpx pydantic pydantic-settings typer PyYAML \
+                      "psycopg[binary]"
+
+      - name: Check secrets
+        id: gate
+        env:
+          DB: ${{ secrets.SCRAPER_POSTGRES_URL }}
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$TOKEN" ]; then
+            echo "SCRAPER_POSTGRES_URL and/or CLAUDE_CODE_OAUTH_TOKEN not set; skipping."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Quick visibility: how many studies are waiting before we start.
+      - name: Queue size (pre)
+        if: steps.gate.outputs.enabled == 'true'
+        run: python -m study_scraper status || true
+
+      - name: Run attribution pass (subscription)
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Allow the file + shell tools the skill needs; no network tools
+          # beyond what the CLI already permits.
+          claude_args: '--allowedTools "Bash,Read,Write,Glob,Grep,Skill"'
+          prompt: |
+            You are running headless in CI for the study-scraper project.
+            POSTGRES_URL is already set in your environment (a Supabase
+            Postgres connection). Your job: run the LLM attribution pass
+            over the database queue, using THIS session (no API key).
+
+            Use the project skill `.claude/skills/attribute-queue/SKILL.md`
+            and follow it exactly. In short:
+              1. python -m study_scraper attribute-prompts --limit 40 --out /tmp/attr_prompts.jsonl
+                 (if it prints "(attribution queue empty)", stop — success.)
+              2. For every line {study_id, prompt} in that file, act as the
+                 llm-v1 extractor described by the printed SYSTEM PROMPT and
+                 produce {"attributions":[{question,position,percentage,
+                 population,confidence}, ...]} grounded ONLY in the text.
+                 Write {study_id, response:<json string>} lines to
+                 /tmp/attr_responses.jsonl.
+              3. python -m study_scraper attribute-apply /tmp/attr_responses.jsonl
+              4. python -m study_scraper status  (report the new totals)
+            Do not commit anything — the output lives in Postgres. Do not
+            invent figures. Keep going until the responses file is applied.
+
+      - name: Status report (post)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          python -m study_scraper status
+          python -m study_scraper status --json > attribute-status.json || true
+
+      - name: Upload status artifact
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: attribute-status-${{ github.run_id }}
+          path: attribute-status.json
+          retention-days: 30
+          if-no-files-found: ignore

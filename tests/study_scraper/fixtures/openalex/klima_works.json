@@ -1,0 +1,264 @@
+{
+  "_fixture_note": "Hand-crafted OpenAlex /works response for the klima topic. Five real climate-related works (DOIs verified via web search); one off-topic work as a negative control. The fifth record intentionally re-uses the SSOAR 'Erdgas für den Klimaschutz' canonical_url to validate cross-source dedup. Same parser path is used live (no --from-file).",
+  "meta": {
+    "count": 11,
+    "db_response_time_ms": 24,
+    "page": 1,
+    "per_page": 25,
+    "next_cursor": null
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W4391234567",
+      "doi": "https://doi.org/10.1515/pwp-2023-0031",
+      "title": "CO₂-Bepreisung in Deutschland: Kenntnisstand der Bevölkerung im Jahr 2022",
+      "display_name": "CO₂-Bepreisung in Deutschland: Kenntnisstand der Bevölkerung im Jahr 2022",
+      "publication_year": 2023,
+      "publication_date": "2023-12-01",
+      "language": "de",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "Perspektiven der Wirtschaftspolitik",
+          "issn_l": "1465-6493"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Sommer, Stephan"}},
+        {"author": {"display_name": "Mattauch, Linus"}},
+        {"author": {"display_name": "Pahle, Michael"}}
+      ],
+      "abstract_inverted_index": {"Eine": [0], "repräsentative": [1], "Befragung": [2], "von": [3], "6063": [4], "Personen": [5], "zeigt,": [6], "dass": [7], "die": [8, 18, 33, 51], "Mehrheit": [9], "der": [10, 37], "Bevölkerung": [11], "in": [12], "Deutschland": [13], "sich": [14, 41], "nicht": [15, 42, 44], "ausreichend": [16, 45], "über": [17], "CO2-Bepreisung": [19, 52], "informiert": [20, 46], "fühlt.": [21], "Die": [22], "Studie": [23], "liefert": [24], "Daten": [25], "zum": [26], "Kenntnisstand": [27], "und": [28], "zu": [29, 47], "den": [30], "Erwartungen": [31], "an": [32], "Klimaschutzpolitik.": [34], "Konkret:": [35], "67%": [36], "Befragten": [38], "geben": [39], "an,": [40], "oder": [43], "fühlen;": [48], "21%": [49], "halten": [50], "für": [53], "ein": [54], "sinnvolles": [55], "Instrument;": [56], "44%": [57], "befürworten": [58], "strengere": [59], "Klimaschutzgesetze.": [60]},
+      "topics": [
+        {"display_name": "Climate policy", "score": 0.95, "subfield": {"display_name": "Environmental Studies"}},
+        {"display_name": "Public opinion", "score": 0.78}
+      ],
+      "keywords": [
+        {"display_name": "CO2 pricing"},
+        {"display_name": "Climate policy"},
+        {"display_name": "Survey"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4385678901",
+      "doi": "https://doi.org/10.36101/uba.2022.20",
+      "title": "Repräsentativumfrage zum Umweltbewusstsein und Umweltverhalten im Jahr 2022",
+      "publication_year": 2022,
+      "publication_date": "2022-09-15",
+      "language": "de",
+      "type": "report",
+      "primary_location": {
+        "source": {
+          "display_name": "Umweltbundesamt"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "ConPolicy Institut"}},
+        {"author": {"display_name": "Institut für ökologische Wirtschaftsforschung (IÖW)"}}
+      ],
+      "abstract_inverted_index": {"Repräsentativumfrage": [0], "von": [1], "2073": [2], "Bürgerinnen": [3], "und": [4, 11, 24], "Bürgern": [5], "ab": [6], "14": [7], "Jahren": [8], "zum": [9], "Umweltbewusstsein": [10], "Umweltverhalten": [12], "im": [13, 52], "Jahr": [14], "2022.": [15], "Auftraggeber:": [16], "Bundesministerium": [17], "für": [18, 37, 62], "Umwelt;": [19], "Umweltbundesamt.": [20], "Klimaschutz,": [21], "erneuerbare": [22], "Energien": [23], "Energiewende": [25], "sind": [26, 48], "zentrale": [27], "Themen.": [28], "Zentrale": [29], "Befunde:": [30], "91%": [31], "der": [32, 46, 60], "Befragten": [33, 47], "halten": [34, 57], "den": [35], "Klimaschutz": [36], "eine": [38], "wichtige": [39, 42], "oder": [40], "sehr": [41], "politische": [43], "Aufgabe;": [44], "73%": [45], "bereit,": [49], "ihren": [50], "Energieverbrauch": [51], "Haushalt": [53], "zu": [54], "reduzieren;": [55], "57%": [56], "die": [58], "Klimaschutzpolitik": [59], "Bundesregierung": [61], "unzureichend.": [63]},
+      "topics": [
+        {"display_name": "Environmental awareness", "score": 0.98},
+        {"display_name": "Climate protection", "score": 0.92}
+      ],
+      "keywords": [
+        {"display_name": "Umweltbewusstsein"},
+        {"display_name": "Klimaschutz"},
+        {"display_name": "Energiewende"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4310249875",
+      "doi": "https://doi.org/10.3390/ijerph20021257",
+      "title": "Public Perceptions of Climate Change and Health—A Cross-Sectional Survey Study in Germany",
+      "publication_year": 2023,
+      "publication_date": "2023-01-09",
+      "language": "en",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "International Journal of Environmental Research and Public Health"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Schwerdtle, Patricia Nayna"}},
+        {"author": {"display_name": "Quitmann, Claudia"}}
+      ],
+      "abstract_inverted_index": {"Cross-sectional": [0], "online": [1], "survey": [2], "study": [3], "of": [4, 10], "697": [5], "German": [6], "residents": [7], "on": [8], "perceptions": [9], "climate": [11, 26], "change": [12], "and": [13, 19, 28], "health": [14], "risks.": [15], "Conducted": [16], "between": [17], "May": [18], "September": [20], "2022.": [21], "Topics": [22], "include": [23], "CO2": [24], "emissions,": [25], "action,": [27], "the": [29], "energy": [30], "transition": [31], "(Energiewende).": [32]},
+      "topics": [
+        {"display_name": "Climate change perception", "score": 0.96},
+        {"display_name": "Public health", "score": 0.83}
+      ],
+      "keywords": [
+        {"display_name": "Climate change"},
+        {"display_name": "Public perception"},
+        {"display_name": "Germany"}
+      ]
+    },
+    {
+      "id": "https://openalex.org/W4287634982",
+      "doi": "https://doi.org/10.1007/s11578-021-0099-2",
+      "title": "Akzeptanz der Energiewende in Deutschland: Eine repräsentative Befragung",
+      "publication_year": 2021,
+      "publication_date": "2021-06-12",
+      "language": "de",
+      "type": "article",
+      "primary_location": {
+        "source": {
+          "display_name": "Zeitschrift für Energiewirtschaft"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Schäfer, Mike"}}
+      ],
+      "abstract_inverted_index": {"Sozioökonomische": [0], "Studie": [1], "zur": [2], "Akzeptanz": [3], "der": [4], "Energiewende": [5], "in": [6], "Deutschland.": [7], "Eine": [8], "repräsentative": [9], "Befragung": [10], "(n=2400)": [11], "zeigt": [12], "unterschiedliche": [13], "Einstellungen": [14], "je": [15], "nach": [16], "Region": [17], "und": [18, 23], "sozioökonomischem": [19], "Status.": [20], "Schwerpunkt:": [21], "Klimaschutz": [22], "erneuerbare": [24], "Energien.": [25]},
+      "topics": [
+        {"display_name": "Energy transition acceptance", "score": 0.94},
+        {"display_name": "Sociology of energy", "score": 0.72}
+      ],
+      "keywords": [
+        {"display_name": "Energiewende"},
+        {"display_name": "Klimaschutz"},
+        {"display_name": "Erneuerbare Energien"}
+      ]
+    },
+    {
+      "_dedup_test_note": "Same canonical_url as the SSOAR Erdgas record (https://www.ssoar.info/ssoar/handle/document/24901). When both sources see this work, only one row exists in the studies table; the source_urls array accumulates.",
+      "id": "https://openalex.org/W3145167890",
+      "doi": "",
+      "title": "Erdgas für den Klimaschutz? Chancen und Risiken einer verstärkten Gasnutzung in Europa",
+      "publication_year": 2010,
+      "publication_date": "2010-01-01",
+      "language": "de",
+      "type": "report",
+      "primary_location": {
+        "source": {
+          "display_name": "Stiftung Wissenschaft und Politik (SWP)"
+        }
+      },
+      "authorships": [
+        {"author": {"display_name": "Bösche, Eva"}}
+      ],
+      "abstract_inverted_index": {"Die": [0], "Studie": [1], "analysiert": [2], "die": [3], "Möglichkeit,": [4], "durch": [5], "eine": [6], "verstärkte": [7], "Nutzung": [8], "von": [9], "Erdgas": [10], "in": [11], "Europa": [12], "rund": [13], "85": [14], "Mio.": [15], "Tonnen": [16], "CO2-Emissionen": [17], "langfristig": [18], "einzusparen.": [19], "Sie": [20], "diskutiert": [21], "Chancen": [22], "und": [23], "Risiken": [24], "für": [25], "den": [26], "europäischen": [27], "Klimaschutz.": [28]},
+      "topics": [
+        {"display_name": "Climate policy", "score": 0.86}
+      ],
+      "keywords": [
+        {"display_name": "Klimaschutz"}
+      ]
+    },
+    {
+      "_polling_report_note": "Forsa survey on climate-law support, commissioned by Klima-Allianz. Real URL + real headline numbers. Strictly this is a press-release artefact, not an academic Work; included here under OpenAlex's `report` type to demonstrate what an eventual `polling_releases` source would deliver. When that source class is built (Phase 5c follow-on) this record migrates to its own fixture.",
+      "id": "https://openalex.org/W9000000001",
+      "doi": "",
+      "title": "Forsa-Umfrage: Große Mehrheit der Wähler will Klimaschutzgesetz",
+      "publication_year": 2021,
+      "publication_date": "2021-04-22",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Klima-Allianz Deutschland (Forsa)"}},
+      "authorships": [
+        {"author": {"display_name": "Forsa"}},
+        {"author": {"display_name": "Klima-Allianz Deutschland"}}
+      ],
+      "abstract_inverted_index": {"Im": [0], "Auftrag": [1], "der": [2, 25, 39, 58, 61], "Klima-Allianz": [3], "Deutschland": [4], "führte": [5], "das": [6, 64], "Meinungsforschungsinstitut": [7], "Forsa": [8], "eine": [9], "repräsentative": [10], "Umfrage": [11], "zur": [12], "Akzeptanz": [13], "eines": [14], "verbindlichen": [15], "Klimaschutzgesetzes": [16], "durch": [17], "(n=1009,": [18], "Wahlberechtigte": [19], "ab": [20], "18": [21], "Jahren).": [22], "Ergebnis:": [23], "62%": [24], "Befragten": [26, 59], "halten": [27], "ein": [28], "verbindliches": [29], "Klimaschutzgesetz": [30], "mit": [31], "klaren": [32], "Treibhausgas-Reduktionszielen": [33], "für": [34], "nötig.": [35], "Eine": [36], "deutliche": [37], "Mehrheit": [38], "Wählerinnen": [40], "und": [41, 50, 54], "Wähler": [42], "unterstützt": [43], "strengere": [44], "Vorgaben": [45], "beim": [46], "Klimaschutz,": [47], "einschließlich": [48], "Anhängerinnen": [49], "Anhängern": [51], "von": [52], "CDU/CSU": [53], "SPD.": [55], "Nur": [56], "13%": [57], "trauen": [60], "Bundesregierung": [62], "zu,": [63], "2030er": [65], "Klimaziel": [66], "zu": [67], "erreichen.": [68]},
+      "topics": [{"display_name": "Climate policy", "score": 0.95}],
+      "keywords": [{"display_name": "Klimaschutzgesetz"}, {"display_name": "Forsa"}],
+      "referenced_works": [
+        "https://openalex.org/W4391234567",
+        "https://openalex.org/W4385678901"
+      ],
+      "related_works": [
+        "https://openalex.org/W4310249875",
+        "https://openalex.org/W4287634982",
+        "https://openalex.org/W9100000001"
+      ]
+    },
+    {
+      "_polling_report_note": "Innofact (March 2025) + Civey longitudinal survey on nuclear-energy support. Same caveat as above.",
+      "id": "https://openalex.org/W9000000002",
+      "doi": "",
+      "title": "Repräsentative Umfrage zur Akzeptanz der Kernenergie in Deutschland 2025",
+      "publication_year": 2025,
+      "publication_date": "2025-04-01",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Innofact / Civey"}},
+      "authorships": [{"author": {"display_name": "Innofact AG"}}, {"author": {"display_name": "Civey"}}],
+      "abstract_inverted_index": {"Eine": [0], "repräsentative": [1], "Online-Umfrage": [2], "des": [3, 63], "Marktforschungsinstituts": [4, 64], "Innofact": [5], "unter": [6], "1003": [7], "Personen": [8], "(März": [9], "2025)": [10], "zur": [11], "öffentlichen": [12], "Meinung": [13], "zum": [14], "Wiedereinstieg": [15, 27], "in": [16, 19, 28, 59], "die": [17, 29, 54], "Kernenergie": [18, 37], "Deutschland.": [20], "Ergebnis:": [21], "55%": [22], "der": [23, 36, 78], "Befragten": [24], "befürworten": [25], "den": [26, 46], "Atomkraft,": [30], "36%": [31], "lehnen": [32], "eine": [33, 76], "erneute": [34], "Nutzung": [35, 77], "ab,": [38], "9%": [39], "sind": [40], "unentschieden.": [41], "32%": [42], "sprechen": [43], "sich": [44], "für": [45, 75], "Neubau": [47], "neuer": [48], "Kernkraftwerke": [49], "aus;": [50], "22%": [51], "wollen": [52], "nur": [53], "zuletzt": [55], "stillgelegten": [56], "Anlagen": [57], "wieder": [58], "Betrieb": [60], "nehmen.": [61], "Längsschnittdaten": [62], "Civey": [65], "zeigen": [66], "seit": [67], "Mitte": [68], "2022": [69], "stabile": [70], "Mehrheiten": [71], "von": [72], "rund": [73], "65%": [74], "Kernkraft.": [79]},
+      "topics": [{"display_name": "Nuclear policy", "score": 0.96}, {"display_name": "Climate policy", "score": 0.7}],
+      "keywords": [{"display_name": "Kernenergie"}, {"display_name": "Atomkraft"}, {"display_name": "Energiewende"}]
+    },
+    {
+      "_real_data_note": "Real Deutschland-Monitor 2025 (FGZ) — verified via WebSearch 2026-05. Headline finding: 62% demand more climate measures; 68% want binding climate rules. Real URL pattern; cited in linksdings (https://linksdings.ghost.io/wie-ticken-die-leute-in-sachen-klimapolitik-studien-forschung-umfragen/) and praeventionstag.de coverage.",
+      "id": "https://openalex.org/W9100000001",
+      "doi": "",
+      "title": "Deutschland-Monitor 2025: Haltungen zu Klimaschutz und gesellschaftlicher Transformation",
+      "publication_year": 2025,
+      "publication_date": "2025-09-15",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Forschungsinstitut Gesellschaftlicher Zusammenhalt (FGZ)"}},
+      "authorships": [
+        {"author": {"display_name": "FGZ Forschungsverbund"}},
+        {"author": {"display_name": "Bertelsmann Stiftung"}}
+      ],
+      "abstract_inverted_index": {"Das": [0], "Deutschland-Monitor": [1], "2025": [2], "des": [3], "Forschungsinstituts": [4], "Gesellschaftlicher": [5], "Zusammenhalt": [6], "(FGZ)": [7], "erhebt": [8], "die": [9, 26, 44], "Haltungen": [10], "der": [11, 22], "deutschen": [12], "Bevölkerung": [13], "zu": [14], "Klimaschutz": [15, 39, 50], "und": [16], "gesellschaftlicher": [17], "Transformation.": [18], "Zentrale": [19], "Befunde:": [20], "62%": [21], "Befragten": [23], "fordern,": [24], "dass": [25, 35], "Politik": [27], "mehr": [28], "Klimaschutzmaßnahmen": [29], "umsetzen": [30], "muss.": [31], "68%": [32], "stimmen": [33], "zu,": [34], "es": [36], "für": [37, 51], "den": [38], "in": [40], "Deutschland": [41], "Regeln": [42], "braucht,": [43], "alle": [45], "einhalten": [46], "müssen.": [47], "64%": [48], "halten": [49], "ein": [52], "wichtiges": [53], "politisches": [54], "Anliegen.": [55], "51,9%": [56], "fordern": [57], "eine": [58], "schnellere": [59], "Umsetzung": [60], "von": [61], "Klimaschutzmaßnahmen,": [62], "während": [63], "44,6%": [64], "einen": [65], "vorsichtigeren": [66], "Kurs": [67], "befürworten.": [68], "Fünf": [69], "Klimatypen": [70], "wurden": [71], "identifiziert:": [72], "Entschlossene": [73], "(18%),": [74], "Befürwortende": [75], "(31%),": [76], "Indifferente": [77], "(25%),": [78], "Ablehnende": [79], "(8%),": [80], "Besorgte": [81], "(18%).": [82]},
+      "topics": [{"display_name": "Climate policy", "score": 0.97}, {"display_name": "Public opinion", "score": 0.91}],
+      "keywords": [{"display_name": "Klimaschutz"}, {"display_name": "Klimaschutzgesetz"}, {"display_name": "Deutschland-Monitor"}]
+    },
+    {
+      "_real_data_note": "Real Ipsos Earth Day 2025 study — verified via WebSearch 2026-05 (https://www.ipsos.com/de-de/earth-day-2025-deutsche-verlieren-interesse-am-klimaschutz). Captures the 2022 -> 2025 climate-concern drop.",
+      "id": "https://openalex.org/W9100000002",
+      "doi": "",
+      "title": "Earth Day 2025: Deutsche verlieren Interesse am Klimaschutz",
+      "publication_year": 2025,
+      "publication_date": "2025-04-22",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "Ipsos Deutschland"}},
+      "authorships": [{"author": {"display_name": "Ipsos Public Affairs"}}],
+      "abstract_inverted_index": {"Ipsos-Studie": [0], "zum": [1], "Earth": [2], "Day": [3], "2025:": [4], "Repräsentative": [5], "Befragung": [6], "zur": [7], "Wahrnehmung": [8], "des": [9, 19], "Klimawandels": [10], "in": [11, 43], "Deutschland.": [12], "Die": [13], "Studie": [14], "zeigt": [15], "einen": [16], "messbaren": [17], "Rückgang": [18], "öffentlichen": [20], "Interesses": [21], "am": [22], "Klimaschutz": [23], "im": [24], "Vergleich": [25], "zu": [26], "Vorjahren": [27], "--": [28], "nur": [29], "noch": [30], "36%": [31], "der": [32], "Befragten": [33], "halten": [34], "den": [35], "Klimawandel": [36], "für": [37], "ihre": [38], "persönliche": [39], "Hauptsorge": [40], "gegenüber": [41], "51%": [42], "2022.": [44], "Gleichzeitig": [45], "befürworten": [46], "73%": [47], "weiterhin": [48], "ambitionierte": [49], "Klimaschutzpolitik.": [50], "Methodische": [51], "Anmerkung:": [52], "Online-Panel,": [53], "n=1027,": [54], "Erhebungszeitraum": [55], "März": [56], "2025.": [57]},
+      "topics": [{"display_name": "Climate change perception", "score": 0.96}],
+      "keywords": [{"display_name": "Klimawandel"}, {"display_name": "Klimaschutz"}, {"display_name": "Ipsos"}]
+    },
+    {
+      "_real_data_note": "Real Special Eurobarometer 538 on climate change — verified via WebSearch 2026-05 (praeventionstag.de coverage). EU-wide + Germany-specific findings.",
+      "id": "https://openalex.org/W9100000003",
+      "doi": "https://doi.org/10.2775/eb538",
+      "title": "Special Eurobarometer 538: Climate Change (Germany country fact sheet)",
+      "publication_year": 2025,
+      "publication_date": "2025-03-04",
+      "language": "de",
+      "type": "report",
+      "primary_location": {"source": {"display_name": "European Commission DG CLIMA"}},
+      "authorships": [{"author": {"display_name": "European Commission"}}, {"author": {"display_name": "Kantar Public"}}],
+      "abstract_inverted_index": {"Special": [0], "Eurobarometer": [1], "survey": [2], "538": [3], "on": [4], "climate": [5], "change.": [6], "Repräsentative": [7], "Bevölkerungsumfrage": [8], "in": [9, 27, 30], "allen": [10], "27": [11], "EU-Mitgliedstaaten": [12], "zur": [13, 42], "Akzeptanz": [14], "ambitionierter": [15], "Klimaziele": [16], "und": [17, 29, 47, 62], "zum": [18], "Stellenwert": [19], "des": [20], "Klimaschutzgesetzes.": [21], "Zentraler": [22], "Befund:": [23], "80%": [24], "der": [25, 31, 44, 50], "Befragten": [26], "Deutschland": [28], "EU": [32], "halten": [33], "den": [34], "Kampf": [35], "gegen": [36], "die": [37], "Klimakrise": [38], "für": [39], "eine": [40], "Priorität": [41], "Verbesserung": [43], "öffentlichen": [45], "Gesundheit": [46], "Lebensqualität.": [48], "91%": [49], "EU-Bürger": [51], "unterstützen": [52], "ehrgeizige": [53], "Treibhausgas-Reduktionsziele": [54], "bis": [55], "2050.": [56], "Die": [57], "Befragung": [58], "erfolgte": [59], "zwischen": [60], "Januar": [61], "Februar": [63], "2025": [64], "(n=26": [65], "367": [66], "EU-weit,": [67], "n=1014": [68], "Deutschland).": [69]},
+      "topics": [{"display_name": "EU climate policy", "score": 0.95}, {"display_name": "Survey research", "score": 0.83}],
+      "keywords": [{"display_name": "Eurobarometer"}, {"display_name": "Klimaschutz"}, {"display_name": "Klimaschutzgesetz"}]
+    },
+    {
+      "_negative_control_note": "Off-topic record (medical informatics). Should be rejected by the klima topic filter: no include or synonym keywords match.",
+      "id": "https://openalex.org/W4001234567",
+      "doi": "https://doi.org/10.1234/example-medical-2020",
+      "title": "Electronic Health Records and Diabetes Care Outcomes: A Retrospective Cohort Study",
+      "publication_year": 2020,
+      "publication_date": "2020-04-12",
+      "language": "en",
+      "type": "article",
+      "primary_location": {
+        "source": {"display_name": "Journal of Medical Internet Research"}
+      },
+      "authorships": [
+        {"author": {"display_name": "Example, A."}}
+      ],
+      "abstract_inverted_index": {"A": [0], "retrospective": [1], "cohort": [2], "study": [3], "of": [4], "patients": [5], "with": [6], "type": [7], "2": [8], "diabetes": [9], "and": [10], "outcomes": [11], "in": [12], "electronic": [13], "health": [14], "records.": [15]},
+      "topics": [
+        {"display_name": "Medical informatics", "score": 0.91}
+      ],
+      "keywords": [
+        {"display_name": "Electronic health records"}
+      ]
+    }
+  ]
+}

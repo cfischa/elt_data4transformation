@@ -1,0 +1,40 @@
+# Local Postgres for the study scraper.
+#
+# This file is intentionally independent of the legacy ELT
+# docker-compose.yml (per DECISIONS.md A2). To bring up only what the
+# scraper needs:
+#
+#   docker compose -f study_scraper/docker-compose.yml up -d
+#   docker compose -f study_scraper/docker-compose.yml exec postgres psql -U postgres -d study_scraper
+#
+# Connection URL (paste into .env or export):
+#
+#   POSTGRES_URL=postgresql://postgres:postgres@localhost:5544/study_scraper
+#
+# Port 5544 is chosen to avoid colliding with the legacy Airflow
+# Postgres on 5432 if both stacks ever run at the same time.
+
+services:
+  postgres:
+    # Supabase's Postgres image; behavior matches a hosted Supabase
+    # project's database (extensions, default config). When you later
+    # move to a hosted Supabase project, no schema changes are needed.
+    image: supabase/postgres:15.1.0.117
+    container_name: study_scraper_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: study_scraper
+    ports:
+      - "5544:5432"
+    volumes:
+      - study_scraper_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d study_scraper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  study_scraper_pgdata:
+    name: study_scraper_pgdata

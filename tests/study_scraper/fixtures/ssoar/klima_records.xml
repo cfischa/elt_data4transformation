@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture: real SSOAR records on Klimaschutz / Klimawandel / Energiewende.
+  Hand-built from titles, URLs, and abstract excerpts confirmed via web
+  search (the dev sandbox cannot reach ssoar.info directly). See
+  docs/study_scraper/notes/first-run-2026-05-24.md for context.
+  Includes one off-topic record (Datenmigration in IT) as a negative
+  control: the topic filter must reject it for the klima topic.
+-->
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/
+                             http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+  <responseDate>2026-05-24T12:00:00Z</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">https://www.ssoar.info/OAIHandler/request</request>
+  <ListRecords>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/19672</identifier>
+        <datestamp>2005-12-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Kommunaler Klimaschutz in Deutschland</dc:title>
+          <dc:creator>Kern, Kristine</dc:creator>
+          <dc:creator>Niederhafner, Stefan</dc:creator>
+          <dc:creator>Rechlin, Sandra</dc:creator>
+          <dc:creator>Wagner, Jost</dc:creator>
+          <dc:subject>Klimaschutz</dc:subject>
+          <dc:subject>Kommunalpolitik</dc:subject>
+          <dc:description>Diese Studie untersucht den Stand des lokalen Klimaschutzes in deutschen Städten. Sie basiert auf einer leitfadengestützten Telefonbefragung repräsentativer Mittel- und Großstädte und einer qualitativ-vergleichenden Analyse von drei erfolgreichen Fallstudien (Heidelberg, Frankfurt am Main, München). Insgesamt wurden 41 Städte befragt.</dc:description>
+          <dc:publisher>Wissenschaftszentrum Berlin für Sozialforschung gGmbH</dc:publisher>
+          <dc:date>2005</dc:date>
+          <dc:type>doc-type:report</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/19672</dc:identifier>
+          <dc:language>deu</dc:language>
+          <dc:rights>Deposit Licence - Keine Weiterverbreitung, keine Bearbeitung</dc:rights>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/24901</identifier>
+        <datestamp>2010-01-15</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Erdgas für den Klimaschutz? Chancen und Risiken einer verstärkten Gasnutzung in Europa</dc:title>
+          <dc:creator>Bösche, Eva</dc:creator>
+          <dc:subject>Klimaschutz</dc:subject>
+          <dc:subject>Energiepolitik</dc:subject>
+          <dc:subject>Erdgas</dc:subject>
+          <dc:description>Die Studie analysiert die Möglichkeit, durch eine verstärkte Nutzung von Erdgas in Europa rund 85 Mio. Tonnen CO2-Emissionen langfristig einzusparen. Dabei werden Chancen und Risiken für den europäischen Klimaschutz diskutiert.</dc:description>
+          <dc:publisher>Stiftung Wissenschaft und Politik (SWP)</dc:publisher>
+          <dc:date>2010</dc:date>
+          <dc:type>doc-type:workingPaper</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/24901</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/75671</identifier>
+        <datestamp>2021-09-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Aktionsplan Klima und Außenpolitik: Wie Deutschland zu einer führenden Klimanation werden kann</dc:title>
+          <dc:creator>Geden, Oliver</dc:creator>
+          <dc:creator>Beck, Susanne</dc:creator>
+          <dc:subject>Klimapolitik</dc:subject>
+          <dc:subject>Außenpolitik</dc:subject>
+          <dc:subject>Klimaschutz</dc:subject>
+          <dc:description>Das Diskussionspapier formuliert einen Aktionsplan für eine ambitionierte deutsche Klima-Außenpolitik. Es leitet konkrete Empfehlungen ab, wie Deutschland seine Klimaschutzziele national und international voranbringen und damit zu einer führenden Klimanation werden kann.</dc:description>
+          <dc:publisher>Stiftung Wissenschaft und Politik (SWP)</dc:publisher>
+          <dc:date>2021</dc:date>
+          <dc:type>doc-type:workingPaper</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/75671</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/18612</identifier>
+        <datestamp>2009-06-15</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Klimawandel und Klimabewusstsein: zur Schwierigkeit der Vermittlung eines abstrakten Risikos</dc:title>
+          <dc:creator>Stehr, Nico</dc:creator>
+          <dc:creator>von Storch, Hans</dc:creator>
+          <dc:subject>Klimawandel</dc:subject>
+          <dc:subject>Risikowahrnehmung</dc:subject>
+          <dc:subject>Umweltbewusstsein</dc:subject>
+          <dc:description>Repräsentative Umfragen bestätigen, dass zunehmend globale Umweltprobleme wie der Klimawandel als gefährlich beurteilt werden. Der Beitrag analysiert die Schwierigkeiten, ein abstraktes Risiko wie den Klimawandel öffentlich zu vermitteln, und diskutiert Implikationen für die Klimakommunikation.</dc:description>
+          <dc:publisher>GAIA</dc:publisher>
+          <dc:date>2009</dc:date>
+          <dc:type>doc-type:article</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/18612</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/45873</identifier>
+        <datestamp>2014-11-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Der Fortschritt der Energiewende im Spiegel der politischen Debatte</dc:title>
+          <dc:creator>Reusswig, Fritz</dc:creator>
+          <dc:subject>Energiewende</dc:subject>
+          <dc:subject>erneuerbare Energien</dc:subject>
+          <dc:subject>Klimaschutz</dc:subject>
+          <dc:description>Die Studie wertet eine standardisierte Befragung (n=1024) zur öffentlichen Wahrnehmung der Energiewende in Deutschland aus. Sie zeigt, dass die Mehrheit der Bevölkerung den Ausbau erneuerbarer Energien unterstützt, aber bei den konkreten Maßnahmen vor Ort (Windkraft, Hochspannungstrassen) erhebliche Konflikte entstehen.</dc:description>
+          <dc:publisher>Potsdam-Institut für Klimafolgenforschung</dc:publisher>
+          <dc:date>2014</dc:date>
+          <dc:type>doc-type:report</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/45873</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/27291</identifier>
+        <datestamp>2013-04-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Auf dem Weg zur Energiewende: die Entwicklung der Stromproduktion aus erneuerbaren Energien in Deutschland</dc:title>
+          <dc:creator>Mautz, Rüdiger</dc:creator>
+          <dc:creator>Byzio, Andreas</dc:creator>
+          <dc:creator>Rosenbaum, Wolf</dc:creator>
+          <dc:subject>Energiewende</dc:subject>
+          <dc:subject>erneuerbare Energien</dc:subject>
+          <dc:subject>Stromerzeugung</dc:subject>
+          <dc:description>Eine Studie aus dem Soziologischen Forschungsinstitut Göttingen (SOFI) zur Entwicklung der Stromproduktion aus erneuerbaren Energien in Deutschland. Auf Basis von Experteninterviews und Sekundärdatenanalysen rekonstruiert die Studie die Akteurskonstellationen und Konflikte des Umbaus.</dc:description>
+          <dc:publisher>Universitätsverlag Göttingen</dc:publisher>
+          <dc:date>2013</dc:date>
+          <dc:type>doc-type:book</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/27291</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <!-- Negative control: should be rejected by the topic filter (no
+         climate keywords match, and no exclude either; score = 0). -->
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/99001</identifier>
+        <datestamp>2020-01-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Datenmigration im öffentlichen Sektor: Eine vergleichende Studie zu Servermigrationsprojekten</dc:title>
+          <dc:creator>Beispiel, Anna</dc:creator>
+          <dc:subject>Datenmigration</dc:subject>
+          <dc:subject>IT-Projekte</dc:subject>
+          <dc:description>Eine vergleichende Studie zu IT-Servermigrationsprojekten in deutschen Behörden. Untersucht werden Zeitpläne, Kosten und Risiken bei der Migration von Bestandsdaten in neue Systeme.</dc:description>
+          <dc:publisher>Test Publisher</dc:publisher>
+          <dc:date>2020</dc:date>
+          <dc:type>doc-type:article</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/99001</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+  </ListRecords>
+</OAI-PMH>

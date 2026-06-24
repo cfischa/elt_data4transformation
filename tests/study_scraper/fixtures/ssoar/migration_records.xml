@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture: real SSOAR records on Migration / Einwanderung / Zuwanderung.
+  URLs verified via web search. Used by the broader multi-topic test
+  in docs/study_scraper/notes/multi-topic-run-2026-05-28.md.
+-->
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/
+                             http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+  <responseDate>2026-05-28T17:00:00Z</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">https://www.ssoar.info/OAIHandler/request</request>
+  <ListRecords>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/20586</identifier>
+        <datestamp>2009-08-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Bleiben hochqualifizierte Zuwanderer in Deutschland? Befragungsergebnisse des Bundesamtes für Migration und Flüchtlinge</dc:title>
+          <dc:creator>Heß, Barbara</dc:creator>
+          <dc:subject>Migration</dc:subject>
+          <dc:subject>Zuwanderung</dc:subject>
+          <dc:subject>Hochqualifizierte</dc:subject>
+          <dc:description>Eine repräsentative Befragung von 1.500 hochqualifizierten Zuwanderern aus Drittstaaten zur Aufenthaltsdauer, Migrationsmotiven und sozioökonomischem Hintergrund. Die Studie liefert empirische Daten zur Migrationsforschung des BAMF.</dc:description>
+          <dc:publisher>Bundesamt für Migration und Flüchtlinge (BAMF)</dc:publisher>
+          <dc:date>2009</dc:date>
+          <dc:type>doc-type:report</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/20586</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/51380</identifier>
+        <datestamp>2017-03-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Kontakte und die Wahrnehmung von Bedrohungen besonders wichtig für die Einschätzung von Migranten: Einstellungen der deutschen Bevölkerung zu Zuwanderern von 1980 bis 2016</dc:title>
+          <dc:creator>Czymara, Christian S.</dc:creator>
+          <dc:creator>Schmidt-Catran, Alexander W.</dc:creator>
+          <dc:subject>Einstellungen</dc:subject>
+          <dc:subject>Migration</dc:subject>
+          <dc:subject>Zuwanderung</dc:subject>
+          <dc:description>Auf Basis repräsentativer Bevölkerungsumfragen (ALLBUS, SOEP) analysiert der Beitrag die Einstellungen der deutschen Bevölkerung zu Zuwanderern von 1980 bis 2016. Kontakte mit Migranten und die Wahrnehmung wirtschaftlicher Bedrohung erklären einen Großteil der Varianz.</dc:description>
+          <dc:publisher>GESIS - Leibniz-Institut für Sozialwissenschaften</dc:publisher>
+          <dc:date>2016</dc:date>
+          <dc:type>doc-type:article</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/51380</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/91255</identifier>
+        <datestamp>2023-01-15</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Migrationsbericht der Bundesregierung 2022</dc:title>
+          <dc:creator>Bundesamt für Migration und Flüchtlinge</dc:creator>
+          <dc:subject>Migration</dc:subject>
+          <dc:subject>Einwanderung</dc:subject>
+          <dc:subject>Aufenthaltstitel</dc:subject>
+          <dc:description>Der Migrationsbericht der Bundesregierung dokumentiert die Wanderungsbewegungen, Aufenthaltstitel und Asylanträge in Deutschland im Jahr 2022. Die Daten basieren auf Statistiken des Ausländerzentralregisters und Befragungsergebnissen des BAMF.</dc:description>
+          <dc:publisher>Bundesamt für Migration und Flüchtlinge (BAMF)</dc:publisher>
+          <dc:date>2023</dc:date>
+          <dc:type>doc-type:report</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/91255</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+    <record>
+      <header>
+        <identifier>oai:gesis.izsoz.de:document/25882</identifier>
+        <datestamp>2009-11-01</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Grunddaten der Zuwandererbevölkerung in Deutschland: Integrationsreport, Teil 6</dc:title>
+          <dc:creator>Babka von Gostomski, Christian</dc:creator>
+          <dc:subject>Zuwanderung</dc:subject>
+          <dc:subject>Integration</dc:subject>
+          <dc:subject>Migrationshintergrund</dc:subject>
+          <dc:description>Der Bericht stellt Grunddaten zur Zuwandererbevölkerung in Deutschland vor, basierend auf einer repräsentativen Befragung von rund 8.000 Personen mit Migrationshintergrund. Themen sind Aufenthaltstitel, Bildung, Erwerbstätigkeit und Integration.</dc:description>
+          <dc:publisher>Bundesamt für Migration und Flüchtlinge (BAMF)</dc:publisher>
+          <dc:date>2009</dc:date>
+          <dc:type>doc-type:report</dc:type>
+          <dc:identifier>https://www.ssoar.info/ssoar/handle/document/25882</dc:identifier>
+          <dc:language>deu</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+
+  </ListRecords>
+</OAI-PMH>

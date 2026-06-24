@@ -1,0 +1,99 @@
+# Scheduled production crawl for the study scraper.
+#
+# Activation checklist (maintainer, one-time):
+#   1. Provision a database (Supabase project or any reachable Postgres).
+#   2. Repo Settings -> Secrets and variables -> Actions -> new secret
+#        SCRAPER_POSTGRES_URL = postgresql://user:pass@host:5432/db
+#      (For Supabase: the connection string from Project Settings ->
+#       Database; the session pooler URL works.)
+#   3. Optionally adjust the cron below and the dataset codes.
+#
+# Without the secret, the workflow exits early and green — safe to merge
+# before the database exists.
+
+name: scheduled-scrape
+
+on:
+  schedule:
+    - cron: "0 5 * * 1,4"   # Mon + Thu 05:00 UTC
+  workflow_dispatch: {}      # manual trigger from the Actions tab
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime dependencies
+        run: |
+          pip install httpx pydantic pydantic-settings typer PyYAML \
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+
+      - name: Check database secret
+        id: gate
+        env:
+          DB: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          if [ -z "$DB" ]; then
+            echo "SCRAPER_POSTGRES_URL secret not set; skipping crawl."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Migrate schema
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: python -m study_scraper migrate
+
+      - name: Crawl all sources
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          set +e  # one failing source must not kill the others
+          for topic in klima migration_einwanderung steuern bildung; do
+            python -m study_scraper run --source ssoar    --topic "$topic" --limit 300
+            python -m study_scraper run --source openalex --topic "$topic" --limit 300
+          done
+          python -m study_scraper ingest --source dawum
+          python -m study_scraper ingest --source gesis --limit 500
+          python -m study_scraper ingest --source eurostat \
+              --code env_air_gge --code nrg_bal_s --code demo_pjan
+          exit 0
+
+      - name: Follow citation graph (one hop)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          python -m study_scraper follow --fetch --topic klima --limit 100 || true
+
+      - name: Fetch full documents + extract statistics
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          python -m study_scraper fulltext --limit 50 || true
+
+      - name: Status report
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          python -m study_scraper status
+          python -m study_scraper status --json > scrape-status.json
+
+      - name: Upload status artifact
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-status-${{ github.run_id }}
+          path: scrape-status.json
+          retention-days: 30

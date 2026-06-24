@@ -1,0 +1,48 @@
+{
+  "_real_data_note": "Real YouGov Bundestag Sonntagsfrage from May 2026, verified via WebSearch 2026-05 against https://yougov.com/de-de/artikel/54743-yougov-sonntagsfrage-mai-2026-afd-baut-vorsprung-aus-zustimmung-fur-friedrich-merz-sinkt-weiter and the YouGov methodology PDF. Field period: 2026-05-08 to 2026-05-11. n=2179 surveyed, n=1783 with voting intention. Numbers: AfD 28%, Union 22%, SPD 13%, Grüne 13%, Linke 11%, FDP 4%, BSW 4%, Sonstige (residual) ≈5%. Same root-document shape as https://api.dawum.de/; this is one survey instead of the whole DB so the from-file path stays small and focused.",
+  "Database": {"Version": "0.1.0", "Date": "2026-05-15"},
+  "Last_Update": "2026-05-15T10:00:00",
+  "Surveys": {
+    "yougov_btw_202605": {
+      "Institute_ID":   "5",
+      "Tasker_ID":      "5",
+      "Parliament_ID":  "0",
+      "Method_ID":      "1",
+      "Survey_Period":  {"Date_Start": "2026-05-08", "Date_End": "2026-05-11"},
+      "Date":           "2026-05-12",
+      "Surveyed_Persons": "1783",
+      "Results": {
+        "1": 22.0,
+        "2": 13.0,
+        "3": 13.0,
+        "4": 28.0,
+        "5":  4.0,
+        "6": 11.0,
+        "7":  4.0,
+        "8":  5.0
+      }
+    }
+  },
+  "Institutes": {
+    "5": {"Name": "YouGov", "Url": "https://yougov.com/de-de"}
+  },
+  "Taskers": {
+    "5": {"Name": "YouGov"}
+  },
+  "Parliaments": {
+    "0": {"Name": "Bundestag", "Shortcut": "Bundestag"}
+  },
+  "Methods": {
+    "1": {"Name": "Online"}
+  },
+  "Parties": {
+    "1": {"Name": "CDU/CSU",                              "Shortcut": "Union"},
+    "2": {"Name": "Sozialdemokratische Partei Deutschlands","Shortcut": "SPD"},
+    "3": {"Name": "Bündnis 90/Die Grünen",                 "Shortcut": "Grüne"},
+    "4": {"Name": "Alternative für Deutschland",           "Shortcut": "AfD"},
+    "5": {"Name": "Freie Demokratische Partei",            "Shortcut": "FDP"},
+    "6": {"Name": "Die Linke",                             "Shortcut": "Linke"},
+    "7": {"Name": "Bündnis Sahra Wagenknecht",             "Shortcut": "BSW"},
+    "8": {"Name": "Sonstige",                              "Shortcut": "Sonstige"}
+  }
+}

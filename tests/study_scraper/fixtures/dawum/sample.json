@@ -1,0 +1,95 @@
+{
+  "_fixture_note": "Hand-crafted DAWUM /api root response. Five surveys covering Bundestag + one state (Bayern), plus the reference dictionaries DAWUM publishes alongside (Institutes / Taskers / Parliaments / Methods / Parties). Shape matches what https://api.dawum.de/ returns live; the production parser is the same code path. Real institute names + plausible % distributions; this is for shape testing, not a citation source.",
+  "Database": {"Version": "0.1.0"},
+  "Last_Update": "2026-05-28T08:00:00",
+
+  "Surveys": {
+    "1001": {
+      "Institute_ID": "1",
+      "Tasker_ID":    "1",
+      "Parliament_ID":"0",
+      "Method_ID":    "1",
+      "Survey_Period":{"Date_Start":"2026-05-19","Date_End":"2026-05-23"},
+      "Date":         "2026-05-26",
+      "Surveyed_Persons":"1002",
+      "Results": {"1": 30.0, "2": 16.5, "3": 14.0, "4": 12.5, "5": 8.0, "6": 5.5, "7": 4.0, "8": 9.5}
+    },
+    "1002": {
+      "Institute_ID": "2",
+      "Tasker_ID":    "2",
+      "Parliament_ID":"0",
+      "Method_ID":    "2",
+      "Survey_Period":{"Date_Start":"2026-05-20","Date_End":"2026-05-22"},
+      "Date":         "2026-05-23",
+      "Surveyed_Persons":"1500",
+      "Results": {"1": 31.0, "2": 17.0, "3": 13.5, "4": 12.0, "5": 8.5, "6": 5.0, "7": 4.5, "8": 8.5}
+    },
+    "1003": {
+      "Institute_ID": "3",
+      "Tasker_ID":    "3",
+      "Parliament_ID":"0",
+      "Method_ID":    "3",
+      "Survey_Period":{"Date_Start":"2026-05-15","Date_End":"2026-05-19"},
+      "Date":         "2026-05-21",
+      "Surveyed_Persons":"1287",
+      "Results": {"1": 29.5, "2": 16.0, "3": 14.5, "4": 13.0, "5": 8.0, "6": 5.0, "7": 4.5, "8": 9.5}
+    },
+    "1004": {
+      "Institute_ID": "1",
+      "Tasker_ID":    "1",
+      "Parliament_ID":"5",
+      "Method_ID":    "1",
+      "Survey_Period":{"Date_Start":"2026-05-12","Date_End":"2026-05-16"},
+      "Date":         "2026-05-18",
+      "Surveyed_Persons":"1004",
+      "Results": {"1": 36.0, "2": 12.5, "3": 14.0, "4": 11.0, "5": 7.5, "6": 4.5, "9": 12.5, "8": 2.0}
+    },
+    "1005": {
+      "Institute_ID": "4",
+      "Tasker_ID":    "4",
+      "Parliament_ID":"0",
+      "Method_ID":    "2",
+      "Survey_Period":{"Date_Start":"2026-05-10","Date_End":"2026-05-12"},
+      "Date":         "2026-05-14",
+      "Surveyed_Persons":"2003",
+      "Results": {"1": 30.5, "2": 16.5, "3": 14.0, "4": 12.0, "5": 8.5, "6": 5.0, "7": 5.0, "8": 8.5}
+    }
+  },
+
+  "Institutes": {
+    "1": {"Name": "Forsa",              "Url": "https://www.forsa.de"},
+    "2": {"Name": "Infratest dimap",    "Url": "https://www.infratest-dimap.de"},
+    "3": {"Name": "Allensbach",         "Url": "https://www.ifd-allensbach.de"},
+    "4": {"Name": "Forschungsgruppe Wahlen","Url": "https://www.forschungsgruppe.de"}
+  },
+
+  "Taskers": {
+    "1": {"Name": "RTL"},
+    "2": {"Name": "ARD"},
+    "3": {"Name": "FAZ"},
+    "4": {"Name": "ZDF"}
+  },
+
+  "Parliaments": {
+    "0": {"Name": "Bundestag",       "Shortcut": "Bundestag"},
+    "5": {"Name": "Bayerischer Landtag", "Shortcut": "Bayern"}
+  },
+
+  "Methods": {
+    "1": {"Name": "Online"},
+    "2": {"Name": "Telefon"},
+    "3": {"Name": "Face-to-face"}
+  },
+
+  "Parties": {
+    "1": {"Name": "CDU/CSU", "Shortcut": "Union"},
+    "2": {"Name": "Sozialdemokratische Partei Deutschlands", "Shortcut": "SPD"},
+    "3": {"Name": "Bündnis 90/Die Grünen", "Shortcut": "Grüne"},
+    "4": {"Name": "Alternative für Deutschland", "Shortcut": "AfD"},
+    "5": {"Name": "Freie Demokratische Partei", "Shortcut": "FDP"},
+    "6": {"Name": "Die Linke", "Shortcut": "Linke"},
+    "7": {"Name": "Bündnis Sahra Wagenknecht", "Shortcut": "BSW"},
+    "8": {"Name": "Sonstige", "Shortcut": "Sonstige"},
+    "9": {"Name": "Freie Wähler", "Shortcut": "FW"}
+  }
+}
