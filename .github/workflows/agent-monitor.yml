@@ -1,0 +1,54 @@
+# Monitor agent: watches the daily business of the pipeline and files
+# issues when something is off. Runs daily after the crawl/attribute jobs.
+
+name: agent-monitor
+
+on:
+  schedule:
+    - cron: "11 7 * * *"     # daily 07:11 UTC (after crawl + attribute)
+  workflow_dispatch: {}
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      actions: read           # read recent workflow runs
+      id-token: write
+    env:
+      POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install httpx pydantic pydantic-settings typer PyYAML "psycopg[binary]"
+      - name: Gate on secrets
+        id: gate
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          DB: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          { [ -z "$TOKEN" ] || [ -z "$DB" ]; } && echo "enabled=false" >> "$GITHUB_OUTPUT" || echo "enabled=true" >> "$GITHUB_OUTPUT"
+          { [ -z "$TOKEN" ] || [ -z "$DB" ]; } && echo "secrets missing; skipping." || true
+      - name: Run monitor agent
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash,Read,Write,Glob,Grep,Skill"'
+          prompt: |
+            You are the MONITOR agent for the study-scraper pipeline.
+            Use the project skill `.claude/skills/monitor-pipeline/SKILL.md`
+            and follow it. In short: check the latest `scheduled-scrape` and
+            `scheduled-attribute` runs (`gh run list`), and the live DB
+            (`python -m study_scraper status`, POSTGRES_URL is set). Detect
+            anomalies — failed runs, sources returning 0 results (e.g.
+            OpenAlex), errors>0, the attribution queue not draining, counts
+            not growing. For each real anomaly open ONE issue labeled
+            `agent:task` (dedupe by a stable title — comment instead of
+            duplicating). Do not open issues for healthy runs. Never edit
+            code, .github/**, or .claude/**.

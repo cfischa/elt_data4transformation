@@ -1,0 +1,56 @@
+# Product-lead agent: drives the project toward GOAL.md and discusses
+# direction WITH the maintainer via a pinned "Product Direction" issue.
+# Runs weekly + on demand. Talks to you in issue comments; turns agreed
+# direction into prioritized agent:task issues for the developer agent.
+
+name: agent-product
+
+on:
+  schedule:
+    - cron: "23 8 * * 1"     # Monday 08:23 UTC
+  workflow_dispatch: {}
+
+jobs:
+  product:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write          # update ROADMAP.md
+      issues: write            # the direction issue + agent:task issues
+      id-token: write          # claude-code-action OIDC
+    env:
+      POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install httpx pydantic pydantic-settings typer PyYAML "psycopg[binary]"
+      - name: Gate on token
+        id: gate
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          [ -z "$TOKEN" ] && echo "enabled=false" >> "$GITHUB_OUTPUT" || echo "enabled=true" >> "$GITHUB_OUTPUT"
+          [ -z "$TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN not set; skipping." || true
+      - name: Run product-lead agent
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill"'
+          prompt: |
+            You are the PRODUCT LEAD agent for the study-scraper project.
+            Use the project skill `.claude/skills/product-direction/SKILL.md`
+            and follow it. In short: read GOAL.md / STATUS.md / TODO.md and
+            the live metrics (`python -m study_scraper status`, POSTGRES_URL
+            is set); judge progress toward the goal; maintain the single
+            pinned GitHub issue titled "Product Direction" — post your read
+            of where we are, propose the next direction, and ask the
+            maintainer (@cfischa) 1–3 crisp questions. Read any of their
+            prior replies and incorporate them. Convert agreed direction
+            into prioritized issues labeled `agent:task` (+ priority:high/
+            med/low) for the developer agent, and keep docs/study_scraper/
+            ROADMAP.md in sync via a normal PR (do NOT push to main; do NOT
+            edit .github/** or .claude/**). Be decisive and concise.

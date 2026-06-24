@@ -1,0 +1,30 @@
+# Study-scraper test suite — the green signal the challenger gates on.
+# Runs on human PRs for visibility; the agent-review workflow runs the
+# same tests itself (bot-authored PRs don't trigger this via GITHUB_TOKEN).
+
+name: study-scraper-tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "study_scraper/**"
+      - "tests/study_scraper/**"
+      - "pyproject.toml"
+  workflow_dispatch: {}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install pytest httpx pydantic pydantic-settings typer PyYAML \
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+      - name: Run study_scraper tests
+        run: python -m pytest tests/study_scraper -o addopts="" -q
