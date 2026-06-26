@@ -498,6 +498,24 @@ class PostgresStorage:
             conn.commit()
         return changed
 
+    def set_resolved_pdf_url(self, study_id: str, pdf_url: str) -> bool:
+        """Record the PDF URL resolved from a landing page, merged into the
+        study's provenance jsonb (no schema change). Keeps the audit trail:
+        which document we actually read for full-text claims. True if updated."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET provenance = COALESCE(provenance, '{{}}'::jsonb) "
+                    f"       || jsonb_build_object('resolved_pdf_url', %s::text), "
+                    f"       updated_at = now() "
+                    f" WHERE id = %s",
+                    (pdf_url, study_id),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
     def list_studies_for_fulltext(
         self, *, limit: int = 20, include_done: bool = False
     ) -> List[Dict[str, Any]]:
