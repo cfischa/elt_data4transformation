@@ -736,6 +736,66 @@ class PostgresStorage:
                 cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attributions")
                 return int(cur.fetchone()["c"])
 
+    def filter_attributions(
+        self,
+        *,
+        query: Optional[str] = None,
+        position: Optional[str] = None,
+        topic: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Browse attribution triples with optional text/position/topic
+        filters (powers the dock Attributions page). Joins study context;
+        excludes rejected studies. Ordered by percentage then confidence."""
+        clauses: List[str] = ["s.status <> 'rejected'"]
+        params: List[Any] = []
+        if query:
+            clauses.append("lower(a.question) LIKE %s")
+            params.append(f"%{query.lower()}%")
+        if position:
+            clauses.append("a.position = %s")
+            params.append(position)
+        if topic:
+            clauses.append("%s = ANY(s.topic_ids)")
+            params.append(topic)
+        where = " AND ".join(clauses)
+        params.append(limit)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage, a.population,
+                           a.confidence, a.model,
+                           s.title, s.canonical_url, s.source_id,
+                           s.publication_date, s.topic_ids
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    WHERE  {where}
+                    ORDER  BY a.percentage DESC NULLS LAST,
+                              a.confidence DESC NULLS LAST
+                    LIMIT  %s
+                    """,
+                    params,
+                )
+                return list(cur.fetchall())
+
+    def list_distinct_attribution_topics(self) -> List[str]:
+        """Distinct topic_ids appearing on studies that have attributions —
+        populates the dock's topic filter dropdown."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT DISTINCT unnest(s.topic_ids) AS t
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    WHERE  s.status <> 'rejected'
+                      AND  array_length(s.topic_ids, 1) > 0
+                    ORDER  BY t
+                    """
+                )
+                return [r["t"] for r in cur.fetchall()]
+
     def get_study_for_attribution(self, study_id: str) -> Optional[Dict[str, Any]]:
         """Study + its claim snippets, for feeding the llm-v1 extractor."""
         with self.connection() as conn:
