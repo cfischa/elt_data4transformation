@@ -498,6 +498,23 @@ class PostgresStorage:
             conn.commit()
         return changed
 
+    def set_review_rationale(self, study_id: str, rationale: str) -> bool:
+        """Record why a study was auto-reviewed, merged into provenance jsonb
+        (audit trail for the auto-reviewer; no schema change). True if updated."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET provenance = COALESCE(provenance, '{{}}'::jsonb) "
+                    f"       || jsonb_build_object('review_rationale', %s::text), "
+                    f"       updated_at = now() "
+                    f" WHERE id = %s",
+                    (rationale, study_id),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
     def set_resolved_pdf_url(self, study_id: str, pdf_url: str) -> bool:
         """Record the PDF URL resolved from a landing page, merged into the
         study's provenance jsonb (no schema change). Keeps the audit trail:

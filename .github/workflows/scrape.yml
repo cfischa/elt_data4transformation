@@ -68,6 +68,15 @@ jobs:
               --code env_air_gge --code nrg_bal_s --code demo_pjan
           exit 0
 
+      - name: Auto-review the pending queue (zero-touch)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          # Resolve borderline 'pending' studies to kept/rejected so they
+          # flow on to full-text + attribution without waiting on a human.
+          python -m study_scraper review auto --limit 1000 || true
+
       - name: Follow citation graph (one hop)
         if: steps.gate.outputs.enabled == 'true'
         env:
