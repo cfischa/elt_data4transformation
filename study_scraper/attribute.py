@@ -104,7 +104,21 @@ def apply_responses(
     """
     results: List[Dict[str, Any]] = []
     for sid, text in responses.items():
-        attrs = llm_v1.parse_response(text, study_id=sid, model=model)
+        # Fetch the source text so F1 grounding works on the offline path
+        # too (verify each source_span is real). Best-effort: skip if the
+        # study isn't found.
+        study = storage.get_study_for_attribution(sid)
+        source_text = (
+            llm_v1.build_user_prompt(
+                title=study.get("title"),
+                abstract=study.get("abstract"),
+                claim_snippets=study.get("claim_snippets") or [],
+            )
+            if study else None
+        )
+        attrs = llm_v1.parse_response(
+            text, study_id=sid, model=model, source_text=source_text,
+        )
         n = storage.upsert_attributions(sid, attrs, model=model)
         results.append({"study_id": sid, "status": "ok", "attributions": n})
     return results
