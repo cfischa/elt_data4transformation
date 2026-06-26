@@ -48,13 +48,25 @@ _EN_OPINION_HINTS = (
 _OPINION_HINTS = _DE_OPINION_HINTS + _EN_OPINION_HINTS
 
 
-# A number followed by a percent sign, possibly with a comma/dot decimal,
-# possibly with a space between number and "%". Examples we want to catch:
-#   62%, 62 %, 62,5 %, 62.5%, 6.063 % (rare but ok)
+# A number followed by a percent marker. German polling prose writes the
+# unit many ways, not just "%": "62 Prozent", "55 v.H.", "vom Hundert",
+# and "Prozentpunkte" (percentage points — a *change*, kept as unit 'pp').
+# Examples caught: 62%, 62 %, 62,5 %, 62.5%, 6.063 %, "62 Prozent",
+# "55 v.H.", "3 Prozentpunkte". `\s*` so newlines/double-spaces don't break it.
+# Order matters: longest alternatives first (prozentpunkte before prozent).
 _PERCENT_RE = re.compile(
-    r"(?P<value>\d+(?:[.,]\d+)?)\s?%",
-    re.UNICODE,
+    r"(?P<value>\d+(?:[.,]\d+)?)\s*"
+    r"(?P<unit>%|prozentpunkte|prozentpunkt|prozent|v\.?\s?h\.?|vom\s+hundert)",
+    re.UNICODE | re.IGNORECASE,
 )
+
+
+def _normalize_pct_unit(raw: str) -> str:
+    """Map a matched percent marker to a canonical unit: '%' or 'pp'."""
+    low = raw.lower().replace(" ", "")
+    if low.startswith("prozentpunkt"):
+        return "pp"  # percentage points: a change, not a level
+    return "%"
 
 # "n=1024", "n = 1024", "(n=1009," — sample-size cues, kept as a claim
 # type so the dock can show "based on a sample of X".
@@ -142,13 +154,15 @@ def _extract_from_field(
     out: List[ExtractedClaim],
 ) -> None:
     """Append claims found in one text field to `out` (shared dedup set)."""
-    # Percent matches
+    # Percent matches (incl. German word forms: Prozent / v.H. / vom Hundert)
     for m in _PERCENT_RE.finditer(text):
         value = _value_to_float(m.group("value"))
         if value is None:
             continue
-        # Optional sanity: a percent of >120 is almost always not a
-        # poll figure; suppress those.
+        unit = _normalize_pct_unit(m.group("unit"))
+        # Optional sanity: a percent *level* >120 is almost never a poll
+        # figure; suppress those. Percentage-point *changes* ('pp') are
+        # genuinely small, so the same ceiling is fine.
         if value > 120.0:
             continue
         snippet = _trim_snippet(text, m.start(), m.end())
@@ -163,7 +177,7 @@ def _extract_from_field(
                 study_id=study_id,
                 claim_text=snippet,
                 numeric_value=value,
-                unit="%",
+                unit=unit,
                 source_field=source_field,
             )
         )
