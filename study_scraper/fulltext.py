@@ -38,6 +38,7 @@ import httpx
 
 from study_scraper.claims import extract_claims_from_text
 from study_scraper.config import get_settings
+from study_scraper.pdf_resolver import is_pdf_url, resolve_pdf_url
 from study_scraper.storage import PostgresStorage
 
 
@@ -210,8 +211,26 @@ def run_fulltext(
     for row in rows:
         sid = row["id"]
         url = row["canonical_url"]
+        resolved_pdf: Optional[str] = None
         try:
             content, content_type = fetch_url(url)
+            # If we landed on an HTML page (not the PDF itself), try to
+            # resolve the real document and read THAT instead — otherwise
+            # we'd extract the landing page's chrome, not the study.
+            if sniff_kind(content, content_type) == "html" and not is_pdf_url(url):
+                pdf_url = resolve_pdf_url(url, content)
+                if pdf_url and pdf_url != url:
+                    try:
+                        pdf_content, pdf_ct = fetch_url(pdf_url)
+                        if sniff_kind(pdf_content, pdf_ct) == "pdf":
+                            content, content_type = pdf_content, pdf_ct
+                            resolved_pdf = pdf_url
+                            storage.set_resolved_pdf_url(sid, pdf_url)
+                    except Exception as exc:  # fall back to the landing HTML
+                        LOGGER.warning(
+                            "resolved pdf fetch failed (%s); using landing page: %s",
+                            pdf_url, exc,
+                        )
             summary = process_document(
                 storage=storage, study_id=sid,
                 content=content, content_type=content_type,
@@ -223,9 +242,11 @@ def run_fulltext(
             }
             LOGGER.warning("fulltext fetch failed for %s: %s", url, exc)
         summary["canonical_url"] = url
+        summary["resolved_pdf_url"] = resolved_pdf
         results.append(summary)
         LOGGER.info(
-            "fulltext %s: %s (%s claims)",
+            "fulltext %s: %s (%s claims)%s",
             sid[:12], summary["status"], summary.get("claims", 0),
+            f" [resolved {resolved_pdf}]" if resolved_pdf else "",
         )
     return results
