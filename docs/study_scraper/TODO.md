@@ -34,10 +34,13 @@ before they start.
 - [x] 19 tests; 233 total.
 
 ### Attribution follow-ups (sandbox-buildable)
-- [ ] Dual-target attribution on `source_record`s (table already
-      supports it; orchestrator currently studies-only).
-- [ ] Cross-study dedup of the same finding (confidence-weighted).
-- [ ] Dock: an Attributions page (browse / filter triples).
+- [~] Dual-target attribution on `source_record`s — DEFERRED: DAWUM is
+      party vote-intention, doesn't fit (question, position, %); parser
+      `source_record_id` support shipped, awaiting a policy-opinion lake
+      source. See ACCURACY.md.
+- [x] Cross-study dedup of the same finding (confidence-weighted) — PR #16
+      (`findings.py`, `ask --dedup`).
+- [x] Dock: an Attributions page (browse / filter triples) — PR #11.
 
 ### Done in the production pass (2026-06-11, A20)
 - [x] Full-document fetch + extraction (`fulltext.py`, regex-v2).
@@ -48,19 +51,28 @@ before they start.
 - [x] RUNBOOK.md.
 
 ### Next build items (sandbox-buildable, in order of yield)
-5. **Landing-page → PDF resolver** — many canonical_urls are HTML
-   landing pages linking the actual PDF (SSOAR handles especially).
-   Build after the first live `fulltext` run shows the hit rate
-   (RUNBOOK §3 flags this as the expected top gap).
-6. **LLM claim extractor (`llm-v1`)** — disambiguate WHAT each %
-   refers to; turns claims into (question, answer, %) triples — the
-   real shape of an issue-polling system. Schema ready (extractor
-   column); needs API-key + cost decision from maintainer.
-7. **Destatis GENESIS lake source** (free registration needed).
-8. **UBA / BAMF structured downloads** (XLSX/CSV lake sources).
-9. **Per-table SQL views** as access patterns surface.
-10. **Dock: Sources page** — per-source coverage, last-run, errors.
-11. **Eval harness (Phase 7)** — needs maintainer-curated gold set.
+5. [x] **Landing-page → PDF resolver** — PR #10 (`pdf_resolver.py`,
+   wired into `fulltext.py`; resolved URL in provenance).
+6. [x] **LLM claim/attribution extractor (`llm-v1`)** — shipped A21;
+   accuracy hardened (source-span grounding, German stance lexicon) in
+   PR #13. See ACCURACY.md.
+7. [ ] **Destatis GENESIS lake source** (free registration needed) — NOT
+   sandbox-buildable (credentials).
+8. [ ] **UBA / BAMF structured downloads** (XLSX/CSV lake sources).
+9. [ ] **Per-table SQL views** as access patterns surface.
+10. [x] **Dock: Sources page** — PR #11.
+11. [ ] **Eval harness (Phase 7)** — needs maintainer-curated gold set
+    (see ACCURACY.md "Needs the maintainer").
+
+### Accuracy pass (2026-06-26 audit; see ACCURACY.md)
+- [x] F1 source-span grounding + F3 German stance lexicon + F5
+      distribution sanity (PR #13).
+- [x] F4 German percentage words in claims regex (PR #12).
+- [x] F6 German morphology in topic keywords (PR #14).
+- [x] Auto-reviewer: zero-touch pending triage (PR #15), wired into scrape.yml.
+- [~] F2 claim_id lineage — deferred (covered by F1 source_span).
+- [ ] F7 structured-lake metadata parsing; OCR; spaCy lemmatization;
+      eval gold set — maintainer-gated or lower priority.
 
 ### Deferred / awaiting maintainer call
 12. **Think-tank SitemapSource + polling-firm press releases** (A13
