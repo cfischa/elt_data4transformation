@@ -646,5 +646,30 @@ def review_reject(
     typer.echo("rejected" if changed else "no change (already rejected or unknown id)")
 
 
+@review_app.command("auto")
+def review_auto(
+    topic: Optional[str] = typer.Option(None, "--topic"),
+    limit: int = typer.Option(100, "--limit"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview, don't write."),
+) -> None:
+    """Auto-triage the pending queue (zero-touch loop): promote/reject every
+    pending study, coverage-first. Stamps reviewed_by='auto' + a rationale."""
+    from study_scraper.auto_review import run_auto_review
+
+    storage = _storage_from_settings()
+    results = run_auto_review(
+        storage=storage, limit=limit, topic=topic, dry_run=dry_run,
+    )
+    if not results:
+        typer.echo("(nothing pending)")
+        return
+    kept = sum(1 for r in results if r["decision"] == "kept")
+    rejected = sum(1 for r in results if r["decision"] == "rejected")
+    prefix = "[dry-run] " if dry_run else ""
+    for r in results:
+        typer.echo(f"{prefix}{r['study_id'][:12]}  {r['decision']:<8}  {r['rationale']}")
+    typer.echo(f"{prefix}auto-review: {kept} kept, {rejected} rejected")
+
+
 if __name__ == "__main__":
     app()
