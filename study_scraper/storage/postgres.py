@@ -732,7 +732,7 @@ class PostgresStorage:
                 cur.execute(
                     f"""
                     SELECT a.question, a.position, a.percentage, a.population,
-                           a.confidence, a.model,
+                           a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
                            s.publication_date
                     FROM   {SCHEMA}.attributions a
@@ -746,6 +746,18 @@ class PostgresStorage:
                     (f"%{query.lower()}%", limit),
                 )
                 return list(cur.fetchall())
+
+    def search_attributions_deduped(
+        self, *, query: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Like `search_attributions` but collapses the same finding seen
+        across multiple studies to one confidence-weighted representative
+        (carries `dup_count`). Dedup is read-time in Python; raw rows are
+        untouched. Fetches a wider window first so dedup has material."""
+        from study_scraper.findings import dedupe_attributions
+
+        raw_rows = self.search_attributions(query=query, limit=max(limit * 5, 200))
+        return dedupe_attributions(raw_rows)[:limit]
 
     def count_attributions(self) -> int:
         with self.connection() as conn:

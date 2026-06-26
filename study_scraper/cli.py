@@ -359,13 +359,22 @@ def ask(
         ..., help="Keyword(s) to look for inside attribution questions."
     ),
     limit: int = typer.Option(20, "--limit"),
+    dedup: bool = typer.Option(
+        True, "--dedup/--no-dedup",
+        help="Collapse the same finding across studies to one "
+             "confidence-weighted representative (default on).",
+    ),
 ) -> None:
     """Query structured attributions (question, position, %) — the
     llm-v1 answer layer (A21). Richer than `search`: each hit names the
-    question, the stance, and the figure.
+    question, the stance, and the figure. By default duplicates of the
+    same finding are merged; pass --no-dedup to see every raw row.
     """
     storage = _storage_from_settings()
-    rows = storage.search_attributions(query=query, limit=limit)
+    rows = (
+        storage.search_attributions_deduped(query=query, limit=limit)
+        if dedup else storage.search_attributions(query=query, limit=limit)
+    )
     if not rows:
         typer.echo("(no attributions matched — run `attribute` first?)")
         return
@@ -374,6 +383,9 @@ def ask(
         pct_str = f"{float(pct):>5.1f}%" if pct is not None else "   — "
         pos = (row.get("position") or "").ljust(11)
         q = (row.get("question") or "").replace("\n", " ")
+        dup = row.get("dup_count") or 1
+        if dup > 1:
+            q = f"{q}  (+{dup - 1} more)"
         typer.echo(f"{pct_str}  {pos}  {q}")
         title = (row.get("title") or "").replace("\n", " ")
         if len(title) > 70:
