@@ -36,7 +36,8 @@ class TestSchema:
         item = OUTPUT_SCHEMA["properties"]["attributions"]["items"]
         assert item["additionalProperties"] is False
         assert set(item["required"]) == {
-            "question", "position", "percentage", "population", "confidence"
+            "question", "position", "percentage", "population",
+            "confidence", "source_span"
         }
         assert item["properties"]["position"]["enum"] == [
             "support", "oppose", "neutral", "unspecified"
