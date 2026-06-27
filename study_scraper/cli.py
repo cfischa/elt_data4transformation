@@ -658,6 +658,28 @@ def review_reject(
     typer.echo("rejected" if changed else "no change (already rejected or unknown id)")
 
 
+@app.command("eval")
+def eval_cmd(
+    out: Optional[Path] = typer.Option(
+        Path("docs/study_scraper/eval/accuracy.md"), "--out",
+        help="Where to write the markdown report.",
+    ),
+) -> None:
+    """Run the offline accuracy harness over study_scraper/eval/gold/ and
+    write a report. No DB / API needed — scores topic filter, claims, and
+    the attribution parser against gold files. Replace the sample gold with
+    a curated set for a meaningful number (see docs/study_scraper/ACCURACY.md)."""
+    from study_scraper.eval.harness import format_report, run_all
+
+    results = run_all()
+    report = format_report(results)
+    typer.echo(report)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report + "\n", encoding="utf-8")
+        typer.echo(f"\nwrote {out}")
+
+
 @review_app.command("auto")
 def review_auto(
     topic: Optional[str] = typer.Option(None, "--topic"),
