@@ -58,9 +58,9 @@ jobs:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
           set +e  # one failing source must not kill the others
-          for topic in klima migration_einwanderung steuern bildung; do
-            python -m study_scraper run --source ssoar    --topic "$topic" --limit 300
-            python -m study_scraper run --source openalex --topic "$topic" --limit 300
+          for topic in klima atomkraft migration_einwanderung steuern bildung; do
+            python -m study_scraper run --source ssoar    --topic "$topic" --limit 500
+            python -m study_scraper run --source openalex --topic "$topic" --limit 500
           done
           python -m study_scraper ingest --source dawum
           python -m study_scraper ingest --source gesis --limit 500
@@ -89,7 +89,7 @@ jobs:
         env:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
-          python -m study_scraper fulltext --limit 50 || true
+          python -m study_scraper fulltext --limit 150 || true
 
       - name: Status report
         if: steps.gate.outputs.enabled == 'true'
