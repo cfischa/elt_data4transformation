@@ -31,6 +31,9 @@ TOPICS = {t.id: t for t in load_topics(TOPICS_CSV)}
         ("bildung", "Studierende an der Hochschule befragt."),
         ("bildung", "Die Ausbildung junger Menschen."),
         ("steuern", "Die Gewerbesteuer und der Steuersatz steigen."),
+        ("atomkraft", "Umfrage zum Atomausstieg und zur Kernenergie."),
+        ("atomkraft", "Mehrheit lehnt neue Atomkraftwerke ab."),
+        ("atomkraft", "Streit ums Endlager für Atommüll."),
     ],
 )
 def test_inflected_form_now_matches(topic_id: str, text: str) -> None:
@@ -46,6 +49,7 @@ def test_inflected_form_now_matches(topic_id: str, text: str) -> None:
         ("migration_einwanderung", "Datenmigration auf neue Hardware."),
         ("steuern", "Die Steuerung des Prozesses."),
         ("klima", "Das Investitionsklima der Firma."),
+        ("atomkraft", "Geschichte der Atomwaffe im Kalten Krieg."),
     ],
 )
 def test_exclude_keywords_still_short_circuit(topic_id: str, text: str) -> None:
