@@ -21,7 +21,10 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The heavy multi-topic crawl (5 topics x 2 sources + lake) needs well
+    # over an hour; the old 60-min cap cancelled it mid-crawl. Public-repo
+    # Actions minutes are free, so give it ample headroom.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -57,14 +60,17 @@ jobs:
         env:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
-          set +e  # one failing source must not kill the others
+          set +e  # one failing/slow source must not kill the others
+          # Per-command 15-min cap so a single slow source can't eat the
+          # whole budget and starve auto-review/fulltext (exit 124 = timed
+          # out; ignored). Worst case stays comfortably under timeout-minutes.
           for topic in klima atomkraft migration_einwanderung steuern bildung; do
-            python -m study_scraper run --source ssoar    --topic "$topic" --limit 500
-            python -m study_scraper run --source openalex --topic "$topic" --limit 500
+            timeout 900 python -m study_scraper run --source ssoar    --topic "$topic" --limit 400
+            timeout 900 python -m study_scraper run --source openalex --topic "$topic" --limit 400
           done
-          python -m study_scraper ingest --source dawum
-          python -m study_scraper ingest --source gesis --limit 500
-          python -m study_scraper ingest --source eurostat \
+          timeout 600 python -m study_scraper ingest --source dawum
+          timeout 600 python -m study_scraper ingest --source gesis --limit 500
+          timeout 600 python -m study_scraper ingest --source eurostat \
               --code env_air_gge --code nrg_bal_s --code demo_pjan
           exit 0
 
