@@ -62,3 +62,9 @@ jobs:
             issue closes. Otherwise add `agent:changes-requested` and a
             comment listing exactly what must change. Default to NOT merging
             when uncertain.
+
+      - name: Self-healing check — agent must have actually run
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check_agent_result.sh

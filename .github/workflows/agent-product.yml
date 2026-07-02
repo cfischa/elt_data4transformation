@@ -54,3 +54,9 @@ jobs:
             med/low) for the developer agent, and keep docs/study_scraper/
             ROADMAP.md in sync via a normal PR (do NOT push to main; do NOT
             edit .github/** or .claude/**). Be decisive and concise.
+
+      - name: Self-healing check — agent must have actually run
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check_agent_result.sh
