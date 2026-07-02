@@ -29,7 +29,10 @@ class TestLoadTopics:
         repo_root = Path(__file__).resolve().parents[2]
         topics = load_topics(repo_root / "config" / "topics" / "topics.csv")
         ids = {t.id for t in topics}
-        assert ids == {"steuern", "klima", "migration_einwanderung", "bildung"}
+        # Core topics must be present; new topics (e.g. atomkraft,
+        # added 2026-06-28) may join over time.
+        assert {"steuern", "klima", "migration_einwanderung", "bildung",
+                "atomkraft"} <= ids
         for topic in topics:
             assert "de" in topic.locales
             assert "en" in topic.locales

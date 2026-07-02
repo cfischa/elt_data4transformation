@@ -77,7 +77,10 @@ def _candidate_to_study(
     if cand.raw:
         # own openalex_id included so the reference-follower can match
         # "already ingested" works whose canonical_url is a DOI.
-        for key in ("openalex_id", "referenced_works", "related_works"):
+        # landing_page_url / pdf_url feed the fulltext URL fallback for
+        # openalex-canonical studies (fulltext.select_fetch_url).
+        for key in ("openalex_id", "referenced_works", "related_works",
+                    "landing_page_url", "pdf_url"):
             value = cand.raw.get(key)
             if value:
                 provenance_extras[key] = value

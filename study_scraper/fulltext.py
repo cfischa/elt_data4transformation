@@ -186,6 +186,39 @@ def fetch_url(url: str, *, timeout: float = 60.0) -> Tuple[bytes, Optional[str]]
         return resp.content, resp.headers.get("content-type")
 
 
+# openalex.org work pages are bot-protected METADATA pages, never the
+# document — fetching them 403s (seen live 2026-07-02, 7/91 failures).
+_OPENALEX_HOST_RE = re.compile(r"^https?://(www\.)?openalex\.org/", re.I)
+
+
+def select_fetch_url(
+    *,
+    canonical_url: Optional[str],
+    doi: Optional[str] = None,
+    provenance: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[str], str]:
+    """Pick the URL fulltext should actually fetch for a study.
+
+    Returns (url, why). Non-openalex canonical URLs pass through
+    unchanged. For openalex.org URLs we prefer, in order: the work's
+    `pdf_url`, its `landing_page_url` (both captured into provenance at
+    ingest), then the DOI. If nothing fetchable exists, (None,
+    'no_fetchable_url') — callers should mark the study so it leaves
+    the fulltext queue instead of 403-ing forever. Pure; no I/O.
+    """
+    if not canonical_url or not _OPENALEX_HOST_RE.match(canonical_url):
+        return canonical_url, "canonical"
+    prov = provenance or {}
+    for key in ("pdf_url", "landing_page_url"):
+        alt = prov.get(key)
+        if isinstance(alt, str) and alt and not _OPENALEX_HOST_RE.match(alt):
+            return alt, key
+    if doi:
+        url = doi if doi.startswith("http") else f"https://doi.org/{doi}"
+        return url, "doi"
+    return None, "no_fetchable_url"
+
+
 def run_fulltext(
     *,
     storage: PostgresStorage,
@@ -210,7 +243,22 @@ def run_fulltext(
     results: List[Dict[str, Any]] = []
     for row in rows:
         sid = row["id"]
-        url = row["canonical_url"]
+        url, why = select_fetch_url(
+            canonical_url=row.get("canonical_url"),
+            doi=row.get("doi"),
+            provenance=row.get("provenance") or {},
+        )
+        if url is None:
+            # Nothing fetchable (openalex-only work, no DOI/location):
+            # flag it so it leaves the queue instead of erroring forever.
+            storage.mark_unfetchable(sid)
+            results.append({
+                "study_id": sid, "status": "no_fetchable_url", "claims": 0,
+                "canonical_url": row.get("canonical_url"),
+                "resolved_pdf_url": None,
+            })
+            LOGGER.info("fulltext %s: no_fetchable_url", sid[:12])
+            continue
         resolved_pdf: Optional[str] = None
         try:
             content, content_type = fetch_url(url)
@@ -241,7 +289,10 @@ def run_fulltext(
                 "claims": 0,
             }
             LOGGER.warning("fulltext fetch failed for %s: %s", url, exc)
-        summary["canonical_url"] = url
+        summary["canonical_url"] = row.get("canonical_url")
+        # Where we actually fetched from, when it wasn't the canonical URL
+        # (openalex fallback via pdf_url / landing_page_url / DOI).
+        summary["fetch_url"] = url if why != "canonical" else None
         summary["resolved_pdf_url"] = resolved_pdf
         results.append(summary)
         LOGGER.info(

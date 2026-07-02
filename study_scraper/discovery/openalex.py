@@ -233,6 +233,10 @@ class OpenAlexSource:
             raw={
                 "openalex_id": openalex_id,
                 "doi": doi or None,
+                # Fetchable document locations — openalex.org work pages
+                # are bot-protected metadata, so fulltext needs these.
+                "landing_page_url": primary_location.get("landing_page_url"),
+                "pdf_url": primary_location.get("pdf_url"),
                 "type": work.get("type"),
                 "topics": topics_raw,
                 "keywords": keywords_raw,
