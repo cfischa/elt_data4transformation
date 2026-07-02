@@ -56,6 +56,13 @@ itself.
   `pull_request` workflows (GitHub anti-recursion), so the challenger sweeps
   on a schedule and runs tests itself. Worst case is latency (hours), never
   an unverified merge.
+- **Self-healing credential check.** claude-code-action exits 0 even when
+  the model call fails (an expired `CLAUDE_CODE_OAUTH_TOKEN` dies in ~2s
+  with `is_error=true`), which once left the whole team silently dead for
+  days. Every Claude workflow now runs
+  `.github/scripts/check_agent_result.sh` after the agent step: a no-op
+  turns the run RED and files/updates one deduped `needs-human` issue with
+  the exact fix (rotate the token). Silent failure is impossible by design.
 
 ## Cost
 Four scheduled agents + a review sweep every 4h draw on your Claude

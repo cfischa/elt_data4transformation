@@ -52,3 +52,9 @@ jobs:
             `agent:task` (dedupe by a stable title — comment instead of
             duplicating). Do not open issues for healthy runs. Never edit
             code, .github/**, or .claude/**.
+
+      - name: Self-healing check — agent must have actually run
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check_agent_result.sh

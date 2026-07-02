@@ -29,9 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # claude-code-action authenticates GitHub via OIDC — needs id-token: write.
+    # issues: write lets the self-healing check file a needs-human issue
+    # when the OAuth token dies (see .github/scripts/check_agent_result.sh).
     permissions:
       contents: read
       id-token: write
+      issues: write
     env:
       POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
     steps:
@@ -92,6 +95,12 @@ jobs:
               4. python -m study_scraper status  (report the new totals)
             Do not commit anything — the output lives in Postgres. Do not
             invent figures. Keep going until the responses file is applied.
+
+      - name: Self-healing check — agent must have actually run
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check_agent_result.sh
 
       - name: Status report (post)
         if: steps.gate.outputs.enabled == 'true'

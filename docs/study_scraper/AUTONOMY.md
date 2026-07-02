@@ -117,6 +117,8 @@ laptop at all — point it at `POSTGRES_URL` as a Streamlit secret.
 | `prepared statement "…" already exists` | using Transaction pooler (6543) | switch to Session pooler (5432) |
 | attribute step "queue empty" | no claims yet, or all attributed | expected — run a crawl first |
 | attribute fails auth | bad/expired OAuth token | re-run `claude setup-token`, update the secret |
+| agent run RED, `needs-human` ops issue filed | OAuth token expired — the self-healing check (`.github/scripts/check_agent_result.sh`) caught a no-op agent | rotate `CLAUDE_CODE_OAUTH_TOKEN`, re-run, close the issue |
+| agent runs green but do nothing (pre-fix history) | claude-code-action exits 0 even when the model call errors | fixed: every Claude workflow now verifies the execution output and fails loudly |
 | cron never fires | workflow only on a feature branch | merge to `main` (default branch) |
 | one source errors | upstream API hiccup | non-fatal by design; next run retries |
 

@@ -57,3 +57,9 @@ jobs:
             tests; run `python -m pytest tests/study_scraper -o addopts="" -q`
             until green. Open ONE PR labeled `agent:review`, body
             "Closes #<n>" when from an issue. DO NOT merge. One task per run.
+
+      - name: Self-healing check — agent must have actually run
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/check_agent_result.sh
