@@ -680,6 +680,47 @@ def eval_cmd(
         typer.echo(f"\nwrote {out}")
 
 
+@app.command("audit")
+def audit(
+    sample_size: int = typer.Option(
+        20, "--sample-size", help="How many random findings to show."
+    ),
+) -> None:
+    """Accuracy spot-check: print N RANDOM stored attributions with their
+    evidence (source_span, grounded flag, distribution check) and source
+    link, one block each, so a human can mark pass/fail in minutes.
+    Read-only. (ACCURACY.md measurement C.)"""
+    storage = _storage_from_settings()
+    rows = storage.sample_attributions(limit=sample_size)
+    if not rows:
+        typer.echo("(no attributions stored yet — run `attribute` first)")
+        return
+    for i, row in enumerate(rows, start=1):
+        raw = row.get("raw") or {}
+        pct = row.get("percentage")
+        pct_str = f"{float(pct):.1f}%" if pct is not None else "—"
+        grounded = raw.get("grounded")
+        grounded_str = {True: "✓ grounded", False: "✗ UNGROUNDED"}.get(
+            grounded, "— unchecked"
+        )
+        dist = raw.get("distribution_check")
+        dist_str = "  ⚠ distribution>120%" if dist is False else ""
+        conf = row.get("confidence")
+        conf_str = f"{float(conf):.2f}" if conf is not None else "—"
+        typer.echo(f"[{i}] {pct_str}  {row.get('position')}  {row.get('question')}")
+        typer.echo(f"    evidence : {raw.get('source_span') or '(no span recorded)'}")
+        typer.echo(f"    checks   : {grounded_str}  conf={conf_str}{dist_str}")
+        if row.get("population"):
+            typer.echo(f"    population: {row['population']}")
+        typer.echo(f"    source   : [{row.get('source_id')}] {row.get('title')}")
+        typer.echo(f"               {row.get('canonical_url')}")
+        typer.echo("")
+    typer.echo(
+        f"reviewed 0/{len(rows)} — mark each pass/fail; "
+        "ungrounded findings are the priority queue."
+    )
+
+
 @review_app.command("auto")
 def review_auto(
     topic: Optional[str] = typer.Option(None, "--topic"),

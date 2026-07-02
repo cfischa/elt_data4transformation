@@ -788,6 +788,28 @@ class PostgresStorage:
                 cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attributions")
                 return int(cur.fetchone()["c"])
 
+    def sample_attributions(self, *, limit: int = 20) -> List[Dict[str, Any]]:
+        """Random sample of stored attributions with study context, for
+        the `audit` accuracy spot-check (ACCURACY.md measurement C).
+        Excludes rejected studies. Includes `raw` (source_span, grounded,
+        distribution_check live there)."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage,
+                           a.population, a.confidence, a.model, a.raw,
+                           s.title, s.canonical_url, s.source_id
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    WHERE  s.status <> 'rejected'
+                    ORDER  BY random()
+                    LIMIT  %s
+                    """,
+                    (limit,),
+                )
+                return list(cur.fetchall())
+
     def filter_attributions(
         self,
         *,
