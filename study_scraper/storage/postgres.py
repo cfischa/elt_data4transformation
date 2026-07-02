@@ -839,7 +839,7 @@ class PostgresStorage:
                 cur.execute(
                     f"""
                     SELECT a.question, a.position, a.percentage, a.population,
-                           a.confidence, a.model,
+                           a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
                            s.publication_date, s.topic_ids
                     FROM   {SCHEMA}.attributions a

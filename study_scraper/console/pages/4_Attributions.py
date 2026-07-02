@@ -50,6 +50,15 @@ with col_b:
 with col_c:
     topic = st.selectbox("topic", ["(all)"] + topics)
 
+col_d, col_e = st.columns([1, 3])
+with col_d:
+    ungrounded_only = st.checkbox(
+        "ungrounded only",
+        value=False,
+        help="Show only findings whose source_span did NOT verify against "
+             "the source text — the likely-hallucination review queue.",
+    )
+
 limit = st.slider("limit", min_value=10, max_value=500, value=100, step=10)
 
 rows = storage.filter_attributions(
@@ -59,30 +68,58 @@ rows = storage.filter_attributions(
     limit=limit,
 )
 
+if ungrounded_only:
+    rows = [r for r in rows if (r.get("raw") or {}).get("grounded") is False]
+
 st.write(f"showing {len(rows)} finding(s)")
 if not rows:
     st.info("No attributions match the current filters.")
     st.stop()
 
-# Compact table view. Percentage formatted; source kept as a link column.
-table = [
-    {
+
+def _grounded_badge(raw: dict) -> str:
+    g = raw.get("grounded")
+    if g is True:
+        return "✓"
+    if g is False:
+        return "✗"
+    return "—"  # not checked (no source text at parse time)
+
+
+# Compact table view with the trust signals (source_span evidence,
+# grounded badge, distribution warning) so accuracy is auditable by eye.
+table = []
+for r in rows:
+    raw = r.get("raw") or {}
+    table.append({
         "%": (f"{float(r['percentage']):.0f}" if r.get("percentage") is not None else "—"),
         "position": r.get("position"),
         "question": r.get("question"),
+        "grounded": _grounded_badge(raw),
+        "⚠": "⚠" if raw.get("distribution_check") is False else "",
+        "evidence (source_span)": raw.get("source_span") or "",
         "population": r.get("population") or "",
         "confidence": (f"{float(r['confidence']):.2f}" if r.get("confidence") is not None else ""),
+        "dups": r.get("dup_count") or "",
         "source": r.get("source_id"),
         "study": r.get("title"),
         "url": r.get("canonical_url"),
-    }
-    for r in rows
-]
+    })
 st.dataframe(
     table,
     use_container_width=True,
     hide_index=True,
-    column_config={"url": st.column_config.LinkColumn("url")},
+    column_config={
+        "url": st.column_config.LinkColumn("url"),
+        "grounded": st.column_config.TextColumn(
+            "grounded",
+            help="✓ span verified in source · ✗ NOT found (likely "
+                 "hallucination, confidence capped) · — not checked",
+        ),
+        "⚠": st.column_config.TextColumn(
+            "⚠", help="positions for this question sum to >120%",
+        ),
+    },
 )
 
 st.caption(
