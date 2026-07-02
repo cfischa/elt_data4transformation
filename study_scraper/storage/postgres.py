@@ -549,16 +549,39 @@ class PostgresStorage:
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    SELECT id, canonical_url, title, raw_artifact_ref
+                    SELECT id, canonical_url, title, raw_artifact_ref,
+                           doi, provenance
                     FROM   {SCHEMA}.studies
                     WHERE  status = 'kept'
                       {artifact_clause}
+                      AND  NOT COALESCE(
+                               (provenance->>'no_fetchable_url')::boolean,
+                               false)
                     ORDER  BY fetched_at DESC
                     LIMIT  %s
                     """,
                     (limit,),
                 )
                 return list(cur.fetchall())
+
+    def mark_unfetchable(self, study_id: str) -> bool:
+        """Flag a study as having no fetchable document URL (e.g. an
+        openalex-only work with no DOI/location). Merged into provenance
+        jsonb; `list_studies_for_fulltext` then skips it, so the queue
+        can't 403 on the same study forever. True if updated."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET provenance = COALESCE(provenance, '{{}}'::jsonb) "
+                    f"       || jsonb_build_object('no_fetchable_url', true), "
+                    f"       updated_at = now() "
+                    f" WHERE id = %s",
+                    (study_id,),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
 
     # ------------------------------------------------------------------
     # Claims (Phase 6-mini)
