@@ -257,8 +257,11 @@ class OpenAlexSource:
 def _build_search_query(topic: Topic) -> str:
     """Build a `search` parameter from the topic's include + synonym terms.
 
-    OpenAlex's `search` is a simple full-text match; we OR-join the
-    terms with spaces, which OpenAlex treats as a relevance query.
+    OpenAlex combines space-separated search terms with **AND** — a
+    space-joined keyword list demands a document match ALL terms at once,
+    which returned seen=0 on live runs (issue #26, observed 2026-07-02).
+    Terms must be OR-joined explicitly; multi-word terms are quoted so
+    their words stay one phrase.
     """
     terms: List[str] = []
     seen: set[str] = set()
@@ -268,10 +271,13 @@ def _build_search_query(topic: Topic) -> str:
             if not key or key in seen:
                 continue
             seen.add(key)
-            terms.append(term.strip())
+            cleaned = term.strip()
+            if " " in cleaned:
+                cleaned = f'"{cleaned}"'
+            terms.append(cleaned)
     # Cap to keep URL length sane — most relevant signal is in the first
     # half-dozen terms anyway.
-    return " ".join(terms[:8])
+    return " OR ".join(terms[:8])
 
 
 def _reconstruct_abstract(idx: Optional[Dict[str, List[int]]]) -> Optional[str]:
