@@ -135,6 +135,15 @@ class TestHelpers:
             for kw in ["Klimaschutz", "Energiewende", "Klimawandel", "CO2"]
         )
 
+    def test_build_search_query_or_joins_terms(self, klima) -> None:
+        # OpenAlex ANDs space-separated terms; a keyword list must be
+        # OR-joined or live queries return ~zero results (issue #26).
+        q = _build_search_query(klima)
+        assert " OR " in q
+        for chunk in q.split(" OR "):
+            # multi-word terms must be quoted phrases, not bare AND-words
+            assert " " not in chunk or chunk.startswith('"'), chunk
+
     def test_reconstruct_abstract_handles_none(self) -> None:
         assert _reconstruct_abstract(None) is None
         assert _reconstruct_abstract({}) is None
