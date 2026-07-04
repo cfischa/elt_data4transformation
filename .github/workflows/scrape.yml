@@ -21,10 +21,10 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    # The heavy multi-topic crawl (5 topics x 2 sources + lake) needs well
-    # over an hour; the old 60-min cap cancelled it mid-crawl. Public-repo
-    # Actions minutes are free, so give it ample headroom.
-    timeout-minutes: 180
+    # The heavy multi-topic crawl (8 topics x 2 sources + lake) needs
+    # headroom: worst case with per-command 15-min caps is ~4h+. Typical
+    # runs finish in <30 min; public-repo Actions minutes are free.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -61,10 +61,14 @@ jobs:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
           set +e  # one failing/slow source must not kill the others
+          # Topics come from config/topics/topics.csv — adding a topic row
+          # auto-adds it to the crawl, no workflow edit needed.
+          TOPICS=$(python -c "from study_scraper.config import get_settings; from study_scraper.topics import load_topics; print(' '.join(t.id for t in load_topics(get_settings().topics_csv_path)))")
+          echo "crawling topics: $TOPICS"
           # Per-command 15-min cap so a single slow source can't eat the
           # whole budget and starve auto-review/fulltext (exit 124 = timed
           # out; ignored). Worst case stays comfortably under timeout-minutes.
-          for topic in klima atomkraft migration_einwanderung steuern bildung; do
+          for topic in $TOPICS; do
             timeout 900 python -m study_scraper run --source ssoar    --topic "$topic" --limit 400
             timeout 900 python -m study_scraper run --source openalex --topic "$topic" --limit 400
           done
