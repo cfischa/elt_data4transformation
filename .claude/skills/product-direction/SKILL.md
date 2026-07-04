@@ -48,7 +48,13 @@ gh label create needs-human   --color d93f0b --description "Requires a human dec
    `agent:task` issue with a `priority:*` label and a short, testable
    acceptance criterion. Don't flood — at most a few high-value tasks per
    run; prefer updating existing ones.
-7. **Sync the roadmap.** Update `docs/study_scraper/ROADMAP.md` (create if
+7. **Scout new sources (each run).** WebSearch for German data
+   platforms we don't cover yet (e.g. 'offene Daten Umfrage Deutschland
+   API <topic>', 'Meinungsforschung Datensatz frei'). Vet 1–2 candidates
+   — free? structured? licence? — and add promising ones to the ROADMAP
+   source plan or file an `agent:task`. Coverage breadth is a standing
+   product goal.
+8. **Sync the roadmap.** Update `docs/study_scraper/ROADMAP.md` (create if
    missing) on a branch and open a normal PR (label `agent:review` so the
    challenger merges it). NEVER push to main.
 
