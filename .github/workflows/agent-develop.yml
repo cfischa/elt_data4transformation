@@ -34,14 +34,20 @@ jobs:
         id: gate
         env:
           TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APIKEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          [ -z "$TOKEN" ] && echo "enabled=false" >> "$GITHUB_OUTPUT" || echo "enabled=true" >> "$GITHUB_OUTPUT"
-          [ -z "$TOKEN" ] && echo "CLAUDE_CODE_OAUTH_TOKEN not set; skipping." || true
+          if [ -z "$TOKEN" ] && [ -z "$APIKEY" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No Claude credential (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY); skipping."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Run developer agent
         if: steps.gate.outputs.enabled == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill"'
           prompt: |
             You are the DEVELOPER agent for the study-scraper project.
