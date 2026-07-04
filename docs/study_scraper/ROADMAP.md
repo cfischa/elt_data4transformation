@@ -36,7 +36,7 @@ installs/curation · **[done]** shipped.
    refetch, store `ETag`/`Last-Modified` and send conditional GETs
    (304 → skip). Standard incremental-crawl practice.
 
-## Answer-layer statistics — correctness upgrades (audited 2026-07-04)
+## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
 A. **Population in dedup identity** **[done 2026-07-04]** — same
    question+% among different populations no longer merge.
@@ -71,7 +71,7 @@ statistics breadth*. Ranked by yield per effort:
 7. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
-8. **Domain-audit source discovery** (issue #37) **[now]** — Phase 5d:
+8. **Domain-audit source discovery** (issue #38) **[now]** — Phase 5d:
    walk stored study/reference URLs, group unknown domains, surface them
    as candidate sources (report + dock list). Plus: the product agent now
    scouts via WebSearch each run.
