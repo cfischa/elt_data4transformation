@@ -386,7 +386,9 @@ def ask(
         dup = row.get("dup_count") or 1
         if dup > 1:
             q = f"{q}  (+{dup - 1} more)"
-        typer.echo(f"{pct_str}  {pos}  {q}")
+        pub = row.get("publication_date")
+        year = f" [{pub.year}]" if pub else ""
+        typer.echo(f"{pct_str}  {pos}  {q}{year}")
         title = (row.get("title") or "").replace("\n", " ")
         if len(title) > 70:
             title = title[:67] + "..."

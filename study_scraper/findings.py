@@ -29,9 +29,17 @@ def dedup_finding_key(
     question: Optional[str],
     position: Optional[str],
     percentage: Optional[float],
-) -> Tuple[str, str, Optional[int]]:
+    population: Optional[str] = None,
+) -> Tuple[str, str, Optional[int], str]:
     """Identity of a finding for dedup. Percentage rounds to the nearest
-    whole point so 61.6% and 62% collapse; None stays distinct."""
+    whole point so 61.6% and 62% collapse; None stays distinct.
+
+    `population` is part of the identity: the same question+% among
+    "Ostdeutsche" and among "Wahlberechtigte ab 18" are DIFFERENT
+    findings and must not merge (statistical-correctness fix,
+    2026-07-04). None/blank populations normalize to "" so unlabeled
+    findings still dedup against each other.
+    """
     pos = (position or "unspecified").strip().lower()
     pct: Optional[int]
     if percentage is None:
@@ -41,7 +49,8 @@ def dedup_finding_key(
             pct = int(round(float(percentage)))
         except (TypeError, ValueError):
             pct = None
-    return (_norm_question(question), pos, pct)
+    pop = re.sub(r"\s+", " ", (population or "").lower()).strip()
+    return (_norm_question(question), pos, pct, pop)
 
 
 def _confidence(row: Dict[str, Any]) -> float:
@@ -75,13 +84,14 @@ def dedupe_attributions(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     Input order of distinct findings is preserved (first appearance wins
     the slot), so an already-sorted list stays sorted.
     """
-    best: Dict[Tuple[str, str, Optional[int]], Dict[str, Any]] = {}
-    counts: Dict[Tuple[str, str, Optional[int]], int] = {}
-    order: List[Tuple[str, str, Optional[int]]] = []
+    best: Dict[Tuple[str, str, Optional[int], str], Dict[str, Any]] = {}
+    counts: Dict[Tuple[str, str, Optional[int], str], int] = {}
+    order: List[Tuple[str, str, Optional[int], str]] = []
 
     for row in rows:
         key = dedup_finding_key(
-            row.get("question"), row.get("position"), row.get("percentage")
+            row.get("question"), row.get("position"),
+            row.get("percentage"), row.get("population"),
         )
         counts[key] = counts.get(key, 0) + 1
         if key not in best:

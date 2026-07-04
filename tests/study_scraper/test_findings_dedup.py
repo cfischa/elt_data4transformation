@@ -15,7 +15,7 @@ def _row(q, pos, pct, conf, grounded=None, title="t"):
 
 def test_key_rounds_percentage_to_whole_point() -> None:
     assert dedup_finding_key("Q", "support", 61.6) == dedup_finding_key("Q", "support", 62.0)
-    assert dedup_finding_key("Q", "support", 62) == ("q", "support", 62)
+    assert dedup_finding_key("Q", "support", 62) == ("q", "support", 62, "")
 
 
 def test_key_normalizes_question_whitespace_case() -> None:
@@ -74,3 +74,23 @@ def test_dedupe_grounded_breaks_confidence_tie() -> None:
 
 def test_empty_input() -> None:
     assert dedupe_attributions([]) == []
+
+
+def test_different_populations_do_not_merge() -> None:
+    # Statistical correctness: same question+% among different populations
+    # are DIFFERENT findings (e.g. East vs West Germany).
+    rows = [
+        {**_row("Tempolimit", "support", 60, 0.8), "population": "Ostdeutsche"},
+        {**_row("Tempolimit", "support", 60, 0.9), "population": "Westdeutsche"},
+    ]
+    out = dedupe_attributions(rows)
+    assert len(out) == 2
+
+
+def test_blank_and_none_population_still_merge() -> None:
+    rows = [
+        {**_row("Q", "support", 50, 0.6), "population": None},
+        {**_row("Q", "support", 50, 0.9), "population": "  "},
+    ]
+    out = dedupe_attributions(rows)
+    assert len(out) == 1 and out[0]["confidence"] == 0.9

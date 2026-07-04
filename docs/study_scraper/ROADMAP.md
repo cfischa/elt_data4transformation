@@ -36,6 +36,24 @@ installs/curation · **[done]** shipped.
    refetch, store `ETag`/`Last-Modified` and send conditional GETs
    (304 → skip). Standard incremental-crawl practice.
 
+## Answer-layer statistics — correctness upgrades (audited 2026-07-04)
+
+A. **Population in dedup identity** **[done 2026-07-04]** — same
+   question+% among different populations no longer merge.
+B. **Recency-aware answers** **[now, small]** — `ask` now shows the year;
+   next: order deduped findings by publication_date (newest first) on
+   confidence ties, and let `ask --since 2024` filter stale polls.
+C. **Sample-size context** **[now, small]** — we extract `n=` claims but
+   don't attach them to findings; join the study's sample-size claim to
+   its attributions so answers can show "(n=1004, 2026)".
+D. **Poll-of-polls aggregation** **[larger]** — a real "what does Germany
+   think about X" answer aggregates across institutes: recency- and
+   sample-size-weighted average per (question-cluster, position) with a
+   spread indicator, instead of a list of single findings.
+E. **Semantic question clustering** **[larger, embeddings]** — 'Atomausstieg
+   rückgängig machen' and 'return to nuclear power' should cluster; lexical
+   ILIKE misses them. Prereq for D at scale.
+
 ## Source-coverage plan — toward a representative platform
 
 Current coverage: **catalog** SSOAR + OpenAlex (academic); **lake** DAWUM
@@ -53,7 +71,11 @@ statistics breadth*. Ranked by yield per effort:
 7. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
-8. **Polling-institute press releases** **[now, larger]** — Forsa, INSA,
+8. **Domain-audit source discovery** (issue #37) **[now]** — Phase 5d:
+   walk stored study/reference URLs, group unknown domains, surface them
+   as candidate sources (report + dock list). Plus: the product agent now
+   scouts via WebSearch each run.
+9. **Polling-institute press releases** **[now, larger]** — Forsa, INSA,
    infratest dimap (ARD-DeutschlandTrend), Allensbach, YouGov DE, Civey
    publish issue-polls as HTML/PDF press pages. One config-driven
    `SitemapSource` (per-publisher YAML: sitemap/listing URL + selectors),
