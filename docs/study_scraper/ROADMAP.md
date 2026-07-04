@@ -12,49 +12,95 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-1. **Spot-check CLI** — `study_scraper audit --sample-size N`: print N
-   random stored attributions with their `source_span`, `grounded`,
-   `dup_count`, and source URL, for weekly manual accuracy review
-   (ACCURACY.md measurement C). Storage helper + CLI + test.
-2. **Surface provenance in the dock Attributions page** — show
-   `source_span` (the verbatim quote), a `grounded` ✓/✗ badge, the
-   `distribution_check` flag, and `dup_count`. Console-only; page-compile
-   test. Makes accuracy auditable by eye.
-3. **HTTP robustness** — wrap the source HTTP clients (ssoar, openalex,
-   fulltext fetch) in `tenacity` retry + exponential backoff, and honour
-   HTTP 429. One small helper reused across sources; unit-test the retry
-   policy with a mock transport. Production resilience.
-4. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
+1. **HTTP resilience** (issue #32) — shared fetch helper for all source
+   clients + fulltext: `tenacity` retries with exponential backoff and
+   jitter, honour 429/503 `Retry-After`, and a small per-domain politeness
+   delay in the fulltext loop (we currently burst dozens of PDFs at
+   ssoar.info with no delay and no retry anywhere). Unit-test the policy
+   with a mock transport.
+2. **CI artifact-path bug** (issue #33) — `fulltext` saves PDFs to the
+   Actions runner's local disk and writes that path into
+   `studies.raw_artifact_ref`; the runner dies after the job, so the path
+   dangles. Text + claims are safely in Postgres — the dangling ref only
+   breaks refetch/reading-list assumptions. Make artifact storage
+   CI-aware (skip local persist + leave ref NULL, or store bytes in
+   Supabase storage) and re-queue accordingly.
+3. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
    `env_air_gge` (and `nrg_bal_s`) lake payloads into typed rows
-   (geo, year, value), like the existing `dawum_poll_results` view, so the
-   numbers are queryable. Migration + a view smoke check.
+   (geo, year, value), like `dawum_poll_results`, so the numbers are
+   queryable. Migration + a view smoke check.
+4. **Incremental harvesting** (issue #34) — SSOAR OAI supports
+   `from=`/`until=`; store the last successful harvest timestamp per
+   (source, topic) (derivable from `crawl_runs`) and pass it, instead of
+   re-walking the same 400 newest records every run. For fulltext
+   refetch, store `ETag`/`Last-Modified` and send conditional GETs
+   (304 → skip). Standard incremental-crawl practice.
 
-## P2 — next (still [now])
+## Source-coverage plan — toward a representative platform
 
-5. **BASE source** — OAI-PMH academic index; reuse the SSOAR OAI parser,
-   new source id `base`. Fixture + unit tests (no live call in CI).
-6. **F2 attribution → claim lineage** — add `claim_id` FK on
-   `attributions` (migration) and thread the claim id through so each
-   triple links to the exact claim row (deeper than `source_span`).
-7. **Distribution-warning surfacing** — in `ask` / the dock, flag findings
-   whose `raw.distribution_check is False` so impossible splits are visible.
-8. **Domain-audit discovery (Phase 5d)** — from stored study URLs, group
-   by domain and list domains we have no source for as candidate sources
-   (read-only report + a dock list). Pure aggregation; testable.
+Current coverage: **catalog** SSOAR + OpenAlex (academic); **lake** DAWUM
+(vote intention), GESIS KG (survey catalog), Eurostat (official stats).
+The representativeness gaps are *issue-opinion* data and *official
+statistics breadth*. Ranked by yield per effort:
 
-## P3 — needs the maintainer ([needs-human])
+5. **Eurobarometer** (issue #35) **[now]** — the EU Commission's
+   standing opinion survey; free, structured, includes Germany, directly
+   answers "what do people think about X". Lake source; data via the EC
+   open-data portal / GESIS mirrors.
+6. **Bundestag DIP API** **[needs-human: free API key by email]** —
+   parliamentary documents (Drucksachen/Plenarprotokolle) frequently cite
+   polling; structured JSON REST. Catalog-style source.
+7. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
+   reuses the SSOAR OAI parser almost verbatim; widens the catalog far
+   beyond SSOAR. Fixture + unit tests, no live call in CI.
+8. **Polling-institute press releases** **[now, larger]** — Forsa, INSA,
+   infratest dimap (ARD-DeutschlandTrend), Allensbach, YouGov DE, Civey
+   publish issue-polls as HTML/PDF press pages. One config-driven
+   `SitemapSource` (per-publisher YAML: sitemap/listing URL + selectors),
+   feeding the existing PDF/fulltext + attribution machinery (A20/A21
+   unblocked this tier). This is the single biggest issue-opinion win.
+9. **Destatis GENESIS** **[needs-human: registration]** — official
+   statistics REST API; scaffold + `from_file` tests buildable now.
+10. **UBA / BAMF structured downloads** **[needs-human: sample files]** —
+    XLSX/CSV lake sources.
+11. **GESIS microdata (ALLBUS, Politbarometer)** **[needs-human:
+    account/licences]** — the deepest issue-opinion source; revisit after
+    the free tiers are exhausted.
+12. *(skip)* wahlrecht.de — vote-intention aggregation duplicates DAWUM.
 
-9. **Destatis GENESIS source** — REST API, free registration. Scaffold +
-   `from_file` tests buildable now; live needs a credential secret.
-10. **UBA / BAMF structured downloads** — XLSX/CSV lake sources; need real
-    sample files to pin the parser.
-11. **Gold set + eval wiring** — replace the sample gold in
+## Production craft — patterns from mature scrapers (investigated 2026-07-04)
+
+Adopted checklist from incremental-crawl / scraping best practice
+(conditional GET, fingerprinting, politeness — see AGENTS/ACCURACY docs
+for our verification layers):
+
+- **Fetch only what changed**: conditional GET (ETag/Last-Modified → 304)
+  and content-hash fingerprints; we already hash payloads for idempotent
+  upserts, but we re-download everything — item 4 closes this.
+- **Politeness & backoff**: jittered delays, exponential backoff on
+  429/503, robots.txt as a floor — item 1 closes this.
+- **Two-layer bookkeeping**: "already scheduled" keys vs response metadata
+  (etag, last fetch, checksum) — falls out of items 1+4.
+- **Measure waste**: track duplicate rate / bytes fetched vs kept per run
+  (extend `status --json`) so crawl spend is visible. **[now, small]**
+- **Config-driven crawling**: topics now flow from `topics.csv` into the
+  scheduled crawl automatically (done 2026-07-04); move the Eurostat code
+  list into config too. **[now, small]**
+
+## P3 — other [needs-human]
+
+13. **Gold set + eval wiring** — replace the sample gold in
     `study_scraper/eval/gold/` with ~50 curated studies + ~40 tagged
     titles, then the harness reports a real accuracy number.
-12. **spaCy lemmatization** (full German morphology) and **OCR** for
+14. **spaCy lemmatization** (full German morphology) and **OCR** for
     scanned PDFs — both need host installs.
 
 ## Done (recent)
 - PDF resolver, dock Attributions + Sources pages, auto-reviewer,
-  cross-finding dedup, accuracy F1/F3/F4/F5/F6, eval harness scaffold,
-  `atomkraft` topic. See ACCURACY.md / TODO.md.
+  cross-finding dedup, accuracy F1/F3/F4/F5/F6, eval harness scaffold.
+- Agent tasks #20 (audit CLI), #21 (dock trust signals), #25 (openalex
+  403 fulltext fallback), #26 root cause (OpenAlex OR-joins) — PRs #27–#30.
+- Self-healing: no-op detection, RED runs, auto-filed/auto-closed ops
+  ticket, ANTHROPIC_API_KEY alternative credential (PRs #23, #31).
+- Topics: `atomkraft`, `wohnen`, `rente`, `verteidigung`; crawl topic list
+  now derived from topics.csv.

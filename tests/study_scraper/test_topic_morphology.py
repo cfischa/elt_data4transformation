@@ -34,6 +34,12 @@ TOPICS = {t.id: t for t in load_topics(TOPICS_CSV)}
         ("atomkraft", "Umfrage zum Atomausstieg und zur Kernenergie."),
         ("atomkraft", "Mehrheit lehnt neue Atomkraftwerke ab."),
         ("atomkraft", "Streit ums Endlager für Atommüll."),
+        ("wohnen", "Umfrage: Mietpreisbremse und Wohnungsnot in Großstädten."),
+        ("wohnen", "Der Wohnungsmarkt bleibt angespannt."),
+        ("rente", "Mehrheit gegen höheres Rentenalter, für Aktienrente."),
+        ("rente", "Altersvorsorge und Altersarmut im Vergleich."),
+        ("verteidigung", "Zustimmung zur Wehrpflicht wächst laut Umfrage."),
+        ("verteidigung", "Verteidigungsausgaben und Bundeswehr im Fokus."),
     ],
 )
 def test_inflected_form_now_matches(topic_id: str, text: str) -> None:
@@ -50,6 +56,9 @@ def test_inflected_form_now_matches(topic_id: str, text: str) -> None:
         ("steuern", "Die Steuerung des Prozesses."),
         ("klima", "Das Investitionsklima der Firma."),
         ("atomkraft", "Geschichte der Atomwaffe im Kalten Krieg."),
+        ("rente", "Rentenfonds: Anleihen im Portfolio."),
+        ("verteidigung", "Titelverteidigung beim Pokalfinale."),
+        ("wohnen", "Autovermietung am Flughafen."),
     ],
 )
 def test_exclude_keywords_still_short_circuit(topic_id: str, text: str) -> None:
@@ -59,4 +68,5 @@ def test_exclude_keywords_still_short_circuit(topic_id: str, text: str) -> None:
 
 
 def test_all_four_topics_present() -> None:
-    assert {"klima", "steuern", "bildung", "migration_einwanderung"} <= set(TOPICS)
+    assert {"klima", "steuern", "bildung", "migration_einwanderung",
+            "atomkraft", "wohnen", "rente", "verteidigung"} <= set(TOPICS)
