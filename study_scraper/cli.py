@@ -124,9 +124,14 @@ def run(
         ctx = SSOARSource(from_file=from_file)
     elif source == "openalex":
         ctx = OpenAlexSource(from_file=from_file)
+    elif source == "bundestag_dip":
+        from study_scraper.discovery.bundestag_dip import BundestagDIPSource
+
+        ctx = BundestagDIPSource(from_file=from_file)
     else:
         raise typer.BadParameter(
-            f"unknown source {source!r}; supported: ssoar, openalex"
+            f"unknown source {source!r}; supported: ssoar, openalex, "
+            f"bundestag_dip"
         )
     topic_obj = _load_topic(topic)
     storage = _storage_from_settings()
@@ -697,6 +702,30 @@ def dossier(
 
     storage = _storage_from_settings()
     text = build_dossier(storage, query, since=since)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
+@app.command("policy-gap")
+def policy_gap(
+    topic: str = typer.Option(..., "--topic", help="Topic id from topics.csv."),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown report here (else stdout)."
+    ),
+) -> None:
+    """Opinion–policy gap: what the polls say on a topic next to what
+    the Bundestag is doing on it (DIP Drucksachen). The flagship
+    democratic-accountability view — strong majorities with no
+    parliamentary activity (or activity against the majority) are the
+    gaps."""
+    from study_scraper.dossier import build_policy_gap_report
+
+    storage = _storage_from_settings()
+    text = build_policy_gap_report(storage, topic=topic)
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8")

@@ -146,6 +146,85 @@ def build_dossier(
     return "\n".join(lines) + "\n"
 
 
+def build_policy_gap_report(
+    storage: Any,
+    *,
+    topic: str,
+    today: Optional[_dt.date] = None,
+) -> str:
+    """Opinion–policy gap (flagship, product Axis 4): juxtapose what
+    the polls say on a topic with what parliament is doing on it.
+
+    Opinion half: the topic's aggregated question clusters. Parliament
+    half: ingested Bundestag DIP Drucksachen on the topic, newest
+    first. v1 is a juxtaposition, not a per-question join — question →
+    bill matching needs richer DIP coverage first; the renderer makes
+    the pairing a human judgement with both halves on one page.
+    """
+    today = today or _dt.date.today()
+    lines: List[str] = [f"# Opinion–policy gap: `{topic}`", ""]
+
+    raw = storage.filter_attributions(topic=topic, limit=1000)
+    rows = dedupe_attributions(raw)
+    answers = aggregate_findings(rows, today=today)
+
+    lines.append("## What the polls say")
+    lines.append("")
+    if not answers:
+        lines.append("_(no aggregated findings for this topic yet — run the")
+        lines.append("pipeline through `attribute`)_")
+    else:
+        for a in answers[:15]:
+            lines.append(f"**{a.label}**")
+            for p in a.positions:
+                lines.append(
+                    f"- {p.position}: **{p.weighted_pct:.1f}%** "
+                    f"({p.n_findings} poll{'s' if p.n_findings != 1 else ''}"
+                    + (
+                        f", {p.year_min}–{p.year_max}"
+                        if p.year_min and p.year_min != p.year_max
+                        else (f", {p.year_max}" if p.year_max else "")
+                    )
+                    + ")"
+                )
+            lines.append("")
+
+    lines.append("## What parliament is doing")
+    lines.append("")
+    docs = storage.list_studies(
+        topic_id=topic, source_id="bundestag_dip", limit=30
+    )
+    if not docs:
+        lines.append("_(no Bundestag DIP documents ingested for this topic —")
+        lines.append("run `run --source bundestag_dip --topic " + topic + "`)_")
+    else:
+        docs.sort(
+            key=lambda d: d.get("publication_date") or _dt.date.min,
+            reverse=True,
+        )
+        for d in docs:
+            prov = d.get("provenance") or {}
+            typ = prov.get("drucksachetyp") or "Drucksache"
+            nr = prov.get("dokumentnummer")
+            nr_str = f" {nr}" if nr else ""
+            title = (d.get("title") or "").replace("\n", " ")
+            lines.append(
+                f"- **{typ}{nr_str}** ({_fmt_year(d.get('publication_date'))}, "
+                f"{d.get('publisher') or 'Deutscher Bundestag'}): {title}  "
+            )
+            lines.append(f"  <{d.get('canonical_url')}>")
+        lines.append("")
+
+    lines.append("---")
+    lines.append(
+        "_Read the two halves together: strong majorities with no "
+        "parliamentary activity, or activity against the majority, are "
+        "the gaps. Aggregation method as in the dossier; both halves "
+        "carry provenance links._"
+    )
+    return "\n".join(lines) + "\n"
+
+
 def build_gap_report(
     storage: Any,
     *,

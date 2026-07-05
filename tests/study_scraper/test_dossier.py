@@ -5,7 +5,11 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, List, Optional
 
-from study_scraper.dossier import build_dossier, build_gap_report
+from study_scraper.dossier import (
+    build_dossier,
+    build_gap_report,
+    build_policy_gap_report,
+)
 
 TODAY = datetime.date(2026, 7, 1)
 
@@ -21,8 +25,15 @@ def _finding(q, pos, pct, *, date=None, n=None, publisher="Forsa",
 
 
 class FakeStorage:
-    def __init__(self, findings: List[Dict[str, Any]]) -> None:
+    def __init__(self, findings: List[Dict[str, Any]],
+                 dip_docs: Optional[List[Dict[str, Any]]] = None) -> None:
         self.findings = findings
+        self.dip_docs = dip_docs or []
+
+    def list_studies(self, *, topic_id=None, source_id=None, status="kept",
+                     limit=100):
+        assert source_id == "bundestag_dip"
+        return list(self.dip_docs)
 
     def search_attributions_deduped(self, *, query: str, limit: int = 500,
                                     since: Optional[int] = None):
@@ -126,3 +137,36 @@ class TestGapReport:
         ])
         md = build_gap_report(store, today=TODAY)
         assert "## Topic: `klima`" in md and "## Topic: `rente`" in md
+
+
+class TestPolicyGap:
+    def _dip_doc(self, title, *, typ="Antrag", nr="21/4521",
+                 date_=datetime.date(2025, 11, 12)):
+        return {
+            "title": title, "publisher": "Fraktion X",
+            "publication_date": date_,
+            "canonical_url": "https://dserver.bundestag.de/btd/x.pdf",
+            "provenance": {"drucksachetyp": typ, "dokumentnummer": nr},
+        }
+
+    def test_juxtaposes_opinion_and_parliament(self) -> None:
+        store = FakeStorage(
+            [_finding("Stricter climate laws", "support", 62,
+                      date=datetime.date(2025, 6, 1))],
+            dip_docs=[self._dip_doc("Klimaschutzgesetz konsequent umsetzen")],
+        )
+        md = build_policy_gap_report(store, topic="klima", today=TODAY)
+        assert "# Opinion–policy gap: `klima`" in md
+        assert "## What the polls say" in md
+        assert "support: **62.0%**" in md
+        assert "## What parliament is doing" in md
+        assert "**Antrag 21/4521** (2025, Fraktion X)" in md
+        assert "dserver.bundestag.de" in md
+
+    def test_empty_halves_have_hints(self) -> None:
+        md = build_policy_gap_report(
+            FakeStorage([], dip_docs=[]), topic="rente", today=TODAY
+        )
+        assert "no aggregated findings" in md
+        assert "no Bundestag DIP documents" in md
+        assert "run `run --source bundestag_dip --topic rente`" in md
