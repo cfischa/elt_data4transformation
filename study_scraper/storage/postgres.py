@@ -747,9 +747,29 @@ class PostgresStorage:
         return len(rows)
 
     def search_attributions(
-        self, *, query: str, limit: int = 50
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """ILIKE search over attribution questions; joins study context."""
+        """ILIKE search over attribution questions; joins study context.
+
+        Each row carries `sample_size` — the study's representative n=
+        claim (ROADMAP item C): the most frequent plausible sample-size
+        value extracted from that study, largest on ties. NULL when the
+        study has no n= claim.
+
+        `since` (ROADMAP item B) keeps only findings whose study was
+        published in that year or later; studies with an unknown
+        publication date are excluded when the filter is active (an
+        undatable poll can't be shown as "recent").
+        """
+        since_clause = ""
+        params: List[Any] = [f"%{query.lower()}%"]
+        if since is not None:
+            since_clause = (
+                "AND s.publication_date IS NOT NULL "
+                "AND EXTRACT(YEAR FROM s.publication_date) >= %s"
+            )
+            params.append(since)
+        params.append(limit)
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -757,21 +777,32 @@ class PostgresStorage:
                     SELECT a.question, a.position, a.percentage, a.population,
                            a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
-                           s.publication_date
+                           s.publication_date, n.sample_size
                     FROM   {SCHEMA}.attributions a
                     JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    LEFT JOIN LATERAL (
+                        SELECT c.numeric_value AS sample_size
+                        FROM   {SCHEMA}.claims c
+                        WHERE  c.study_id = s.id
+                          AND  c.unit = 'n'
+                          AND  c.numeric_value BETWEEN 30 AND 10000000
+                        GROUP  BY c.numeric_value
+                        ORDER  BY COUNT(*) DESC, c.numeric_value DESC
+                        LIMIT  1
+                    ) n ON TRUE
                     WHERE  lower(a.question) LIKE %s
                       AND  s.status <> 'rejected'
+                      {since_clause}
                     ORDER  BY a.percentage DESC NULLS LAST,
                               s.publication_date DESC NULLS LAST
                     LIMIT  %s
                     """,
-                    (f"%{query.lower()}%", limit),
+                    params,
                 )
                 return list(cur.fetchall())
 
     def search_attributions_deduped(
-        self, *, query: str, limit: int = 50
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Like `search_attributions` but collapses the same finding seen
         across multiple studies to one confidence-weighted representative
@@ -779,7 +810,9 @@ class PostgresStorage:
         untouched. Fetches a wider window first so dedup has material."""
         from study_scraper.findings import dedupe_attributions
 
-        raw_rows = self.search_attributions(query=query, limit=max(limit * 5, 200))
+        raw_rows = self.search_attributions(
+            query=query, limit=max(limit * 5, 200), since=since
+        )
         return dedupe_attributions(raw_rows)[:limit]
 
     def count_attributions(self) -> int:

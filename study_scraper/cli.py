@@ -364,6 +364,11 @@ def ask(
         help="Collapse the same finding across studies to one "
              "confidence-weighted representative (default on).",
     ),
+    since: Optional[int] = typer.Option(
+        None, "--since",
+        help="Only findings from studies published in this year or "
+             "later (undated studies are excluded).",
+    ),
 ) -> None:
     """Query structured attributions (question, position, %) — the
     llm-v1 answer layer (A21). Richer than `search`: each hit names the
@@ -372,8 +377,9 @@ def ask(
     """
     storage = _storage_from_settings()
     rows = (
-        storage.search_attributions_deduped(query=query, limit=limit)
-        if dedup else storage.search_attributions(query=query, limit=limit)
+        storage.search_attributions_deduped(query=query, limit=limit, since=since)
+        if dedup
+        else storage.search_attributions(query=query, limit=limit, since=since)
     )
     if not rows:
         typer.echo("(no attributions matched — run `attribute` first?)")
@@ -387,8 +393,14 @@ def ask(
         if dup > 1:
             q = f"{q}  (+{dup - 1} more)"
         pub = row.get("publication_date")
-        year = f" [{pub.year}]" if pub else ""
-        typer.echo(f"{pct_str}  {pos}  {q}{year}")
+        ctx_bits = []
+        if pub:
+            ctx_bits.append(str(pub.year))
+        n = row.get("sample_size")
+        if n is not None:
+            ctx_bits.append(f"n={int(n)}")
+        ctx = f" [{', '.join(ctx_bits)}]" if ctx_bits else ""
+        typer.echo(f"{pct_str}  {pos}  {q}{ctx}")
         title = (row.get("title") or "").replace("\n", " ")
         if len(title) > 70:
             title = title[:67] + "..."
