@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Iterator
 
 import pytest
@@ -14,12 +15,19 @@ from study_scraper.cli import app
 TEST_DSN = os.environ.get("STUDY_SCRAPER_TEST_DSN")
 
 
+def _plain(text: str) -> str:
+    """Strip ANSI escapes: on CI runners rich forces terminal mode and
+    styles help output, splitting option names with color codes (seen
+    with rich 15 on GitHub Actions, 2026-07-05)."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
 def test_cli_registers_audit_command() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["audit", "--help"])
     assert result.exit_code == 0
-    assert "--sample-size" in result.output
-    assert "spot-check" in result.output.lower()
+    assert "--sample-size" in _plain(result.output)
+    assert "spot-check" in _plain(result.output).lower()
 
 
 # ---------------------------------------------------------------------------
