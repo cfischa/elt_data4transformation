@@ -79,8 +79,11 @@ def _candidate_to_study(
         # "already ingested" works whose canonical_url is a DOI.
         # landing_page_url / pdf_url feed the fulltext URL fallback for
         # openalex-canonical studies (fulltext.select_fetch_url).
+        # drucksachetyp / dokumentnummer / vorgangsbezug: Bundestag DIP
+        # metadata the opinion–policy gap view renders.
         for key in ("openalex_id", "referenced_works", "related_works",
-                    "landing_page_url", "pdf_url"):
+                    "landing_page_url", "pdf_url",
+                    "drucksachetyp", "dokumentnummer", "vorgangsbezug"):
             value = cand.raw.get(key)
             if value:
                 provenance_extras[key] = value

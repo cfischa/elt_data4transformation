@@ -1,0 +1,60 @@
+{
+  "numFound": 3,
+  "cursor": "AoJwgLKt0ZADLzMwMDc1NA==",
+  "documents": [
+    {
+      "id": "300754",
+      "dokumentart": "Drucksache",
+      "drucksachetyp": "Antrag",
+      "titel": "Klimaschutzgesetz konsequent umsetzen – Sektorziele wiederherstellen",
+      "datum": "2025-11-12",
+      "wahlperiode": 21,
+      "urheber": [
+        {"titel": "Fraktion BÜNDNIS 90/DIE GRÜNEN"}
+      ],
+      "fundstelle": {
+        "dokumentnummer": "21/4521",
+        "herausgeber": "BT",
+        "pdf_url": "https://dserver.bundestag.de/btd/21/045/2104521.pdf"
+      },
+      "vorgangsbezug": [
+        {"id": "320011", "titel": "Klimaschutzgesetz konsequent umsetzen", "vorgangstyp": "Antrag"}
+      ]
+    },
+    {
+      "id": "300892",
+      "dokumentart": "Drucksache",
+      "drucksachetyp": "Antwort",
+      "titel": "Antwort der Bundesregierung: Stand der Klimaanpassungsstrategie",
+      "datum": "2026-01-20",
+      "wahlperiode": 21,
+      "urheber": [
+        {"titel": "Bundesregierung"}
+      ],
+      "fundstelle": {
+        "dokumentnummer": "21/4890",
+        "herausgeber": "BT",
+        "pdf_url": "https://dserver.bundestag.de/btd/21/048/2104890.pdf"
+      },
+      "vorgangsbezug": []
+    },
+    {
+      "id": "300901",
+      "dokumentart": "Drucksache",
+      "drucksachetyp": "Gesetzentwurf",
+      "titel": "Entwurf eines Gesetzes zur Änderung des Bundes-Klimaschutzgesetzes",
+      "datum": "2026-03-05",
+      "wahlperiode": 21,
+      "urheber": [
+        {"titel": "Bundesregierung"}
+      ],
+      "fundstelle": {
+        "dokumentnummer": "21/5102",
+        "herausgeber": "BT"
+      },
+      "vorgangsbezug": [
+        {"id": "321400", "titel": "Änderung des Bundes-Klimaschutzgesetzes", "vorgangstyp": "Gesetzgebung"}
+      ]
+    }
+  ]
+}

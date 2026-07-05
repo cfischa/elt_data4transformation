@@ -59,6 +59,7 @@ jobs:
         if: steps.gate.outputs.enabled == 'true'
         env:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+          DIP_API_KEY: ${{ secrets.DIP_API_KEY }}
         run: |
           set +e  # one failing/slow source must not kill the others
           # Topics come from config/topics/topics.csv — adding a topic row
@@ -71,6 +72,10 @@ jobs:
           for topic in $TOPICS; do
             timeout 900 python -m study_scraper run --source ssoar    --topic "$topic" --limit 400
             timeout 900 python -m study_scraper run --source openalex --topic "$topic" --limit 400
+            # Bundestag DIP (opinion-policy gap, parliament half). Uses
+            # the published public API key unless DIP_API_KEY is set as
+            # a repo secret (recommended; the public key rotates).
+            timeout 600 python -m study_scraper run --source bundestag_dip --topic "$topic" --limit 200
           done
           timeout 600 python -m study_scraper ingest --source dawum
           timeout 600 python -m study_scraper ingest --source gesis --limit 500
@@ -109,10 +114,23 @@ jobs:
           python -m study_scraper status
           python -m study_scraper status --json > scrape-status.json
 
+      - name: Opinion digest (monitoring v1)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          # Aggregates every active watch (see `watch add`), reports
+          # shifts >=5pts and newly tracked questions vs the previous
+          # digest, and stores the new snapshot in the DB.
+          python -m study_scraper digest --out opinion-digest.md || true
+          cat opinion-digest.md || true
+
       - name: Upload status artifact
         if: steps.gate.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: scrape-status-${{ github.run_id }}
-          path: scrape-status.json
+          path: |
+            scrape-status.json
+            opinion-digest.md
           retention-days: 30

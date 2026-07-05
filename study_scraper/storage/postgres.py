@@ -747,9 +747,29 @@ class PostgresStorage:
         return len(rows)
 
     def search_attributions(
-        self, *, query: str, limit: int = 50
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """ILIKE search over attribution questions; joins study context."""
+        """ILIKE search over attribution questions; joins study context.
+
+        Each row carries `sample_size` — the study's representative n=
+        claim (ROADMAP item C): the most frequent plausible sample-size
+        value extracted from that study, largest on ties. NULL when the
+        study has no n= claim.
+
+        `since` (ROADMAP item B) keeps only findings whose study was
+        published in that year or later; studies with an unknown
+        publication date are excluded when the filter is active (an
+        undatable poll can't be shown as "recent").
+        """
+        since_clause = ""
+        params: List[Any] = [f"%{query.lower()}%"]
+        if since is not None:
+            since_clause = (
+                "AND s.publication_date IS NOT NULL "
+                "AND EXTRACT(YEAR FROM s.publication_date) >= %s"
+            )
+            params.append(since)
+        params.append(limit)
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -757,21 +777,32 @@ class PostgresStorage:
                     SELECT a.question, a.position, a.percentage, a.population,
                            a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
-                           s.publication_date
+                           s.publisher, s.publication_date, n.sample_size
                     FROM   {SCHEMA}.attributions a
                     JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    LEFT JOIN LATERAL (
+                        SELECT c.numeric_value AS sample_size
+                        FROM   {SCHEMA}.claims c
+                        WHERE  c.study_id = s.id
+                          AND  c.unit = 'n'
+                          AND  c.numeric_value BETWEEN 30 AND 10000000
+                        GROUP  BY c.numeric_value
+                        ORDER  BY COUNT(*) DESC, c.numeric_value DESC
+                        LIMIT  1
+                    ) n ON TRUE
                     WHERE  lower(a.question) LIKE %s
                       AND  s.status <> 'rejected'
+                      {since_clause}
                     ORDER  BY a.percentage DESC NULLS LAST,
                               s.publication_date DESC NULLS LAST
                     LIMIT  %s
                     """,
-                    (f"%{query.lower()}%", limit),
+                    params,
                 )
                 return list(cur.fetchall())
 
     def search_attributions_deduped(
-        self, *, query: str, limit: int = 50
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Like `search_attributions` but collapses the same finding seen
         across multiple studies to one confidence-weighted representative
@@ -779,8 +810,32 @@ class PostgresStorage:
         untouched. Fetches a wider window first so dedup has material."""
         from study_scraper.findings import dedupe_attributions
 
-        raw_rows = self.search_attributions(query=query, limit=max(limit * 5, 200))
+        raw_rows = self.search_attributions(
+            query=query, limit=max(limit * 5, 200), since=since
+        )
         return dedupe_attributions(raw_rows)[:limit]
+
+    def search_attributions_semantic(
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Deduped attribution search with a semantic fallback.
+
+        Attribution questions are normalized to English (llm-v1), so a
+        German query like 'klimaschutzgesetz' finds nothing under ILIKE.
+        When the lexical pass comes up empty, fall back to ranking ALL
+        stored findings by bilingual concept similarity (clustering.py).
+        Lexical hits keep priority — they are exact evidence."""
+        from study_scraper.clustering import semantic_filter
+
+        rows = self.search_attributions_deduped(
+            query=query, limit=limit, since=since
+        )
+        if rows:
+            return rows
+        broad = self.search_attributions_deduped(
+            query="", limit=max(limit * 10, 500), since=since
+        )
+        return semantic_filter(query, broad)[:limit]
 
     def count_attributions(self) -> int:
         with self.connection() as conn:
@@ -841,7 +896,7 @@ class PostgresStorage:
                     SELECT a.question, a.position, a.percentage, a.population,
                            a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
-                           s.publication_date, s.topic_ids
+                           s.publisher, s.publication_date, s.topic_ids
                     FROM   {SCHEMA}.attributions a
                     JOIN   {SCHEMA}.studies s ON s.id = a.study_id
                     WHERE  {where}
@@ -1049,6 +1104,141 @@ class PostgresStorage:
                     f"SELECT * FROM {SCHEMA}.{view_name} LIMIT %s", (limit,)
                 )
                 return list(cur.fetchall())
+
+    # ------------------------------------------------------------------
+    # Open dataset export
+    # ------------------------------------------------------------------
+
+    def list_attributions_for_export(self) -> List[Dict[str, Any]]:
+        """Every attribution on a non-rejected study, with study context
+        and the representative sample size — the findings.csv shape."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage, a.population,
+                           a.confidence, a.model, n.sample_size,
+                           s.publication_date, s.publisher, s.title,
+                           s.source_id, s.canonical_url, s.topic_ids
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    LEFT JOIN LATERAL (
+                        SELECT c.numeric_value AS sample_size
+                        FROM   {SCHEMA}.claims c
+                        WHERE  c.study_id = s.id
+                          AND  c.unit = 'n'
+                          AND  c.numeric_value BETWEEN 30 AND 10000000
+                        GROUP  BY c.numeric_value
+                        ORDER  BY COUNT(*) DESC, c.numeric_value DESC
+                        LIMIT  1
+                    ) n ON TRUE
+                    WHERE  s.status <> 'rejected'
+                    ORDER  BY s.publication_date DESC NULLS LAST, a.question
+                    """
+                )
+                return list(cur.fetchall())
+
+    def list_studies_for_export(self) -> List[Dict[str, Any]]:
+        """Kept studies' bibliographic metadata — the studies.csv shape.
+        Deliberately excludes abstract / key_findings / raw artifacts."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, title, publisher, publication_date, language,
+                           topic_ids, has_quantitative_data, source_id,
+                           canonical_url
+                    FROM   {SCHEMA}.studies
+                    WHERE  status = 'kept'
+                    ORDER  BY publication_date DESC NULLS LAST, id
+                    """
+                )
+                return list(cur.fetchall())
+
+    # ------------------------------------------------------------------
+    # Monitoring v1: watches + snapshots (migration 0009)
+    # ------------------------------------------------------------------
+
+    def add_watch(
+        self,
+        *,
+        query: str,
+        label: Optional[str] = None,
+        since_year: Optional[int] = None,
+    ) -> int:
+        """Register a standing question; returns the watch id.
+        Re-adding the same query re-activates it and updates label/since."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.watches (query, label, since_year)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (query) DO UPDATE SET
+                        label = EXCLUDED.label,
+                        since_year = EXCLUDED.since_year,
+                        active = TRUE
+                    RETURNING id
+                    """,
+                    (query, label, since_year),
+                )
+                watch_id = int(cur.fetchone()["id"])
+            conn.commit()
+        return watch_id
+
+    def list_watches(self, *, active_only: bool = True) -> List[Dict[str, Any]]:
+        where = "WHERE active" if active_only else ""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT id, query, label, since_year, active, created_at "
+                    f"FROM {SCHEMA}.watches {where} ORDER BY id"
+                )
+                return list(cur.fetchall())
+
+    def remove_watch(self, watch_id: int) -> bool:
+        """Deactivate (not delete) so snapshot history survives."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.watches SET active = FALSE "
+                    f"WHERE id = %s AND active",
+                    (watch_id,),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
+    def latest_watch_snapshot(self, watch_id: int) -> Optional[Dict[str, Any]]:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, watch_id, taken_at, findings_count, payload
+                    FROM   {SCHEMA}.watch_snapshots
+                    WHERE  watch_id = %s
+                    ORDER  BY taken_at DESC, id DESC
+                    LIMIT  1
+                    """,
+                    (watch_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def save_watch_snapshot(
+        self, watch_id: int, *, findings_count: int, payload: List[Dict[str, Any]]
+    ) -> None:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.watch_snapshots
+                        (watch_id, findings_count, payload)
+                    VALUES (%s, %s, %s::jsonb)
+                    """,
+                    (watch_id, findings_count, json.dumps(payload, ensure_ascii=False)),
+                )
+            conn.commit()
 
     # ------------------------------------------------------------------
     # Crawl runs

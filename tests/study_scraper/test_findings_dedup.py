@@ -72,6 +72,35 @@ def test_dedupe_grounded_breaks_confidence_tie() -> None:
     assert out[0]["raw"]["grounded"] is True
 
 
+def test_dedupe_newer_publication_breaks_confidence_tie() -> None:
+    # ROADMAP item B: on equal confidence + groundedness, the newer
+    # study's row represents the finding.
+    import datetime
+
+    rows = [
+        {**_row("Q", "support", 50, 0.8), "title": "old",
+         "publication_date": datetime.date(2021, 1, 1)},
+        {**_row("Q", "support", 50, 0.8), "title": "new",
+         "publication_date": datetime.date(2025, 6, 1)},
+    ]
+    out = dedupe_attributions(rows)
+    assert len(out) == 1
+    assert out[0]["title"] == "new"
+
+
+def test_dedupe_unknown_date_loses_to_dated_row() -> None:
+    import datetime
+
+    rows = [
+        {**_row("Q", "support", 50, 0.8), "title": "dated",
+         "publication_date": datetime.date(2020, 1, 1)},
+        {**_row("Q", "support", 50, 0.8), "title": "undated",
+         "publication_date": None},
+    ]
+    out = dedupe_attributions(rows)
+    assert out[0]["title"] == "dated"
+
+
 def test_empty_input() -> None:
     assert dedupe_attributions([]) == []
 

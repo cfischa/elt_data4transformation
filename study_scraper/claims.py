@@ -91,8 +91,18 @@ class ExtractedClaim:
 
     @property
     def id(self) -> str:
-        """Stable id so re-extraction is idempotent."""
-        key = f"{self.study_id}|{self.source_field}|{self.claim_text}"
+        """Stable id so re-extraction is idempotent.
+
+        Unit and value are part of the identity: a % claim and an n=
+        claim extracted from the SAME sentence share their snippet, and
+        without them the second insert hit ON CONFLICT DO NOTHING and
+        was silently dropped (bug found 2026-07-05 — sample sizes never
+        reached the DB when they shared a sentence with the finding).
+        """
+        key = (
+            f"{self.study_id}|{self.source_field}|{self.claim_text}"
+            f"|{self.unit}|{self.numeric_value}"
+        )
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 

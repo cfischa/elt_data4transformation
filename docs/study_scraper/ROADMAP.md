@@ -40,19 +40,42 @@ installs/curation · **[done]** shipped.
 
 A. **Population in dedup identity** **[done 2026-07-04]** — same
    question+% among different populations no longer merge.
-B. **Recency-aware answers** **[now, small]** — `ask` now shows the year;
-   next: order deduped findings by publication_date (newest first) on
-   confidence ties, and let `ask --since 2024` filter stale polls.
-C. **Sample-size context** **[now, small]** — we extract `n=` claims but
-   don't attach them to findings; join the study's sample-size claim to
-   its attributions so answers can show "(n=1004, 2026)".
-D. **Poll-of-polls aggregation** **[larger]** — a real "what does Germany
-   think about X" answer aggregates across institutes: recency- and
-   sample-size-weighted average per (question-cluster, position) with a
-   spread indicator, instead of a list of single findings.
-E. **Semantic question clustering** **[larger, embeddings]** — 'Atomausstieg
-   rückgängig machen' and 'return to nuclear power' should cluster; lexical
-   ILIKE misses them. Prereq for D at scale.
+B. **Recency-aware answers** **[done 2026-07-05]** — `ask --since YEAR`;
+   dedup representative prefers newer publication on confidence ties.
+C. **Sample-size context** **[done 2026-07-05]** — the study's
+   representative n= claim joins its attributions; `ask` shows
+   "[2025, n=1009]". (Also fixed: % and n= claims from the same
+   sentence used to collide on claim id and the n was dropped.)
+D. **Poll-of-polls aggregation** **[done 2026-07-05]** — `answer <q>`:
+   recency- (3y half-life) and sample-size- (sqrt(n/1000), clamped)
+   weighted mean per (question-cluster, position) with spread, poll
+   count, year range, Σn. Never a lone number.
+E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
+   `clustering.py`: bilingual concept-map token cosine, greedy
+   single-linkage; 'Atomausstieg rückgängig machen' and 'return to
+   nuclear power' cluster. `embedder=` hook ready for a real embedding
+   backend (pgvector) later. German queries reach English-normalized
+   questions via the same map (`search_attributions_semantic`).
+
+## Product-expansion build (2026-07-05; see notes/product-expansion-2026-07-04.md)
+
+- **Monitoring v1** **[done]** — migration 0009 `watches` +
+  `watch_snapshots`; `watch add/list/rm`; `digest` reports ≥5pt shifts
+  and newly tracked questions vs the previous snapshot; scheduled
+  workflow uploads `opinion-digest.md` per run.
+- **Research dossier** **[done]** — `dossier <q> [--out]`: citable
+  Markdown (summary, per-finding table, method caveats, provenance).
+- **Evidence-gap report** **[done]** — `gaps [--topic]`: per question
+  cluster the freshness/breadth flags (stale, single source, no
+  percentages).
+- **Opinion–policy gap** **[done, v1 juxtaposition]** — `policy-gap
+  --topic X`: aggregated opinion vs ingested Bundestag DIP Drucksachen.
+  Per-question → bill matching is the v2 once DIP coverage grows.
+- **Open dataset export** **[done]** — `export --out DIR`: findings.csv
+  + studies.csv + manifest; facts and links only.
+- **Next**: real embedding backend for E; demographic breakdowns
+  (population_segment); opinion⇄fact joins (needs Eurostat typed
+  views, P1.3); public read-only surface (gated on gold-set eval).
 
 ## Source-coverage plan — toward a representative platform
 
@@ -65,9 +88,11 @@ statistics breadth*. Ranked by yield per effort:
    standing opinion survey; free, structured, includes Germany, directly
    answers "what do people think about X". Lake source; data via the EC
    open-data portal / GESIS mirrors.
-6. **Bundestag DIP API** **[needs-human: free API key by email]** —
-   parliamentary documents (Drucksachen/Plenarprotokolle) frequently cite
-   polling; structured JSON REST. Catalog-style source.
+6. **Bundestag DIP API** **[done 2026-07-05]** —
+   `discovery/bundestag_dip.py`, catalog-style, fixture-tested; in the
+   scheduled crawl. Runs on the Bundestag's published public API key;
+   set the `DIP_API_KEY` secret with a personal key (free by mail to
+   infoline.id3@bundestag.de) when the public one rotates out.
 7. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.

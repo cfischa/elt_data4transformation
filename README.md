@@ -42,9 +42,18 @@ python -m study_scraper ingest --source gesis    --topic klima   # see docs
 
 # Query the data
 python -m study_scraper search klimaschutzgesetz   # extracted claims
-python -m study_scraper search atomkraft
+python -m study_scraper ask    klimaschutzgesetz   # structured findings (llm-v1)
+python -m study_scraper answer atomkraft           # poll-of-polls aggregate
 python -m study_scraper view   dawum_poll_results   # SQL view over the lake
 python -m study_scraper status
+
+# Products over the answer layer (2026-07-05)
+python -m study_scraper watch add klimagesetz --label "Climate law"
+python -m study_scraper digest --out digest.md      # shifts + novelties per watch
+python -m study_scraper dossier atomkraft --out dossier.md   # citable report
+python -m study_scraper gaps                        # evidence-gap table per topic
+python -m study_scraper policy-gap --topic klima    # opinion vs Bundestag DIP
+python -m study_scraper export --out dataset/       # open CSV dataset
 
 # Streamlit operator dock (status overview + topic editor + review queue)
 streamlit run study_scraper/console/Home.py

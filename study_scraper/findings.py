@@ -11,12 +11,13 @@ function applied before display. No migration, fully offline-testable.
 
 A finding's identity = (normalized question, position, percentage rounded
 to the nearest whole point). Within a group we keep the highest-confidence
-row (ties broken by higher percentage, then by presence of a grounded
-source span), and report how many duplicates it stood for.
+row (ties broken by grounded source span, then newer publication date,
+then higher percentage), and report how many duplicates it stood for.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -76,10 +77,23 @@ def _grounded(row: Dict[str, Any]) -> int:
     return 0
 
 
+def _pub_date(row: Dict[str, Any]) -> _dt.date:
+    """Publication date for recency tie-breaks; unknown sorts oldest
+    (ROADMAP item B: on confidence ties the newer poll represents the
+    finding — a 2025 topline beats a 2021 one saying the same thing)."""
+    d = row.get("publication_date")
+    if isinstance(d, _dt.datetime):
+        return d.date()
+    if isinstance(d, _dt.date):
+        return d
+    return _dt.date.min
+
+
 def dedupe_attributions(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Collapse rows to one representative per finding key.
 
-    Representative = max by (confidence, grounded, percentage). Each kept
+    Representative = max by (confidence, grounded, publication_date,
+    percentage). Each kept
     row gains `dup_count` (how many rows shared its key, incl. itself).
     Input order of distinct findings is preserved (first appearance wins
     the slot), so an already-sorted list stays sorted.
@@ -99,8 +113,12 @@ def dedupe_attributions(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             order.append(key)
             continue
         cur = best[key]
-        challenger = (_confidence(row), _grounded(row), _percentage(row))
-        incumbent = (_confidence(cur), _grounded(cur), _percentage(cur))
+        challenger = (
+            _confidence(row), _grounded(row), _pub_date(row), _percentage(row)
+        )
+        incumbent = (
+            _confidence(cur), _grounded(cur), _pub_date(cur), _percentage(cur)
+        )
         if challenger > incumbent:
             best[key] = row
 

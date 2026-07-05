@@ -124,9 +124,14 @@ def run(
         ctx = SSOARSource(from_file=from_file)
     elif source == "openalex":
         ctx = OpenAlexSource(from_file=from_file)
+    elif source == "bundestag_dip":
+        from study_scraper.discovery.bundestag_dip import BundestagDIPSource
+
+        ctx = BundestagDIPSource(from_file=from_file)
     else:
         raise typer.BadParameter(
-            f"unknown source {source!r}; supported: ssoar, openalex"
+            f"unknown source {source!r}; supported: ssoar, openalex, "
+            f"bundestag_dip"
         )
     topic_obj = _load_topic(topic)
     storage = _storage_from_settings()
@@ -364,6 +369,11 @@ def ask(
         help="Collapse the same finding across studies to one "
              "confidence-weighted representative (default on).",
     ),
+    since: Optional[int] = typer.Option(
+        None, "--since",
+        help="Only findings from studies published in this year or "
+             "later (undated studies are excluded).",
+    ),
 ) -> None:
     """Query structured attributions (question, position, %) — the
     llm-v1 answer layer (A21). Richer than `search`: each hit names the
@@ -372,8 +382,9 @@ def ask(
     """
     storage = _storage_from_settings()
     rows = (
-        storage.search_attributions_deduped(query=query, limit=limit)
-        if dedup else storage.search_attributions(query=query, limit=limit)
+        storage.search_attributions_semantic(query=query, limit=limit, since=since)
+        if dedup
+        else storage.search_attributions(query=query, limit=limit, since=since)
     )
     if not rows:
         typer.echo("(no attributions matched — run `attribute` first?)")
@@ -387,13 +398,56 @@ def ask(
         if dup > 1:
             q = f"{q}  (+{dup - 1} more)"
         pub = row.get("publication_date")
-        year = f" [{pub.year}]" if pub else ""
-        typer.echo(f"{pct_str}  {pos}  {q}{year}")
+        ctx_bits = []
+        if pub:
+            ctx_bits.append(str(pub.year))
+        n = row.get("sample_size")
+        if n is not None:
+            ctx_bits.append(f"n={int(n)}")
+        ctx = f" [{', '.join(ctx_bits)}]" if ctx_bits else ""
+        typer.echo(f"{pct_str}  {pos}  {q}{ctx}")
         title = (row.get("title") or "").replace("\n", " ")
         if len(title) > 70:
             title = title[:67] + "..."
         typer.echo(f"          [{row.get('source_id')}] {title}")
         typer.echo(f"          {row.get('canonical_url')}")
+
+
+@app.command()
+def answer(
+    query: str = typer.Argument(
+        ..., help="Keyword(s) matched against attribution questions."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since",
+        help="Only findings from studies published in this year or later.",
+    ),
+    limit: int = typer.Option(
+        10, "--limit", help="Max question clusters to print."
+    ),
+) -> None:
+    """Poll-of-polls answer (ROADMAP D): aggregate matching findings
+    across institutes into a recency- and sample-size-weighted average
+    per question cluster, with the spread shown honestly. Where `ask`
+    lists findings, `answer` synthesizes them.
+    """
+    from study_scraper.aggregate import aggregate_findings, format_answer
+
+    storage = _storage_from_settings()
+    rows = storage.search_attributions_semantic(
+        query=query, limit=500, since=since
+    )
+    answers = aggregate_findings(rows)
+    if not answers:
+        typer.echo("(no findings with percentages matched — run `attribute` first?)")
+        return
+    for a in answers[:limit]:
+        typer.echo(format_answer(a))
+        typer.echo("")
+    typer.echo(
+        "method: weighted mean per question cluster; weights = recency "
+        "(3y half-life) × sqrt(n/1000) clamped to [0.3, 3]."
+    )
 
 
 @app.command()
@@ -605,6 +659,187 @@ def view(
         if len(line) > 200:
             line = line[:197] + "..."
         typer.echo(line)
+
+
+@app.command()
+def export(
+    out: Path = typer.Option(
+        Path("dataset"), "--out",
+        help="Directory for findings.csv / studies.csv / manifest.json.",
+    ),
+) -> None:
+    """Export the findings layer as an open dataset: published toplines
+    with provenance (findings.csv), study metadata (studies.csv), and a
+    manifest. Facts + links only — no abstracts or full texts."""
+    from study_scraper.export import run_export
+
+    storage = _storage_from_settings()
+    manifest = run_export(storage, out)
+    typer.echo(
+        f"wrote {out}/: {manifest['findings']} findings, "
+        f"{manifest['studies']} studies"
+    )
+
+
+@app.command()
+def dossier(
+    query: str = typer.Argument(
+        ..., help="The policy question, as keyword(s) matched against "
+                  "attribution questions."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since", help="Only findings from this year or later."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown dossier here (else stdout)."
+    ),
+) -> None:
+    """Research dossier: one policy question rendered as a citable
+    Markdown report — poll-of-polls summary, every finding with year /
+    n / population / institute, methodology caveats, and a provenance
+    appendix. What a journalist or NGO would assemble by hand."""
+    from study_scraper.dossier import build_dossier
+
+    storage = _storage_from_settings()
+    text = build_dossier(storage, query, since=since)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
+@app.command("policy-gap")
+def policy_gap(
+    topic: str = typer.Option(..., "--topic", help="Topic id from topics.csv."),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown report here (else stdout)."
+    ),
+) -> None:
+    """Opinion–policy gap: what the polls say on a topic next to what
+    the Bundestag is doing on it (DIP Drucksachen). The flagship
+    democratic-accountability view — strong majorities with no
+    parliamentary activity (or activity against the majority) are the
+    gaps."""
+    from study_scraper.dossier import build_policy_gap_report
+
+    storage = _storage_from_settings()
+    text = build_policy_gap_report(storage, topic=topic)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
+@app.command()
+def gaps(
+    topic: Optional[str] = typer.Option(
+        None, "--topic", help="Limit to one topic id (default: all attributed)."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown report here (else stdout)."
+    ),
+) -> None:
+    """Evidence-gap report: per topic, which question clusters have
+    data, how fresh and how broadly sourced — and where the holes are
+    (stale, single-source, no percentages). The coverage-first store's
+    unique product: it shows what we DON'T know."""
+    from study_scraper.dossier import build_gap_report
+
+    storage = _storage_from_settings()
+    text = build_gap_report(storage, topic=topic)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
+watch_app = typer.Typer(
+    help="Standing questions for the monitoring digest (product Axis 1).",
+    no_args_is_help=True,
+)
+app.add_typer(watch_app, name="watch")
+
+
+@watch_app.command("add")
+def watch_add(
+    query: str = typer.Argument(
+        ..., help="Keyword(s) matched against attribution questions."
+    ),
+    label: Optional[str] = typer.Option(
+        None, "--label", help="Human-readable heading for the digest."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since", help="Only findings from this year or later."
+    ),
+) -> None:
+    """Register a standing question. Each `digest` run aggregates its
+    findings and reports shifts/novelties against the previous run."""
+    storage = _storage_from_settings()
+    watch_id = storage.add_watch(query=query, label=label, since_year=since)
+    typer.echo(f"watch {watch_id} active: {label or query!r}")
+
+
+@watch_app.command("list")
+def watch_list(
+    all_: bool = typer.Option(
+        False, "--all", help="Include deactivated watches."
+    ),
+) -> None:
+    """List watches."""
+    storage = _storage_from_settings()
+    rows = storage.list_watches(active_only=not all_)
+    if not rows:
+        typer.echo("(no watches — add one with `watch add <query>`)")
+        return
+    for row in rows:
+        state = "active" if row["active"] else "off"
+        since = f" since={row['since_year']}" if row.get("since_year") else ""
+        label = f"  — {row['label']}" if row.get("label") else ""
+        typer.echo(f"{row['id']:>3}  [{state:<6}] {row['query']!r}{since}{label}")
+
+
+@watch_app.command("rm")
+def watch_rm(watch_id: int = typer.Argument(...)) -> None:
+    """Deactivate a watch (snapshot history is kept)."""
+    storage = _storage_from_settings()
+    changed = storage.remove_watch(watch_id)
+    typer.echo("deactivated" if changed else "no change (unknown or already off)")
+
+
+@app.command()
+def digest(
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown digest here (else stdout)."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Compute without saving snapshots (repeatable preview).",
+    ),
+) -> None:
+    """Run the monitoring digest over all active watches: aggregate each
+    standing question, report shifts (≥5 pts) and newly tracked
+    questions vs the previous digest, store the new snapshot. Designed
+    to run after each scheduled crawl."""
+    from study_scraper.digest import format_digest_markdown, run_digest
+
+    storage = _storage_from_settings()
+    digests = run_digest(storage, save=not dry_run)
+    text = format_digest_markdown(digests)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        news = sum(1 for d in digests if d.has_news)
+        typer.echo(
+            f"wrote {out} — {len(digests)} watch(es), {news} with news"
+        )
+    else:
+        typer.echo(text)
 
 
 review_app = typer.Typer(

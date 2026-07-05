@@ -238,13 +238,15 @@ def _clean(storage) -> Iterator[None]:
     yield
 
 
-def _seed_study_with_claim(storage, *, title: str, abstract: str):
+def _seed_study_with_claim(storage, *, title: str, abstract: str,
+                           publication_date=None):
     from study_scraper.claims import extract_claims
     from study_scraper.models import Provenance, Study
     study = Study.build(
         canonical_url=f"https://example.org/{abs(hash(title))}",
         title=title,
         abstract=abstract,
+        publication_date=publication_date,
         fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
         source_id="openalex",
         provenance=Provenance(discovery_source="openalex"),
@@ -297,6 +299,65 @@ def test_upsert_attributions_idempotent_per_model(storage) -> None:
     apply_responses(storage=storage, responses={s.id: resp})
     apply_responses(storage=storage, responses={s.id: resp})  # re-run
     assert storage.count_attributions() == 1  # not 2
+
+
+def test_search_attributions_since_filters_old_and_undated(storage) -> None:
+    from datetime import date
+
+    from study_scraper.attribute import apply_responses
+
+    old = _seed_study_with_claim(
+        storage, title="Alt", abstract="44% befürworten strengere Klimagesetze.",
+        publication_date=date(2021, 3, 1))
+    new = _seed_study_with_claim(
+        storage, title="Neu", abstract="62% befürworten strengere Klimagesetze.",
+        publication_date=date(2025, 5, 1))
+    undated = _seed_study_with_claim(
+        storage, title="Ohne Datum",
+        abstract="50% befürworten strengere Klimagesetze.")
+
+    def resp(pct):
+        return json.dumps({"attributions": [
+            {"question": "Stricter climate laws", "position": "support",
+             "percentage": pct, "population": None, "confidence": 0.9},
+        ]})
+
+    apply_responses(storage=storage, responses={
+        old.id: resp(44), new.id: resp(62), undated.id: resp(50)})
+
+    all_hits = storage.search_attributions(query="climate")
+    assert len(all_hits) == 3
+    recent = storage.search_attributions(query="climate", since=2024)
+    assert [float(r["percentage"]) for r in recent] == [62.0]
+
+
+def test_search_attributions_carries_sample_size(storage) -> None:
+    from study_scraper.attribute import apply_responses
+
+    s = _seed_study_with_claim(
+        storage, title="Tempolimit",
+        abstract="60% der Befragten (n=1009) befürworten ein Tempolimit.")
+    resp = json.dumps({"attributions": [
+        {"question": "General speed limit", "position": "support",
+         "percentage": 60, "population": None, "confidence": 0.9},
+    ]})
+    apply_responses(storage=storage, responses={s.id: resp})
+    hits = storage.search_attributions(query="speed limit")
+    assert hits and int(hits[0]["sample_size"]) == 1009
+
+
+def test_search_attributions_sample_size_null_without_n_claim(storage) -> None:
+    from study_scraper.attribute import apply_responses
+
+    s = _seed_study_with_claim(
+        storage, title="Rente", abstract="70% wollen ein höheres Rentenniveau.")
+    resp = json.dumps({"attributions": [
+        {"question": "Higher pension level", "position": "support",
+         "percentage": 70, "population": None, "confidence": 0.9},
+    ]})
+    apply_responses(storage=storage, responses={s.id: resp})
+    hits = storage.search_attributions(query="pension")
+    assert hits and hits[0]["sample_size"] is None
 
 
 def test_dump_prompts_emits_queue(storage) -> None:
