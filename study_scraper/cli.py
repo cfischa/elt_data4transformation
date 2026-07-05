@@ -656,6 +656,60 @@ def view(
         typer.echo(line)
 
 
+@app.command()
+def dossier(
+    query: str = typer.Argument(
+        ..., help="The policy question, as keyword(s) matched against "
+                  "attribution questions."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since", help="Only findings from this year or later."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown dossier here (else stdout)."
+    ),
+) -> None:
+    """Research dossier: one policy question rendered as a citable
+    Markdown report — poll-of-polls summary, every finding with year /
+    n / population / institute, methodology caveats, and a provenance
+    appendix. What a journalist or NGO would assemble by hand."""
+    from study_scraper.dossier import build_dossier
+
+    storage = _storage_from_settings()
+    text = build_dossier(storage, query, since=since)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
+@app.command()
+def gaps(
+    topic: Optional[str] = typer.Option(
+        None, "--topic", help="Limit to one topic id (default: all attributed)."
+    ),
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown report here (else stdout)."
+    ),
+) -> None:
+    """Evidence-gap report: per topic, which question clusters have
+    data, how fresh and how broadly sourced — and where the holes are
+    (stale, single-source, no percentages). The coverage-first store's
+    unique product: it shows what we DON'T know."""
+    from study_scraper.dossier import build_gap_report
+
+    storage = _storage_from_settings()
+    text = build_gap_report(storage, topic=topic)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text)
+
+
 watch_app = typer.Typer(
     help="Standing questions for the monitoring digest (product Axis 1).",
     no_args_is_help=True,

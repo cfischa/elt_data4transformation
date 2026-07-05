@@ -777,7 +777,7 @@ class PostgresStorage:
                     SELECT a.question, a.position, a.percentage, a.population,
                            a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
-                           s.publication_date, n.sample_size
+                           s.publisher, s.publication_date, n.sample_size
                     FROM   {SCHEMA}.attributions a
                     JOIN   {SCHEMA}.studies s ON s.id = a.study_id
                     LEFT JOIN LATERAL (
@@ -874,7 +874,7 @@ class PostgresStorage:
                     SELECT a.question, a.position, a.percentage, a.population,
                            a.confidence, a.model, a.raw,
                            s.title, s.canonical_url, s.source_id,
-                           s.publication_date, s.topic_ids
+                           s.publisher, s.publication_date, s.topic_ids
                     FROM   {SCHEMA}.attributions a
                     JOIN   {SCHEMA}.studies s ON s.id = a.study_id
                     WHERE  {where}
