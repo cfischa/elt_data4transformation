@@ -657,6 +657,26 @@ def view(
 
 
 @app.command()
+def export(
+    out: Path = typer.Option(
+        Path("dataset"), "--out",
+        help="Directory for findings.csv / studies.csv / manifest.json.",
+    ),
+) -> None:
+    """Export the findings layer as an open dataset: published toplines
+    with provenance (findings.csv), study metadata (studies.csv), and a
+    manifest. Facts + links only — no abstracts or full texts."""
+    from study_scraper.export import run_export
+
+    storage = _storage_from_settings()
+    manifest = run_export(storage, out)
+    typer.echo(
+        f"wrote {out}/: {manifest['findings']} findings, "
+        f"{manifest['studies']} studies"
+    )
+
+
+@app.command()
 def dossier(
     query: str = typer.Argument(
         ..., help="The policy question, as keyword(s) matched against "

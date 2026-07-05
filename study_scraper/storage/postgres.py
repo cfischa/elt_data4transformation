@@ -1084,6 +1084,56 @@ class PostgresStorage:
                 return list(cur.fetchall())
 
     # ------------------------------------------------------------------
+    # Open dataset export
+    # ------------------------------------------------------------------
+
+    def list_attributions_for_export(self) -> List[Dict[str, Any]]:
+        """Every attribution on a non-rejected study, with study context
+        and the representative sample size — the findings.csv shape."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage, a.population,
+                           a.confidence, a.model, n.sample_size,
+                           s.publication_date, s.publisher, s.title,
+                           s.source_id, s.canonical_url, s.topic_ids
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    LEFT JOIN LATERAL (
+                        SELECT c.numeric_value AS sample_size
+                        FROM   {SCHEMA}.claims c
+                        WHERE  c.study_id = s.id
+                          AND  c.unit = 'n'
+                          AND  c.numeric_value BETWEEN 30 AND 10000000
+                        GROUP  BY c.numeric_value
+                        ORDER  BY COUNT(*) DESC, c.numeric_value DESC
+                        LIMIT  1
+                    ) n ON TRUE
+                    WHERE  s.status <> 'rejected'
+                    ORDER  BY s.publication_date DESC NULLS LAST, a.question
+                    """
+                )
+                return list(cur.fetchall())
+
+    def list_studies_for_export(self) -> List[Dict[str, Any]]:
+        """Kept studies' bibliographic metadata — the studies.csv shape.
+        Deliberately excludes abstract / key_findings / raw artifacts."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, title, publisher, publication_date, language,
+                           topic_ids, has_quantitative_data, source_id,
+                           canonical_url
+                    FROM   {SCHEMA}.studies
+                    WHERE  status = 'kept'
+                    ORDER  BY publication_date DESC NULLS LAST, id
+                    """
+                )
+                return list(cur.fetchall())
+
+    # ------------------------------------------------------------------
     # Monitoring v1: watches + snapshots (migration 0009)
     # ------------------------------------------------------------------
 
