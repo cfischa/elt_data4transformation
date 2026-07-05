@@ -1,10 +1,45 @@
 # Status — independent analysis of the repo
 
-_Last updated: 2026-06-15 (A21: llm-v1 attribution extractor — the
-answer layer turning claims into (question, position, %) triples, with
-a live Option-A path and a zero-cost Cowork offline path. **233 tests
-pass.** Remaining work is machine-bound; the exact local steps are in
-[`RUNBOOK.md`](RUNBOOK.md) §0.)._
+_Last updated: 2026-07-05 (product-expansion build: answer-layer
+B/C/D/E complete, monitoring digest, dossier + gap reports, Bundestag
+DIP + opinion–policy gap, open dataset export. **392 tests pass**,
+full loop verified end-to-end against a real Postgres.)_
+
+## Product-expansion pass (2026-07-05)
+
+Everything buildable from the strategy note
+(`notes/product-expansion-2026-07-04.md`) shipped in one pass:
+
+1. **Answer-layer correctness finished** — ROADMAP B (recency:
+   `ask --since`, newer-poll dedup ties), C (sample size joined to
+   findings: "[2025, n=1009]"), plus a real bug found on the way: %
+   and n= claims from the same sentence collided on claim id, so
+   sample sizes never reached the DB.
+2. **Clustering (E) + aggregation (D)** — `clustering.py` (bilingual
+   concept cosine, pluggable embedder) and `aggregate.py`; new CLI
+   `answer` prints the weighted poll-of-polls view with spread.
+3. **Monitoring v1** — migration 0009 (`watches`, `watch_snapshots`),
+   `watch add/list/rm`, `digest` (≥5pt shift + novelty detection,
+   Markdown artifact in the scheduled workflow).
+4. **Dossier / gaps / policy-gap** — citable per-question Markdown
+   dossier; per-topic evidence-gap table; opinion vs Bundestag-DIP
+   juxtaposition (`policy-gap --topic X`).
+5. **Bundestag DIP source** — catalog-style, fixture-tested, in the
+   scheduled crawl (public API key default, `DIP_API_KEY` override).
+6. **Open dataset export** — findings.csv + studies.csv + manifest.
+
+Verified end-to-end on a local Postgres: 6-source fixture ingest →
+claims → offline attribution (24 triples over 9 studies) → ask/answer
+(German queries hit English questions via the semantic fallback) →
+digest snapshot cycle (baseline → shift detection → settles at 0 news)
+→ dossier/gaps/policy-gap/export. Three real defects found by the
+production run and fixed with regression tests (claim-id collision,
+ILIKE language miss, cluster over-merge at concept weight 3).
+
+**Machine-bound remainder:** live crawl + fulltext need outbound
+network (the dev environment's proxy policy blocks non-registry
+hosts); scheduled production needs the `SCRAPER_POSTGRES_URL` secret
+(RUNBOOK §1.1), optionally `DIP_API_KEY` and `ANTHROPIC_API_KEY`.
 
 ## Attribution pass (2026-06-15, A21)
 

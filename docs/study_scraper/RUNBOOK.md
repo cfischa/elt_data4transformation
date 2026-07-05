@@ -230,6 +230,22 @@ streamlit run study_scraper/console/Home.py
 4. **Lake** — spot-check new structured records.
 5. CLI: `reading-list` → pick studies to read; `search <begriff>` →
    answer questions.
+6. **Answer-layer products (2026-07-05)**: `answer <q>` for the
+   aggregated poll-of-polls view; `digest` after each crawl (or read
+   the `opinion-digest.md` workflow artifact) for shifts/novelties on
+   your watches (`watch add <q>` to register one); `gaps` to see which
+   question clusters are stale or single-sourced; `policy-gap --topic
+   <id>` for the opinion-vs-Bundestag view; `dossier <q> --out f.md`
+   when someone needs a citable report; `export --out dataset/` for
+   the open CSV dump.
+
+### 5.1 Credentials the products can use (all optional)
+
+| Secret / env | Used by | Without it |
+| --- | --- | --- |
+| `SCRAPER_POSTGRES_URL` (repo secret) | scheduled crawl + digest | workflow exits early, green |
+| `DIP_API_KEY` | Bundestag DIP source | falls back to the published public key (rotates yearly) |
+| `ANTHROPIC_API_KEY` | live `attribute` | use the offline Cowork path (§3.5b) |
 
 ## 6. What is NOT done (honest list, also in TODO.md)
 
