@@ -71,6 +71,12 @@ _CONCEPTS: Dict[str, List[str]] = {
     "conscription": ["conscription"],
     "gesetz": ["law"],
     "law": ["law"],
+    # 'plant/kraftwerk' keeps "build new nuclear power plants" from
+    # merging with the general "use nuclear power" question (over-merge
+    # observed on real data, 2026-07-05: 32% and 65% averaged to a
+    # meaningless 48.5%).
+    "kraftwerk": ["plant"],
+    "plant": ["plant"],
     "verbot": ["ban"],
     "ban": ["ban"],
     "energie": ["energy"],
@@ -80,7 +86,12 @@ _CONCEPTS: Dict[str, List[str]] = {
     "erneuerbar": ["renewable"],
     "renewable": ["renewable"],
 }
-_CONCEPT_WEIGHT = 3.0
+# 2.0, not 3.0: at weight 3 the shared concept dominates short
+# questions so hard that nine distinct climate questions merged into
+# one cluster on real data (2026-07-05). At 2.0 the ROADMAP DE/EN
+# example still clusters (0.73) while 'ambitious climate policy' vs
+# 'climate protection is an important task' separates (0.67).
+_CONCEPT_WEIGHT = 2.0
 
 _STOPWORDS = frozenset(
     """
@@ -146,6 +157,34 @@ def _cosine_dense(a: Sequence[float], b: Sequence[float]) -> float:
 def question_similarity(a: str, b: str) -> float:
     """Similarity in [0, 1] under the default offline backend."""
     return _cosine_sparse(question_vector(a), question_vector(b))
+
+
+# Looser than the clustering threshold: search wants recall (ranked),
+# clustering wants precision (grouped).
+SEARCH_THRESHOLD = 0.35
+
+
+def semantic_filter(
+    query: str,
+    rows: Iterable[Dict[str, Any]],
+    *,
+    threshold: float = SEARCH_THRESHOLD,
+    key: str = "question",
+) -> List[Dict[str, Any]]:
+    """Rank rows by concept similarity between `query` and row[key].
+
+    The answer layer normalizes questions to English, so a German query
+    ('klimaschutzgesetz') misses them under ILIKE. The concept map folds
+    both languages into shared tokens, letting the query match anyway.
+    Returns matching rows best-first; rows below `threshold` drop."""
+    qv = question_vector(query)
+    scored: List[tuple] = []
+    for i, row in enumerate(rows):
+        sim = _cosine_sparse(qv, question_vector(row.get(key) or ""))
+        if sim >= threshold:
+            scored.append((-sim, i, row))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return [row for _sim, _i, row in scored]
 
 
 def cluster_questions(

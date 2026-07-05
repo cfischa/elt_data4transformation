@@ -44,7 +44,7 @@ class FakeStorage:
     def list_watches(self, *, active_only: bool = True):
         return [w for w in self.watches if w["active"] or not active_only]
 
-    def search_attributions_deduped(self, *, query: str, limit: int = 500,
+    def search_attributions_semantic(self, *, query: str, limit: int = 500,
                                     since: Optional[int] = None):
         rows = [f for f in self.findings if query.lower() in f["question"].lower()]
         if since is not None:

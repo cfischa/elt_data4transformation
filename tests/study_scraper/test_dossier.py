@@ -35,7 +35,7 @@ class FakeStorage:
         assert source_id == "bundestag_dip"
         return list(self.dip_docs)
 
-    def search_attributions_deduped(self, *, query: str, limit: int = 500,
+    def search_attributions_semantic(self, *, query: str, limit: int = 500,
                                     since: Optional[int] = None):
         rows = [f for f in self.findings if query.lower() in f["question"].lower()]
         if since is not None:

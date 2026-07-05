@@ -59,7 +59,7 @@ def build_dossier(
     """Render the Markdown dossier for one query. Empty result → a
     short 'no findings' document (still valid Markdown)."""
     today = today or _dt.date.today()
-    rows = storage.search_attributions_deduped(query=query, limit=500, since=since)
+    rows = storage.search_attributions_semantic(query=query, limit=500, since=since)
     lines: List[str] = [f"# Research dossier: “{query}”", ""]
     scope = f"findings from {since} onward" if since else "all ingested findings"
     lines.append(

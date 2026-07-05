@@ -382,7 +382,7 @@ def ask(
     """
     storage = _storage_from_settings()
     rows = (
-        storage.search_attributions_deduped(query=query, limit=limit, since=since)
+        storage.search_attributions_semantic(query=query, limit=limit, since=since)
         if dedup
         else storage.search_attributions(query=query, limit=limit, since=since)
     )
@@ -434,7 +434,7 @@ def answer(
     from study_scraper.aggregate import aggregate_findings, format_answer
 
     storage = _storage_from_settings()
-    rows = storage.search_attributions_deduped(
+    rows = storage.search_attributions_semantic(
         query=query, limit=500, since=since
     )
     answers = aggregate_findings(rows)

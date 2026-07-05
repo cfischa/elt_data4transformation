@@ -93,7 +93,7 @@ def digest_watch(
     save: bool = True,
 ) -> WatchDigest:
     """Compute one watch's digest and (by default) persist the snapshot."""
-    rows = storage.search_attributions_deduped(
+    rows = storage.search_attributions_semantic(
         query=watch["query"], limit=500, since=watch.get("since_year")
     )
     answers = aggregate_findings(rows, today=today)

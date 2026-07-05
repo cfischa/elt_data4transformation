@@ -815,6 +815,28 @@ class PostgresStorage:
         )
         return dedupe_attributions(raw_rows)[:limit]
 
+    def search_attributions_semantic(
+        self, *, query: str, limit: int = 50, since: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Deduped attribution search with a semantic fallback.
+
+        Attribution questions are normalized to English (llm-v1), so a
+        German query like 'klimaschutzgesetz' finds nothing under ILIKE.
+        When the lexical pass comes up empty, fall back to ranking ALL
+        stored findings by bilingual concept similarity (clustering.py).
+        Lexical hits keep priority — they are exact evidence."""
+        from study_scraper.clustering import semantic_filter
+
+        rows = self.search_attributions_deduped(
+            query=query, limit=limit, since=since
+        )
+        if rows:
+            return rows
+        broad = self.search_attributions_deduped(
+            query="", limit=max(limit * 10, 500), since=since
+        )
+        return semantic_filter(query, broad)[:limit]
+
     def count_attributions(self) -> int:
         with self.connection() as conn:
             with conn.cursor() as cur:

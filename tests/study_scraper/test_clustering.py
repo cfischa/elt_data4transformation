@@ -7,6 +7,7 @@ from study_scraper.clustering import (
     cluster_attributions,
     cluster_questions,
     question_similarity,
+    semantic_filter,
 )
 
 
@@ -33,7 +34,8 @@ class TestSimilarity:
         assert sim >= DEFAULT_THRESHOLD
 
     def test_umlaut_folding(self) -> None:
-        assert question_similarity("Rückkehr zur Atomkraft", "ruckkehr zur atomkraft") == 1.0
+        sim = question_similarity("Rückkehr zur Atomkraft", "ruckkehr zur atomkraft")
+        assert abs(sim - 1.0) < 1e-9
 
     def test_unrelated_questions_zero(self) -> None:
         sim = question_similarity(
@@ -43,6 +45,60 @@ class TestSimilarity:
 
     def test_empty_question_no_crash(self) -> None:
         assert question_similarity("", "anything") == 0.0
+
+
+class TestOverMergeRegressions:
+    def test_build_new_plants_distinct_from_general_use(self) -> None:
+        # Real-data regression (2026-07-05): 32% (build new plants) and
+        # 65% (use nuclear power) merged into a meaningless 48.5%.
+        sim = question_similarity(
+            "Use nuclear power", "Build new nuclear power plants"
+        )
+        assert sim < DEFAULT_THRESHOLD
+
+    def test_kraftwerk_maps_to_plant_cross_language(self) -> None:
+        sim = question_similarity(
+            "Neubau neuer Kernkraftwerke", "Build new nuclear power plants"
+        )
+        assert sim >= DEFAULT_THRESHOLD
+
+    def test_distinct_climate_questions_stay_apart(self) -> None:
+        # Real-data regression (2026-07-05): at concept weight 3, nine
+        # different climate questions merged into one mushy cluster.
+        pairs = [
+            ("Ambitious climate protection policy",
+             "Climate protection is an important political task"),
+            ("Ambitious climate protection policy",
+             "Politics must implement more climate protection measures"),
+            ("Willingness to reduce household energy consumption",
+             "Ambitious climate protection policy"),
+        ]
+        for a, b in pairs:
+            assert question_similarity(a, b) < DEFAULT_THRESHOLD, (a, b)
+
+
+class TestSemanticFilter:
+    def test_german_query_finds_english_questions(self) -> None:
+        # `ask klimaschutzgesetz` returned nothing under ILIKE because
+        # llm-v1 normalizes questions to English (found 2026-07-05).
+        rows = [
+            {"question": "Stricter climate protection laws", "percentage": 44},
+            {"question": "Higher pension level", "percentage": 70},
+        ]
+        out = semantic_filter("klimaschutzgesetz", rows)
+        assert [r["question"] for r in out] == ["Stricter climate protection laws"]
+
+    def test_ranked_best_first(self) -> None:
+        rows = [
+            {"question": "Ambitious climate protection policy"},
+            {"question": "Stricter climate protection laws"},
+        ]
+        out = semantic_filter("klimagesetz", rows)
+        assert out[0]["question"] == "Stricter climate protection laws"
+
+    def test_unrelated_rows_dropped(self) -> None:
+        rows = [{"question": "General speed limit"}]
+        assert semantic_filter("klimaschutzgesetz", rows) == []
 
 
 class TestClusterQuestions:
