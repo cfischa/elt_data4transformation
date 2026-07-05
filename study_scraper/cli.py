@@ -409,6 +409,43 @@ def ask(
 
 
 @app.command()
+def answer(
+    query: str = typer.Argument(
+        ..., help="Keyword(s) matched against attribution questions."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since",
+        help="Only findings from studies published in this year or later.",
+    ),
+    limit: int = typer.Option(
+        10, "--limit", help="Max question clusters to print."
+    ),
+) -> None:
+    """Poll-of-polls answer (ROADMAP D): aggregate matching findings
+    across institutes into a recency- and sample-size-weighted average
+    per question cluster, with the spread shown honestly. Where `ask`
+    lists findings, `answer` synthesizes them.
+    """
+    from study_scraper.aggregate import aggregate_findings, format_answer
+
+    storage = _storage_from_settings()
+    rows = storage.search_attributions_deduped(
+        query=query, limit=500, since=since
+    )
+    answers = aggregate_findings(rows)
+    if not answers:
+        typer.echo("(no findings with percentages matched — run `attribute` first?)")
+        return
+    for a in answers[:limit]:
+        typer.echo(format_answer(a))
+        typer.echo("")
+    typer.echo(
+        "method: weighted mean per question cluster; weights = recency "
+        "(3y half-life) × sqrt(n/1000) clamped to [0.3, 3]."
+    )
+
+
+@app.command()
 def attribute(
     limit: int = typer.Option(
         20, "--limit", help="Max queued studies to attribute."
