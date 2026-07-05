@@ -1084,6 +1084,91 @@ class PostgresStorage:
                 return list(cur.fetchall())
 
     # ------------------------------------------------------------------
+    # Monitoring v1: watches + snapshots (migration 0009)
+    # ------------------------------------------------------------------
+
+    def add_watch(
+        self,
+        *,
+        query: str,
+        label: Optional[str] = None,
+        since_year: Optional[int] = None,
+    ) -> int:
+        """Register a standing question; returns the watch id.
+        Re-adding the same query re-activates it and updates label/since."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.watches (query, label, since_year)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (query) DO UPDATE SET
+                        label = EXCLUDED.label,
+                        since_year = EXCLUDED.since_year,
+                        active = TRUE
+                    RETURNING id
+                    """,
+                    (query, label, since_year),
+                )
+                watch_id = int(cur.fetchone()["id"])
+            conn.commit()
+        return watch_id
+
+    def list_watches(self, *, active_only: bool = True) -> List[Dict[str, Any]]:
+        where = "WHERE active" if active_only else ""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT id, query, label, since_year, active, created_at "
+                    f"FROM {SCHEMA}.watches {where} ORDER BY id"
+                )
+                return list(cur.fetchall())
+
+    def remove_watch(self, watch_id: int) -> bool:
+        """Deactivate (not delete) so snapshot history survives."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.watches SET active = FALSE "
+                    f"WHERE id = %s AND active",
+                    (watch_id,),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
+    def latest_watch_snapshot(self, watch_id: int) -> Optional[Dict[str, Any]]:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, watch_id, taken_at, findings_count, payload
+                    FROM   {SCHEMA}.watch_snapshots
+                    WHERE  watch_id = %s
+                    ORDER  BY taken_at DESC, id DESC
+                    LIMIT  1
+                    """,
+                    (watch_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def save_watch_snapshot(
+        self, watch_id: int, *, findings_count: int, payload: List[Dict[str, Any]]
+    ) -> None:
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.watch_snapshots
+                        (watch_id, findings_count, payload)
+                    VALUES (%s, %s, %s::jsonb)
+                    """,
+                    (watch_id, findings_count, json.dumps(payload, ensure_ascii=False)),
+                )
+            conn.commit()
+
+    # ------------------------------------------------------------------
     # Crawl runs
     # ------------------------------------------------------------------
 

@@ -109,10 +109,23 @@ jobs:
           python -m study_scraper status
           python -m study_scraper status --json > scrape-status.json
 
+      - name: Opinion digest (monitoring v1)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
+        run: |
+          # Aggregates every active watch (see `watch add`), reports
+          # shifts >=5pts and newly tracked questions vs the previous
+          # digest, and stores the new snapshot in the DB.
+          python -m study_scraper digest --out opinion-digest.md || true
+          cat opinion-digest.md || true
+
       - name: Upload status artifact
         if: steps.gate.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: scrape-status-${{ github.run_id }}
-          path: scrape-status.json
+          path: |
+            scrape-status.json
+            opinion-digest.md
           retention-days: 30

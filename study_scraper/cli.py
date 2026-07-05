@@ -656,6 +656,89 @@ def view(
         typer.echo(line)
 
 
+watch_app = typer.Typer(
+    help="Standing questions for the monitoring digest (product Axis 1).",
+    no_args_is_help=True,
+)
+app.add_typer(watch_app, name="watch")
+
+
+@watch_app.command("add")
+def watch_add(
+    query: str = typer.Argument(
+        ..., help="Keyword(s) matched against attribution questions."
+    ),
+    label: Optional[str] = typer.Option(
+        None, "--label", help="Human-readable heading for the digest."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since", help="Only findings from this year or later."
+    ),
+) -> None:
+    """Register a standing question. Each `digest` run aggregates its
+    findings and reports shifts/novelties against the previous run."""
+    storage = _storage_from_settings()
+    watch_id = storage.add_watch(query=query, label=label, since_year=since)
+    typer.echo(f"watch {watch_id} active: {label or query!r}")
+
+
+@watch_app.command("list")
+def watch_list(
+    all_: bool = typer.Option(
+        False, "--all", help="Include deactivated watches."
+    ),
+) -> None:
+    """List watches."""
+    storage = _storage_from_settings()
+    rows = storage.list_watches(active_only=not all_)
+    if not rows:
+        typer.echo("(no watches — add one with `watch add <query>`)")
+        return
+    for row in rows:
+        state = "active" if row["active"] else "off"
+        since = f" since={row['since_year']}" if row.get("since_year") else ""
+        label = f"  — {row['label']}" if row.get("label") else ""
+        typer.echo(f"{row['id']:>3}  [{state:<6}] {row['query']!r}{since}{label}")
+
+
+@watch_app.command("rm")
+def watch_rm(watch_id: int = typer.Argument(...)) -> None:
+    """Deactivate a watch (snapshot history is kept)."""
+    storage = _storage_from_settings()
+    changed = storage.remove_watch(watch_id)
+    typer.echo("deactivated" if changed else "no change (unknown or already off)")
+
+
+@app.command()
+def digest(
+    out: Optional[Path] = typer.Option(
+        None, "--out", help="Write the Markdown digest here (else stdout)."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Compute without saving snapshots (repeatable preview).",
+    ),
+) -> None:
+    """Run the monitoring digest over all active watches: aggregate each
+    standing question, report shifts (≥5 pts) and newly tracked
+    questions vs the previous digest, store the new snapshot. Designed
+    to run after each scheduled crawl."""
+    from study_scraper.digest import format_digest_markdown, run_digest
+
+    storage = _storage_from_settings()
+    digests = run_digest(storage, save=not dry_run)
+    text = format_digest_markdown(digests)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        news = sum(1 for d in digests if d.has_news)
+        typer.echo(
+            f"wrote {out} — {len(digests)} watch(es), {news} with news"
+        )
+    else:
+        typer.echo(text)
+
+
 review_app = typer.Typer(
     help="Human review of pending candidates (Q12 review queue).",
     no_args_is_help=True,
