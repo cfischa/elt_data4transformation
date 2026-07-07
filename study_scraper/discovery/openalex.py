@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import httpx
 
 from study_scraper.discovery.base import Candidate, DiscoverySource
+from study_scraper.http import get_with_retry
 from study_scraper.topics import Topic
 
 
@@ -119,7 +120,7 @@ class OpenAlexSource:
         while True:
             params["cursor"] = cursor
             LOGGER.info("OpenAlex request: %s", params)
-            resp = self._client.get(self._base_url, params=params)
+            resp = get_with_retry(self._client, self._base_url, params=params)
             resp.raise_for_status()
             payload = resp.json()
             for cand in self._parse_payload(payload, topic=topic, limit=None):

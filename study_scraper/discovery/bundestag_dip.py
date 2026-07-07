@@ -36,6 +36,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import httpx
 
 from study_scraper.discovery.base import Candidate
+from study_scraper.http import get_with_retry
 from study_scraper.topics import Topic
 
 LOGGER = logging.getLogger(__name__)
@@ -120,8 +121,8 @@ class BundestagDIPSource:
                 if cursor:
                     params["cursor"] = cursor
                 LOGGER.info("DIP request: f.titel=%r cursor=%s", term, cursor)
-                resp = self._client.get(
-                    f"{self._base_url}/drucksache", params=params
+                resp = get_with_retry(
+                    self._client, f"{self._base_url}/drucksache", params=params
                 )
                 resp.raise_for_status()
                 payload = resp.json()

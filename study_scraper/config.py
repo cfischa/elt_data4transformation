@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     )
     http_timeout_seconds: float = Field(default=30.0)
     http_max_retries: int = Field(default=3)
+    # Small pause between successive document fetches in the fulltext loop so
+    # we don't burst dozens of PDF requests at one host (scraper politeness).
+    http_politeness_delay_seconds: float = Field(default=0.5)
     respect_robots_txt: bool = Field(default=True)
 
     @property

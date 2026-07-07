@@ -30,6 +30,7 @@ from xml.etree import ElementTree as ET
 import httpx
 
 from study_scraper.discovery.base import Candidate, DiscoverySource
+from study_scraper.http import get_with_retry
 from study_scraper.topics import Topic
 
 
@@ -105,7 +106,7 @@ class SSOARSource:
         # caller passes --limit to keep the live run bounded.
         while True:
             LOGGER.info("SSOAR OAI-PMH request: %s", params)
-            resp = self._client.get(self._base_url, params=params)
+            resp = get_with_retry(self._client, self._base_url, params=params)
             resp.raise_for_status()
             for cand in self._parse_response(resp.text, topic=topic, limit=None):
                 yield cand

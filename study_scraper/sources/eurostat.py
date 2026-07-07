@@ -41,6 +41,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 import httpx
 
+from study_scraper.http import get_with_retry
 from study_scraper.models import SourceRecord
 
 
@@ -185,7 +186,7 @@ class EurostatSource:
         url = f"{self._base_url}/{code}"
         params = self._params(with_filters=with_filters)
         LOGGER.info("eurostat GET %s params=%s", url, params)
-        return self._client.get(url, params=params)
+        return get_with_retry(self._client, url, params=params)
 
     # ------------------------------------------------------------------
     # Fixture path

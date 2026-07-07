@@ -38,6 +38,7 @@ import httpx
 
 from study_scraper.claims import extract_claims_from_text
 from study_scraper.config import get_settings
+from study_scraper.http import get_with_retry, polite_sleep
 from study_scraper.pdf_resolver import is_pdf_url, resolve_pdf_url
 from study_scraper.storage import PostgresStorage
 
@@ -181,7 +182,7 @@ def fetch_url(url: str, *, timeout: float = 60.0) -> Tuple[bytes, Optional[str]]
         headers={"User-Agent": settings.http_user_agent},
         follow_redirects=True,
     ) as client:
-        resp = client.get(url)
+        resp = get_with_retry(client, url)
         resp.raise_for_status()
         return resp.content, resp.headers.get("content-type")
 
@@ -241,7 +242,10 @@ def run_fulltext(
         )
 
     results: List[Dict[str, Any]] = []
-    for row in rows:
+    politeness = get_settings().http_politeness_delay_seconds
+    for idx, row in enumerate(rows):
+        if idx > 0:
+            polite_sleep(politeness)  # don't burst all documents at one host
         sid = row["id"]
         url, why = select_fetch_url(
             canonical_url=row.get("canonical_url"),
