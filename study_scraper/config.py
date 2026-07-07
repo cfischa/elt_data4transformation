@@ -33,6 +33,11 @@ class Settings(BaseSettings):
         default=REPO_ROOT / "config" / "topics" / "topics.csv",
         description="CSV of topics edited by the maintainer.",
     )
+    questions_yaml_path: Path = Field(
+        default=REPO_ROOT / "config" / "topics" / "questions.yml",
+        description="Registry of standing questions, each scoped to a topic. "
+        "The declarative source of the monitoring watches.",
+    )
 
     # Storage — Supabase primary (per DECISIONS.md A7). When unset, the
     # scraper falls back to a plain Postgres URL for local development.

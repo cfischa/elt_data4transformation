@@ -435,6 +435,43 @@ This document tracks design decisions for the study scraper. Two sections:
   `GOAL.md` remain valid as the eventual bar — they just aren't measured
   until the gold set exists.
 
+### A22. Question registry — topics and questions are one thing (2026-07-07)
+- **Decision:** A standing **question registry** (`config/topics/questions.yml`,
+  loaded by `study_scraper/questions.py`) sits beside `topics.csv`. Each
+  question is a neutral proposition scoped to exactly one topic id. The
+  registry is the **declarative source of the monitoring watches**:
+  `questions sync` upserts each question as a `watch`, and the existing
+  crawl → attribute → **digest** loop answers it from all relevant
+  attributions and tracks it over time.
+- **Rationale (maintainer, 2026-07-07):** "We have questions and topics —
+  this should be ONE thing. All relevant data we collect should be used to
+  answer the registered questions. Streamline the logic." `topics.csv`
+  already steers collection; questions were only ever emergent (whatever
+  the llm-v1 extractor found per document) and ad-hoc (`ask`). The registry
+  ties the two halves together: *which subjects we collect for* × *which
+  propositions we answer*.
+- **Why no new answerer / no new statistics:** `watches` (A-series
+  monitoring v1, migration 0009) is already "a registry of standing
+  questions answered over the whole corpus". Rather than add a parallel
+  surface, the question registry **feeds** it. Answering reuses the shipped
+  `search_attributions_semantic → aggregate_findings` path unchanged, so a
+  registered question resolves to a **set of question-cluster answers**
+  (spread shown, populations kept distinct) — never a single averaged
+  number across heterogeneous polls.
+- **Why not fold question keywords into collection (rejected):**
+  `Topic.all_keywords()` is not on the discovery/scoring path (discovery
+  builds queries from `include_keywords + synonyms` directly; scoring uses
+  `topic_filter._gather_terms`), so folding question keywords there would be
+  a silent no-op; wiring them into the real capped query builders would
+  displace topic terms and add false-friend surfaces the per-topic
+  `exclude_keywords` never covered. Collection-for-questions is deferred to
+  a separate change with its own exclude review. v1 answers the questions
+  from the data the topics already collect.
+- **Invariants (loader-enforced):** every `topic_id` exists in `topics.csv`;
+  question `id` and `query` are each unique across the registry
+  (`watches.query` is UNIQUE). A test guards that the shipped registry
+  stays consistent with the shipped topics.
+
 ---
 
 ## Open questions
