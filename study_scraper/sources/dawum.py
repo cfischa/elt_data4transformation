@@ -40,6 +40,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 import httpx
 
+from study_scraper.http import get_with_retry
 from study_scraper.models import SourceRecord
 
 
@@ -98,7 +99,7 @@ class DAWUMSource:
             payload = json.loads(self._from_file.read_text(encoding="utf-8"))
         else:
             LOGGER.info("DAWUM GET %s", self._base_url)
-            resp = self._client.get(self._base_url)
+            resp = get_with_retry(self._client, self._base_url)
             resp.raise_for_status()
             payload = resp.json()
 
