@@ -75,11 +75,32 @@ Two independent input types:
   entirely.
 
 ### 4 · How we answer questions
-- **CLI:** `python -m study_scraper ask "atomkraft"` → searches
-  `attributions` → returns `PCT% position question` + source.
+Topics and questions are **one registry**: `topics.csv` says *which
+subjects we collect for*, `questions.yml` says *which propositions we
+answer within them*. Each registered question is a neutral proposition
+scoped to one topic (e.g. `atomkraft → "Should Germany keep or return to
+nuclear power?"`).
+
+- **The registry → the loop.** `python -m study_scraper questions sync`
+  upserts each question as a monitoring **watch** (idempotent). From then
+  on the existing crawl → attribute → **digest** loop answers it from
+  **all relevant attributions** (poll-of-polls over the whole corpus,
+  `aggregate.py`) and tracks it over time — no separate answerer, no new
+  statistics.
+- **On demand:** `python -m study_scraper questions answer [--topic X]`
+  answers every registered question now: a **set of question-cluster
+  answers** with the spread shown honestly (never one collapsed number),
+  and flags questions with no findings as **coverage gaps** (they need
+  more collection — the loop back to `topics.csv`).
+- **Ad hoc:** `python -m study_scraper ask "atomkraft"` / `answer "…"` for
+  free-text queries outside the registry.
 - **Dashboard:** the Streamlit dock (`study_scraper/console/`) — Home
   (counts), Topics (taxonomy), Review (the `pending` queue), Lake (raw
   structured data). Reads live from Postgres.
+
+The registry closes the loop the maintainer asked for: *define the
+questions → collect data for them → answer them from everything relevant
+→ see the gaps → collect more.*
 
 ## "I don't want to review by hand" — you already mostly don't
 - The automated loop (`kept → claims → attributions → answers`) needs **no
@@ -100,4 +121,6 @@ Two independent input types:
 | Claims | `study_scraper/claims.py` |
 | Attributions | `study_scraper/attribute.py`, `study_scraper/extractors/llm_v1.py` |
 | Storage / schema | `study_scraper/storage/postgres.py`, `study_scraper/migrations/` |
-| Answer | `ask` in `study_scraper/cli.py`, `study_scraper/console/` |
+| Question registry | `config/topics/questions.yml`, `study_scraper/questions.py` |
+| Answer | `ask` / `answer` / `questions` in `study_scraper/cli.py`, `study_scraper/console/` |
+| Monitoring loop | `study_scraper/digest.py` (answers + tracks synced questions) |

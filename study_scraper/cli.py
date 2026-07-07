@@ -812,6 +812,142 @@ def watch_rm(watch_id: int = typer.Argument(...)) -> None:
     typer.echo("deactivated" if changed else "no change (unknown or already off)")
 
 
+questions_app = typer.Typer(
+    help="Question registry — the standing propositions we answer, tied to "
+    "topics. The declarative source of the monitoring watches.",
+    no_args_is_help=True,
+)
+app.add_typer(questions_app, name="questions")
+
+
+def _load_registry() -> "List":
+    """Load questions.yml, validated against the live topics."""
+    from study_scraper.questions import QuestionRegistryError, load_questions
+
+    settings = get_settings()
+    topics = load_topics(settings.topics_csv_path)
+    try:
+        return load_questions(
+            settings.questions_yaml_path,
+            valid_topic_ids=[t.id for t in topics],
+        )
+    except (QuestionRegistryError, FileNotFoundError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
+def _topic_names() -> dict:
+    settings = get_settings()
+    return {t.id: t.primary_name for t in load_topics(settings.topics_csv_path)}
+
+
+@questions_app.command("list")
+def questions_list(
+    topic: Optional[str] = typer.Option(
+        None, "--topic", help="Only questions for this topic id."
+    ),
+) -> None:
+    """List the registered questions grouped by topic (reads config only)."""
+    registry = _load_registry()
+    if topic is not None:
+        registry = [q for q in registry if q.topic_id == topic]
+    if not registry:
+        typer.echo("(no questions — edit config/topics/questions.yml)")
+        return
+    current = None
+    for q in sorted(registry, key=lambda q: (q.topic_id, q.id)):
+        if q.topic_id != current:
+            current = q.topic_id
+            typer.echo(f"\n{q.topic_id}")
+        since = f"  (since {q.since_year})" if q.since_year else ""
+        typer.echo(f"  {q.id}\t{q.text}\t[query: {q.query!r}]{since}")
+
+
+@questions_app.command("sync")
+def questions_sync(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be synced without writing."
+    ),
+) -> None:
+    """Materialize the registry as monitoring watches (idempotent).
+
+    Each registered question becomes a `watch` (upsert on the unique
+    query), so the existing crawl → attribute → digest loop answers it
+    from ALL relevant attributions and tracks it over time. Re-running is
+    safe: unchanged questions are updated in place, not duplicated.
+    """
+    from study_scraper.questions import watch_spec_for
+
+    registry = _load_registry()
+    names = _topic_names()
+    if dry_run:
+        for q in registry:
+            spec = watch_spec_for(q, topic_name=names.get(q.topic_id))
+            typer.echo(f"would sync: {spec['query']!r}  — {spec['label']}")
+        typer.echo(f"\n{len(registry)} question(s) (dry run — nothing written)")
+        return
+
+    storage = _storage_from_settings()
+    for q in registry:
+        spec = watch_spec_for(q, topic_name=names.get(q.topic_id))
+        wid = storage.add_watch(
+            query=str(spec["query"]),
+            label=str(spec["label"]),
+            since_year=spec["since_year"],
+        )
+        typer.echo(f"watch {wid:>3}  {spec['query']!r}")
+    typer.echo(f"\nsynced {len(registry)} question(s) into watches")
+
+
+@questions_app.command("answer")
+def questions_answer(
+    topic: Optional[str] = typer.Option(
+        None, "--topic", help="Only answer questions for this topic id."
+    ),
+    since: Optional[int] = typer.Option(
+        None, "--since", help="Only findings from this year or later."
+    ),
+) -> None:
+    """Answer every registered question from ALL relevant data.
+
+    For each question this runs the same poll-of-polls path the digest
+    uses (`search_attributions_semantic` → `aggregate_findings`): a set
+    of question-cluster answers with the spread shown honestly — never a
+    single collapsed number. Questions with no matching findings are
+    flagged as coverage gaps (they need more collection).
+    """
+    from study_scraper.aggregate import aggregate_findings, format_answer
+
+    registry = _load_registry()
+    if topic is not None:
+        registry = [q for q in registry if q.topic_id == topic]
+    if not registry:
+        typer.echo("(no questions matched)")
+        return
+
+    storage = _storage_from_settings()
+    gaps: List[str] = []
+    for q in sorted(registry, key=lambda q: (q.topic_id, q.id)):
+        floor = since if since is not None else q.since_year
+        rows = storage.search_attributions_semantic(
+            query=q.query, limit=500, since=floor
+        )
+        answers = aggregate_findings(rows)
+        typer.echo(f"\n### [{q.topic_id}] {q.text}")
+        if not answers:
+            typer.echo("  (coverage gap — no findings yet; needs collection)")
+            gaps.append(f"{q.topic_id}/{q.id}")
+            continue
+        for a in answers:
+            typer.echo(format_answer(a))
+            typer.echo("")
+    if gaps:
+        typer.echo(f"\ncoverage gaps ({len(gaps)}): {', '.join(gaps)}")
+    typer.echo(
+        "\nmethod: weighted mean per question cluster; weights = recency "
+        "(3y half-life) × sqrt(n/1000) clamped to [0.3, 3]."
+    )
+
+
 @app.command()
 def digest(
     out: Optional[Path] = typer.Option(
