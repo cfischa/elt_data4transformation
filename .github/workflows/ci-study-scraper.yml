@@ -25,6 +25,6 @@ jobs:
       - name: Install deps
         run: |
           pip install pytest httpx pydantic pydantic-settings typer PyYAML \
-                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 tenacity
       - name: Run study_scraper tests
         run: python -m pytest tests/study_scraper -o addopts="" -q

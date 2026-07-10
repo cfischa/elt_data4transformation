@@ -35,7 +35,7 @@ jobs:
       - name: Install runtime dependencies
         run: |
           pip install httpx pydantic pydantic-settings typer PyYAML \
-                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4
+                      "psycopg[binary]" SPARQLWrapper pypdf beautifulsoup4 tenacity
 
       - name: Check database secret
         id: gate

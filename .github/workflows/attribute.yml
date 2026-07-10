@@ -47,7 +47,7 @@ jobs:
       - name: Install runtime dependencies
         run: |
           pip install httpx pydantic pydantic-settings typer PyYAML \
-                      "psycopg[binary]"
+                      "psycopg[binary]" tenacity
 
       - name: Check secrets
         id: gate
