@@ -134,6 +134,28 @@ def test_topic_scores_populated(
         assert 0.0 < row["topic_scores"]["klima"] <= 1.0
 
 
+def test_last_crawl_finished_at_tracks_completed_runs(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """Feeds the SSOAR OAI `from=` incremental window (issue #34): None
+    before any run, then the run's finished_at once one completes."""
+    assert storage.last_crawl_finished_at(
+        source_id="ssoar", topic_id="klima"
+    ) is None
+
+    with SSOARSource(from_file=FIXTURE) as src:
+        run = run_one(source=src, topic=klima_topic, storage=storage)
+
+    latest = storage.last_crawl_finished_at(source_id="ssoar", topic_id="klima")
+    assert latest is not None
+    assert latest == run.finished_at
+
+    # A different (source, topic) pair stays untouched.
+    assert storage.last_crawl_finished_at(
+        source_id="openalex", topic_id="klima"
+    ) is None
+
+
 def test_openalex_citation_graph_propagated_to_provenance(
     storage: PostgresStorage, klima_topic
 ) -> None:

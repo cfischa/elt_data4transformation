@@ -187,17 +187,49 @@ def process_document(
 # ----------------------------------------------------------------------
 
 
-def fetch_url(url: str, *, timeout: float = 60.0) -> Tuple[bytes, Optional[str]]:
-    """GET one URL; returns (bytes, content_type). Raises on HTTP error."""
+def fetch_url(
+    url: str,
+    *,
+    timeout: float = 60.0,
+    headers: Optional[Dict[str, str]] = None,
+    transport: Optional[httpx.BaseTransport] = None,
+) -> Tuple[Optional[bytes], Optional[str], httpx.Response]:
+    """GET one URL; returns (content, content_type, response).
+
+    `content` is `None` when the server answers 304 Not Modified for a
+    conditional request (`headers` carrying If-None-Match /
+    If-Modified-Since, issue #34) — callers should treat that as
+    "unchanged, skip processing" rather than an error. Raises on other
+    HTTP error statuses via `raise_for_status()`. `transport` lets tests
+    inject an `httpx.MockTransport` instead of hitting the network.
+    """
     settings = get_settings()
     with httpx.Client(
         timeout=timeout,
         headers={"User-Agent": settings.http_user_agent},
         follow_redirects=True,
+        transport=transport,
     ) as client:
-        resp = get_with_retry(client, url)
+        resp = get_with_retry(client, url, headers=headers)
+        if resp.status_code == 304:
+            return None, None, resp
         resp.raise_for_status()
-        return resp.content, resp.headers.get("content-type")
+        return resp.content, resp.headers.get("content-type"), resp
+
+
+def conditional_headers(provenance: Dict[str, Any]) -> Dict[str, str]:
+    """Build If-None-Match / If-Modified-Since headers from a study's
+    stored provenance (see `PostgresStorage.set_fetch_conditional`).
+    Empty dict when neither was captured on a prior fetch — an
+    unconditional GET, same as before this feature existed."""
+    headers: Dict[str, str] = {}
+    etag = provenance.get("fetch_etag")
+    if etag:
+        headers["If-None-Match"] = etag
+    last_modified = provenance.get("fetch_last_modified")
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+    return headers
 
 
 # openalex.org work pages are bot-protected METADATA pages, never the
@@ -277,29 +309,43 @@ def run_fulltext(
             LOGGER.info("fulltext %s: no_fetchable_url", sid[:12])
             continue
         resolved_pdf: Optional[str] = None
+        cond_headers = conditional_headers(row.get("provenance") or {})
         try:
-            content, content_type = fetch_url(url)
-            # If we landed on an HTML page (not the PDF itself), try to
-            # resolve the real document and read THAT instead — otherwise
-            # we'd extract the landing page's chrome, not the study.
-            if sniff_kind(content, content_type) == "html" and not is_pdf_url(url):
-                pdf_url = resolve_pdf_url(url, content)
-                if pdf_url and pdf_url != url:
-                    try:
-                        pdf_content, pdf_ct = fetch_url(pdf_url)
-                        if sniff_kind(pdf_content, pdf_ct) == "pdf":
-                            content, content_type = pdf_content, pdf_ct
-                            resolved_pdf = pdf_url
-                            storage.set_resolved_pdf_url(sid, pdf_url)
-                    except Exception as exc:  # fall back to the landing HTML
-                        LOGGER.warning(
-                            "resolved pdf fetch failed (%s); using landing page: %s",
-                            pdf_url, exc,
-                        )
-            summary = process_document(
-                storage=storage, study_id=sid,
-                content=content, content_type=content_type,
-            )
+            content, content_type, resp = fetch_url(url, headers=cond_headers)
+            if content is None:
+                # 304 Not Modified: the document hasn't changed since our
+                # last fetch (issue #34) — leave the existing artifact and
+                # claims alone, don't re-process.
+                summary = {
+                    "study_id": sid, "status": "not_modified", "claims": 0,
+                }
+            else:
+                # If we landed on an HTML page (not the PDF itself), try to
+                # resolve the real document and read THAT instead — otherwise
+                # we'd extract the landing page's chrome, not the study.
+                if sniff_kind(content, content_type) == "html" and not is_pdf_url(url):
+                    pdf_url = resolve_pdf_url(url, content)
+                    if pdf_url and pdf_url != url:
+                        try:
+                            pdf_content, pdf_ct, _pdf_resp = fetch_url(pdf_url)
+                            if sniff_kind(pdf_content, pdf_ct) == "pdf":
+                                content, content_type = pdf_content, pdf_ct
+                                resolved_pdf = pdf_url
+                                storage.set_resolved_pdf_url(sid, pdf_url)
+                        except Exception as exc:  # fall back to the landing HTML
+                            LOGGER.warning(
+                                "resolved pdf fetch failed (%s); using landing page: %s",
+                                pdf_url, exc,
+                            )
+                summary = process_document(
+                    storage=storage, study_id=sid,
+                    content=content, content_type=content_type,
+                )
+                storage.set_fetch_conditional(
+                    sid,
+                    etag=resp.headers.get("etag"),
+                    last_modified=resp.headers.get("last-modified"),
+                )
         except Exception as exc:
             summary = {
                 "study_id": sid, "status": f"fetch_error: {exc}",
