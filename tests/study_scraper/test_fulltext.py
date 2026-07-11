@@ -7,6 +7,7 @@ STUDY_SCRAPER_TEST_DSN like the rest of the integration suite.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +16,9 @@ from typing import Iterator
 import pytest
 
 from study_scraper.claims import extract_claims_from_text
+from study_scraper.config import get_settings
 from study_scraper.fulltext import (
+    PROCESSED_MARKER_PREFIX,
     extract_text,
     extract_text_from_html,
     extract_text_from_pdf,
@@ -75,6 +78,21 @@ class TestTextExtraction:
         assert kind == "html" and "68%" in text
         kind, text = extract_text(b"\x00\x01", None)
         assert kind == "unknown" and text == ""
+
+
+class TestPersistArtifactsSetting:
+    """Pure: no DB needed to check the config knob itself."""
+
+    def test_defaults_true(self) -> None:
+        from study_scraper.config import Settings
+
+        assert Settings().persist_artifacts is True
+
+    def test_env_var_disables(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from study_scraper.config import Settings
+
+        monkeypatch.setenv("STUDY_SCRAPER_PERSIST_ARTIFACTS", "false")
+        assert Settings().persist_artifacts is False
 
 
 class TestFulltextClaims:
@@ -254,6 +272,33 @@ def test_reading_list_view_reasons(
     assert quant.id not in by_id                      # has claims
     assert by_id[quali.id]["reason"] == "no_claims"   # read it yourself
     assert by_id[fresh.id]["reason"] == "no_artifact" # fetch pending
+
+
+def test_process_document_no_persist_leaves_marker_not_path(
+    storage: PostgresStorage, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """STUDY_SCRAPER_PERSIST_ARTIFACTS=false (scheduled CI, disk vanishes
+    after the job): no file is written, but raw_artifact_ref still gets a
+    processed:<sha> marker so the fulltext queue excludes the study."""
+    monkeypatch.setattr(get_settings(), "persist_artifacts", False)
+    study = _mk_study("https://example.org/ci-run.pdf", "Report processed in CI")
+    storage.upsert_study(study)
+
+    summary = process_document(
+        storage=storage, study_id=study.id,
+        content=PDF_BYTES, content_type="application/pdf",
+        artifact_dir=tmp_path,
+    )
+    assert summary["status"] == "ok"
+    expected_ref = PROCESSED_MARKER_PREFIX + hashlib.sha256(PDF_BYTES).hexdigest()
+    assert summary["artifact"] == expected_ref
+    assert list(tmp_path.iterdir()) == []  # nothing written to disk
+
+    row = storage.get_study(study.id)
+    assert row["raw_artifact_ref"] == expected_ref
+
+    queue = storage.list_studies_for_fulltext(limit=10)
+    assert study.id not in {r["id"] for r in queue}  # still leaves the queue
 
 
 def test_list_studies_for_fulltext_queue(
