@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     artifact_local_dir: Path = Field(
         default=REPO_ROOT / "data" / "study_scraper" / "raw",
     )
+    # Scheduled CI runners destroy their disk after the job, so a stored
+    # filesystem path in raw_artifact_ref would dangle forever. Set
+    # STUDY_SCRAPER_PERSIST_ARTIFACTS=false there to skip the write and
+    # record a processed:<sha> marker instead (see DECISIONS.md A23).
+    persist_artifacts: bool = Field(
+        default=True, validation_alias="STUDY_SCRAPER_PERSIST_ARTIFACTS"
+    )
 
     # HTTP
     http_user_agent: str = Field(

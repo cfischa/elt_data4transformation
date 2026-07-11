@@ -28,6 +28,7 @@ the live loop on the maintainer's machine.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from io import BytesIO
@@ -46,6 +47,11 @@ from study_scraper.storage import PostgresStorage
 LOGGER = logging.getLogger(__name__)
 
 FULLTEXT_EXTRACTOR = "regex-v2"
+
+# raw_artifact_ref marker used when the runtime doesn't persist artifacts
+# (e.g. scheduled CI, whose disk vanishes after the job) — proves the
+# document WAS fetched/processed without claiming a file exists.
+PROCESSED_MARKER_PREFIX = "processed:"
 
 # Hard cap on artifact size — a polling report is rarely >20 MB; bigger
 # usually means we hit a data dump or video by mistake.
@@ -147,16 +153,23 @@ def process_document(
         }
 
     # Persist the raw artifact under sha-named file so re-fetching the
-    # same study overwrites rather than accumulates.
-    base_dir = artifact_dir or get_settings().artifact_local_dir
-    base_dir.mkdir(parents=True, exist_ok=True)
-    ext = "pdf" if kind == "pdf" else "html"
-    artifact_path = base_dir / f"{study_id}.{ext}"
-    artifact_path.write_bytes(content)
+    # same study overwrites rather than accumulates. Skipped in runtimes
+    # whose disk doesn't survive the job (STUDY_SCRAPER_PERSIST_ARTIFACTS=
+    # false) — a marker records that fulltext ran without claiming a file
+    # exists, so the fulltext queue (raw_artifact_ref IS NULL) still works.
+    if get_settings().persist_artifacts:
+        base_dir = artifact_dir or get_settings().artifact_local_dir
+        base_dir.mkdir(parents=True, exist_ok=True)
+        ext = "pdf" if kind == "pdf" else "html"
+        artifact_path = base_dir / f"{study_id}.{ext}"
+        artifact_path.write_bytes(content)
+        ref = str(artifact_path)
+    else:
+        ref = PROCESSED_MARKER_PREFIX + hashlib.sha256(content).hexdigest()
 
     claims = extract_claims_from_text(study_id=study_id, text=text)
     n = storage.upsert_claims(study_id, claims, extractor=FULLTEXT_EXTRACTOR)
-    storage.set_artifact_ref(study_id, str(artifact_path))
+    storage.set_artifact_ref(study_id, ref)
 
     return {
         "study_id": study_id,
@@ -165,7 +178,7 @@ def process_document(
         "bytes": len(content),
         "text_chars": len(text),
         "claims": n,
-        "artifact": str(artifact_path),
+        "artifact": ref,
     }
 
 

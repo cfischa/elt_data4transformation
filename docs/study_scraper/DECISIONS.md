@@ -472,6 +472,32 @@ This document tracks design decisions for the study scraper. Two sections:
   (`watches.query` is UNIQUE). A test guards that the shipped registry
   stays consistent with the shipped topics.
 
+### A23. Artifact persistence is environment-aware (fixes dangling `raw_artifact_ref` in CI)
+- **Problem (found 2026-07-02):** `fulltext.process_document` writes the
+  fetched PDF/HTML to `artifact_local_dir` and stores that filesystem path
+  in `studies.raw_artifact_ref`. The scheduled GitHub Action's runner disk
+  is destroyed after the job, so every ref written by a CI run points at a
+  path that no longer exists anywhere (84 studies after that run). Text and
+  claims are safely in Postgres — only the raw-bytes pointer lies.
+- **Decision:** a new setting, `persist_artifacts` (env
+  `STUDY_SCRAPER_PERSIST_ARTIFACTS`, default `true`). When `false`,
+  `process_document` skips the file write entirely and sets
+  `raw_artifact_ref` to a `processed:<sha256>` marker instead of a path —
+  proof fulltext ran, without claiming a file exists. `list_studies_for_fulltext`
+  only checks `raw_artifact_ref IS NULL`, so the marker still removes the
+  study from the fulltext queue; nothing else reads the ref as a path.
+- **Why not skip setting `raw_artifact_ref` at all:** the queue-exclusion
+  query would re-fetch and re-process the same studies every run.
+- **Why not upload to Supabase Storage instead (rejected for now):** the
+  bucket (`artifact_bucket` setting) already exists as a placeholder but
+  wiring real upload is a bigger, separate change (client, bucket
+  provisioning, retry policy). This fix is the minimal correctness patch;
+  Supabase Storage upload is a follow-up once the bucket is provisioned.
+- **Maintainer action needed (`needs-human`):** set
+  `STUDY_SCRAPER_PERSIST_ARTIFACTS=false` in the scheduled workflow's env
+  (`.github/workflows/scrape.yml` or equivalent) — out of this agent's
+  edit scope (`.github/**`).
+
 ---
 
 ## Open questions
