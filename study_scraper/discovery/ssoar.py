@@ -64,12 +64,18 @@ class SSOARSource:
         *,
         base_url: str = DEFAULT_BASE_URL,
         from_file: Optional[Path] = None,
+        since: Optional[date] = None,
         client: Optional[httpx.Client] = None,
         timeout: float = 30.0,
         user_agent: str = "study-scraper/0.0.1 (+https://github.com/cfischa/elt_data4transformation)",
     ) -> None:
         self._base_url = base_url
         self._from_file = from_file
+        # OAI-PMH `from=` (issue #34): harvest only records added/updated
+        # since the last successful run instead of re-walking the same
+        # ~400 newest records every time. None => full harvest (first run,
+        # or the caller explicitly wants everything via --full).
+        self._since = since
         self._owns_client = client is None
         self._client = client or httpx.Client(
             timeout=timeout,
@@ -104,6 +110,8 @@ class SSOARSource:
         # SSOAR doesn't accept a `q=` keyword on OAI-PMH; we yield all
         # records in a date range and let topic_filter filter. The
         # caller passes --limit to keep the live run bounded.
+        if self._since is not None:
+            params["from"] = self._since.strftime("%Y-%m-%d")
         while True:
             LOGGER.info("SSOAR OAI-PMH request: %s", params)
             resp = get_with_retry(self._client, self._base_url, params=params)

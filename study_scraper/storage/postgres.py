@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 from urllib.parse import urlparse
@@ -528,6 +529,40 @@ class PostgresStorage:
                     f"       updated_at = now() "
                     f" WHERE id = %s",
                     (pdf_url, study_id),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
+    def set_fetch_conditional(
+        self,
+        study_id: str,
+        *,
+        etag: Optional[str] = None,
+        last_modified: Optional[str] = None,
+    ) -> bool:
+        """Record ETag/Last-Modified from the last successful fulltext
+        fetch, merged into provenance jsonb (no schema change), so the
+        next run can send a conditional GET (If-None-Match /
+        If-Modified-Since) and skip unchanged documents (issue #34).
+        No-op (returns False) when neither header was present. True if
+        updated."""
+        patch: Dict[str, Any] = {}
+        if etag:
+            patch["fetch_etag"] = etag
+        if last_modified:
+            patch["fetch_last_modified"] = last_modified
+        if not patch:
+            return False
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET provenance = COALESCE(provenance, '{{}}'::jsonb) "
+                    f"       || %s::jsonb, "
+                    f"       updated_at = now() "
+                    f" WHERE id = %s",
+                    (json.dumps(patch), study_id),
                 )
                 changed = cur.rowcount > 0
             conn.commit()
@@ -1276,6 +1311,27 @@ class PostgresStorage:
                     ),
                 )
             conn.commit()
+
+    def last_crawl_finished_at(
+        self, *, source_id: str, topic_id: str
+    ) -> Optional[datetime]:
+        """Timestamp of the most recently completed crawl_runs row for this
+        (source, topic) pair, or None if no prior run exists. Feeds the
+        SSOAR OAI `from=` incremental window (issue #34): full harvest on
+        the first run, incremental thereafter."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT MAX(finished_at) AS latest
+                    FROM   {SCHEMA}.crawl_runs
+                    WHERE  source_id = %s AND topic_id = %s
+                      AND  finished_at IS NOT NULL
+                    """,
+                    (source_id, topic_id),
+                )
+                row = cur.fetchone()
+        return row["latest"] if row else None
 
     def attach_studies_to_run(
         self,

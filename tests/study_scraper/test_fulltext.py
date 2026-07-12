@@ -322,6 +322,39 @@ def test_list_studies_for_fulltext_queue(
     assert {r["id"] for r in queue} == {a.id, b.id}
 
 
+def test_set_fetch_conditional_merges_into_provenance(
+    storage: PostgresStorage,
+) -> None:
+    """Issue #34: ETag/Last-Modified from a fulltext fetch persist onto
+    the study's provenance so the next run can send a conditional GET."""
+    study = _mk_study("https://example.org/cond.pdf", "Conditional GET study")
+    storage.upsert_study(study)
+
+    changed = storage.set_fetch_conditional(
+        study.id, etag='"abc123"', last_modified="Wed, 01 Jul 2026 00:00:00 GMT",
+    )
+    assert changed is True
+
+    row = storage.get_study(study.id)
+    assert row["provenance"]["fetch_etag"] == '"abc123"'
+    assert row["provenance"]["fetch_last_modified"] == "Wed, 01 Jul 2026 00:00:00 GMT"
+
+    # Existing provenance keys survive the merge.
+    assert row["provenance"]["discovery_source"] == "ssoar"
+
+
+def test_set_fetch_conditional_noop_without_headers(
+    storage: PostgresStorage,
+) -> None:
+    study = _mk_study("https://example.org/nocond.pdf", "No headers study")
+    storage.upsert_study(study)
+
+    changed = storage.set_fetch_conditional(study.id)
+    assert changed is False
+    row = storage.get_study(study.id)
+    assert "fetch_etag" not in row["provenance"]
+
+
 def test_pending_references_queue(storage: PostgresStorage) -> None:
     """The follower lists cited works we don't have, skips ones we do."""
     from study_scraper.follow import pending_references

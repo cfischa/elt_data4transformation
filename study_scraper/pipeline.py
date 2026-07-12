@@ -152,6 +152,7 @@ def run_one(
     pending_count = 0
     seen = 0
     errors = 0
+    aborted_note: Optional[str] = None
 
     try:
         for cand in source.iter_candidates(topic, limit=limit):
@@ -207,18 +208,28 @@ def run_one(
                     getattr(cand, "canonical_url", "<unknown>"),
                     exc,
                 )
+    except Exception as exc:
+        # `source.iter_candidates` itself raised (e.g. pagination request
+        # exhausted retries) -- not a per-candidate error caught above.
+        # Leave `finished_at` unset so `last_crawl_finished_at()` (used to
+        # derive the next incremental `from=` watermark) skips this run
+        # instead of treating a partial harvest as a clean completion.
+        aborted_note = f"aborted: {exc}"
+        raise
     finally:
         params_out = dict(run.parameters)
         params_out["pending"] = pending_count
-        run = run.model_copy(
-            update={
-                "finished_at": datetime.now(timezone.utc),
-                "candidates_seen": seen,
-                "candidates_kept": len(kept_ids),
-                "errors": errors,
-                "parameters": params_out,
-            }
-        )
+        update: Dict[str, Any] = {
+            "candidates_seen": seen,
+            "candidates_kept": len(kept_ids),
+            "errors": errors,
+            "parameters": params_out,
+        }
+        if aborted_note is None:
+            update["finished_at"] = datetime.now(timezone.utc)
+        else:
+            update["notes"] = aborted_note
+        run = run.model_copy(update=update)
         storage.record_crawl_run(run)
         if kept_ids:
             storage.attach_studies_to_run(run.id, kept_ids)

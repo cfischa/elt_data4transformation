@@ -12,6 +12,7 @@ from typing import Iterator
 
 import pytest
 
+from study_scraper.discovery.base import Candidate
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage
@@ -132,6 +133,76 @@ def test_topic_scores_populated(
     for row in rows:
         assert "klima" in row["topic_scores"]
         assert 0.0 < row["topic_scores"]["klima"] <= 1.0
+
+
+def test_last_crawl_finished_at_tracks_completed_runs(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """Feeds the SSOAR OAI `from=` incremental window (issue #34): None
+    before any run, then the run's finished_at once one completes."""
+    assert storage.last_crawl_finished_at(
+        source_id="ssoar", topic_id="klima"
+    ) is None
+
+    with SSOARSource(from_file=FIXTURE) as src:
+        run = run_one(source=src, topic=klima_topic, storage=storage)
+
+    latest = storage.last_crawl_finished_at(source_id="ssoar", topic_id="klima")
+    assert latest is not None
+    assert latest == run.finished_at
+
+    # A different (source, topic) pair stays untouched.
+    assert storage.last_crawl_finished_at(
+        source_id="openalex", topic_id="klima"
+    ) is None
+
+
+class _AbortingSource:
+    """A source that yields one candidate then blows up mid-pagination,
+    simulating an OAI resumption-token walk exhausting retries on page 2."""
+
+    source_id = "aborting"
+
+    def iter_candidates(self, topic, *, limit=None):
+        yield Candidate(
+            source_id=self.source_id,
+            external_id="1",
+            canonical_url="https://example.org/aborting-1",
+            title="Kommunaler Klimaschutz erste Seite",
+        )
+        raise RuntimeError("simulated pagination failure")
+
+
+def test_aborted_run_does_not_advance_last_crawl_finished_at(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """issue #34 follow-up: a run whose source raises mid-pagination must
+    not look like a clean completion to `last_crawl_finished_at()` --
+    otherwise the next incremental `from=` window silently skips whatever
+    the aborted run never reached."""
+    assert storage.last_crawl_finished_at(
+        source_id="aborting", topic_id="klima"
+    ) is None
+
+    with pytest.raises(RuntimeError, match="simulated pagination failure"):
+        run_one(source=_AbortingSource(), topic=klima_topic, storage=storage)
+
+    # The failed run must not count as "completed".
+    assert storage.last_crawl_finished_at(
+        source_id="aborting", topic_id="klima"
+    ) is None
+
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT finished_at, notes, candidates_seen "
+                "FROM study_scraper.crawl_runs WHERE source_id = 'aborting'"
+            )
+            row = cur.fetchone()
+    assert row is not None
+    assert row["finished_at"] is None
+    assert row["candidates_seen"] == 1  # the one candidate seen before the raise
+    assert row["notes"] is not None and "aborted" in row["notes"]
 
 
 def test_openalex_citation_graph_propagated_to_provenance(

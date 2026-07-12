@@ -118,10 +118,23 @@ def run(
     min_score: float = typer.Option(
         0.2, "--min-score", help="Minimum stage-1 topic score to keep."
     ),
+    full: bool = typer.Option(
+        False, "--full",
+        help="SSOAR only: ignore the incremental OAI from= window derived "
+             "from the last successful run and harvest the full feed.",
+    ),
 ) -> None:
     """Run a discovery source against one topic and persist results."""
+    topic_obj = _load_topic(topic)
+    storage = _storage_from_settings()
+
     if source == "ssoar":
-        ctx = SSOARSource(from_file=from_file)
+        since = None
+        if from_file is None and not full:
+            since = storage.last_crawl_finished_at(
+                source_id="ssoar", topic_id=topic_obj.id
+            )
+        ctx = SSOARSource(from_file=from_file, since=since)
     elif source == "openalex":
         ctx = OpenAlexSource(from_file=from_file)
     elif source == "bundestag_dip":
@@ -133,8 +146,6 @@ def run(
             f"unknown source {source!r}; supported: ssoar, openalex, "
             f"bundestag_dip"
         )
-    topic_obj = _load_topic(topic)
-    storage = _storage_from_settings()
 
     with ctx as src:
         crawl_run = run_one(
