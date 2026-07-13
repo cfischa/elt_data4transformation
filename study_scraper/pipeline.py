@@ -210,10 +210,15 @@ def run_one(
                 )
     except Exception as exc:
         # `source.iter_candidates` itself raised (e.g. pagination request
-        # exhausted retries) -- not a per-candidate error caught above.
+        # exhausted retries, or an auth failure on the very first request)
+        # -- not a per-candidate error caught above. Count it so the
+        # persisted row is never a deceptively clean `seen=0 errors=0`
+        # (issue #48: a 401 raised here used to look like a healthy,
+        # empty source in `study_scraper status`).
         # Leave `finished_at` unset so `last_crawl_finished_at()` (used to
         # derive the next incremental `from=` watermark) skips this run
         # instead of treating a partial harvest as a clean completion.
+        errors += 1
         aborted_note = f"aborted: {exc}"
         raise
     finally:

@@ -203,6 +203,44 @@ def test_aborted_run_does_not_advance_last_crawl_finished_at(
     assert row["finished_at"] is None
     assert row["candidates_seen"] == 1  # the one candidate seen before the raise
     assert row["notes"] is not None and "aborted" in row["notes"]
+    assert row["errors"] == 1
+
+
+class _FailFastSource:
+    """A source whose very first request blows up before yielding
+    anything, simulating bundestag_dip's 401 (issue #48): the loop over
+    `iter_candidates` never starts, so `seen` stays 0."""
+
+    source_id = "fail_fast"
+
+    def iter_candidates(self, topic, *, limit=None):
+        raise RuntimeError("simulated 401 Unauthorized")
+        yield  # pragma: no cover - unreachable, makes this a generator
+
+
+def test_source_raising_before_any_candidate_is_not_a_silent_clean_run(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """issue #48: bundestag_dip's 401 raised on the first request used to
+    persist as a deceptively healthy `seen=0 kept=0 errors=0` crawl_runs
+    row -- indistinguishable from a source that legitimately found
+    nothing. The run must now record errors>0 so a broken source is
+    visible in `study_scraper status`."""
+    with pytest.raises(RuntimeError, match="simulated 401 Unauthorized"):
+        run_one(source=_FailFastSource(), topic=klima_topic, storage=storage)
+
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT finished_at, notes, candidates_seen, errors "
+                "FROM study_scraper.crawl_runs WHERE source_id = 'fail_fast'"
+            )
+            row = cur.fetchone()
+    assert row is not None
+    assert row["finished_at"] is None
+    assert row["candidates_seen"] == 0
+    assert row["errors"] == 1
+    assert row["notes"] is not None and "aborted" in row["notes"]
 
 
 def test_openalex_citation_graph_propagated_to_provenance(
