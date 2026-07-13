@@ -12,29 +12,41 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-1. **HTTP resilience** (issue #32) — shared fetch helper for all source
-   clients + fulltext: `tenacity` retries with exponential backoff and
-   jitter, honour 429/503 `Retry-After`, and a small per-domain politeness
-   delay in the fulltext loop (we currently burst dozens of PDFs at
-   ssoar.info with no delay and no retry anywhere). Unit-test the policy
-   with a mock transport.
-2. **CI artifact-path bug** (issue #33) — `fulltext` saves PDFs to the
-   Actions runner's local disk and writes that path into
-   `studies.raw_artifact_ref`; the runner dies after the job, so the path
-   dangles. Text + claims are safely in Postgres — the dangling ref only
-   breaks refetch/reading-list assumptions. Make artifact storage
-   CI-aware (skip local persist + leave ref NULL, or store bytes in
-   Supabase storage) and re-queue accordingly.
-3. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
+Re-prioritized 2026-07-13: the raw-collection pipes (HTTP resilience,
+CI artifact path, incremental harvesting) are done. The current
+bottleneck is that collection has outpaced everything downstream of
+it — attribution isn't keeping up, and one required source category
+is silently producing zero records. See issue #8 for the live
+metrics behind this reorder.
+
+1. **Attribution throughput** (issue #49) **[now]** — `claims` is at
+   4,369 rows and growing every crawl; only 33 attributions have ever
+   been written (one 2026-07-11 run). `scheduled-attribute` runs
+   twice-weekly at `--limit 20` studies — far below crawl volume.
+   Change the cadence and/or batch size (e.g. daily, or size scaled to
+   `crawl_runs` output) so the backlog trends toward zero instead of
+   growing, and run a one-off catch-up pass. This is the single
+   biggest lever: 2,593 collected studies are only as useful as the
+   structured `(question, position, %)` triples we actually extract
+   from them.
+2. **`bundestag_dip` silent 401** (issue #48) **[now]** — every request
+   has 401'd since 2026-07-06 on the hardcoded public API key; the
+   failure doesn't increment `errors` so it looked like a clean
+   `seen=0` row instead of a broken source. Fix: raise/count the
+   error so a dead source is visible in `study_scraper status`
+   (see #48 for the exact call-site). Getting a fresh `DIP_API_KEY` is
+   a separate **[needs-human]** step (free, by mail to
+   infoline.id3@bundestag.de) — file that need in the issue but ship
+   the visibility fix regardless.
+3. **Topic-content gap** (issue #50) **[now]** — maintainer's
+   2026-06-26 ask (Erbschaftssteuer keywords on `steuern`, new
+   `russland_ukraine` topic) never landed. Pure `topics.csv` +
+   `questions.yml` change, no code risk.
+4. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
    `env_air_gge` (and `nrg_bal_s`) lake payloads into typed rows
    (geo, year, value), like `dawum_poll_results`, so the numbers are
-   queryable. Migration + a view smoke check.
-4. **Incremental harvesting** (issue #34) — SSOAR OAI supports
-   `from=`/`until=`; store the last successful harvest timestamp per
-   (source, topic) (derivable from `crawl_runs`) and pass it, instead of
-   re-walking the same 400 newest records every run. For fulltext
-   refetch, store `ETag`/`Last-Modified` and send conditional GETs
-   (304 → skip). Standard incremental-crawl practice.
+   queryable. Still only 3 lake rows total (2 codes × geo=DE) so this
+   stays lower-value until the code list grows — keep it after 1–3.
 
 ## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
@@ -79,20 +91,27 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage: **catalog** SSOAR + OpenAlex (academic); **lake** DAWUM
-(vote intention), GESIS KG (survey catalog), Eurostat (official stats).
-The representativeness gaps are *issue-opinion* data and *official
+Current coverage: **catalog** SSOAR + OpenAlex (academic, 2,373 +
+220 studies as of 2026-07-13 — openalex now dominates volume); **lake**
+DAWUM (vote intention, 3,861 rows), GESIS KG (survey catalog, 500),
+Eurostat (official stats, 3 — thin by design). **Bundestag DIP is
+wired but currently producing zero records** — see #48. The
+representativeness gaps are *issue-opinion* data and *official
 statistics breadth*. Ranked by yield per effort:
 
 5. **Eurobarometer** (issue #35) **[now]** — the EU Commission's
    standing opinion survey; free, structured, includes Germany, directly
    answers "what do people think about X". Lake source; data via the EC
-   open-data portal / GESIS mirrors.
-6. **Bundestag DIP API** **[done 2026-07-05]** —
+   open-data portal / GESIS mirrors. Bonus: Eurobarometer waves
+   regularly poll German attitudes on the Russia/Ukraine war and
+   sanctions, so this also feeds the new `russland_ukraine` topic
+   (#50) with real structured data, not just a keyword filter.
+6. **Bundestag DIP API** **[broken since 2026-07-06, see #48]** —
    `discovery/bundestag_dip.py`, catalog-style, fixture-tested; in the
-   scheduled crawl. Runs on the Bundestag's published public API key;
-   set the `DIP_API_KEY` secret with a personal key (free by mail to
-   infoline.id3@bundestag.de) when the public one rotates out.
+   scheduled crawl, but the hardcoded public API key now 401s on every
+   request (0 records ingested). Needs a fresh personal key (free by
+   mail to infoline.id3@bundestag.de) **and** the silent-failure fix
+   in #48 so a dead source shows up as `errors>0`.
 7. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
@@ -114,6 +133,16 @@ statistics breadth*. Ranked by yield per effort:
     account/licences]** — the deepest issue-opinion source; revisit after
     the free tiers are exhausted.
 12. *(skip)* wahlrecht.de — vote-intention aggregation duplicates DAWUM.
+13. **bpb.de "Ukraine-/Länder-Analysen"** (Forschungsstelle Osteuropa
+    Bremen, scouted 2026-07-13) — free, no auth, periodic HTML analysis
+    series that regularly cites representative war-opinion surveys
+    (German and Ukrainian). Tier-3 (HTML, no API) — candidate for the
+    `SitemapSource` config (item 9) once that tier is built, not
+    buildable standalone.
+14. **eupinions** (Bertelsmann Stiftung quarterly EU opinion survey,
+    scouted 2026-07-13) — same tier-3 bucket as #13; blog/PDF
+    publication, no API found. Lower priority than #13 — Bertelsmann is
+    already on the think-tank list and the data feed feels less durable.
 
 ## Production craft — patterns from mature scrapers (investigated 2026-07-04)
 
@@ -151,3 +180,6 @@ for our verification layers):
   ticket, ANTHROPIC_API_KEY alternative credential (PRs #23, #31).
 - Topics: `atomkraft`, `wohnen`, `rente`, `verteidigung`; crawl topic list
   now derived from topics.csv.
+- HTTP resilience (#32), CI artifact-path fix / A23 `persist_artifacts`
+  (#33), incremental harvesting / OAI `from=` windows + conditional GET
+  (#34, PR #47) — all closed as of 2026-07-13.
