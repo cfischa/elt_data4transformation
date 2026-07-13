@@ -498,6 +498,29 @@ This document tracks design decisions for the study scraper. Two sections:
   (`.github/workflows/scrape.yml` or equivalent) — out of this agent's
   edit scope (`.github/**`).
 
+### A24. `run_one` counts a whole-source failure as `errors>=1` (resolves issue #48's visibility half)
+- **Problem:** `bundestag_dip` 401'd on every request since 2026-07-06.
+  `source.iter_candidates` raised from inside the pagination loop, outside
+  the per-candidate `try/except` in `run_one`. The outer `except` caught it,
+  re-raised (so the CLI process does exit non-zero), but the `finally`
+  block still persisted `candidates_seen=0, errors=0` — indistinguishable
+  in `crawl_runs`/`study_scraper status` from a source that legitimately
+  found nothing that day.
+- **Decision:** `run_one`'s outer `except` (the one wrapping the
+  `iter_candidates` loop, not the per-candidate one) now increments
+  `errors` before re-raising, so any source-level abort — auth failure,
+  exhausted retries, malformed response — always persists `errors>=1`.
+  `study_scraper status` already surfaces `errors>0`; no further code
+  change needed there.
+- **Why not fix `iter_candidates` inside `bundestag_dip.py` instead:** the
+  same silent-clean-row failure mode applies to any discovery source, not
+  just DIP (e.g. SSOAR/OpenAlex pagination). Fixing it once in `run_one`
+  covers all current and future sources instead of patching one call site.
+- **Maintainer action still needed (`needs-human`, tracked in #48):** a
+  fresh `DIP_API_KEY` from `infoline.id3@bundestag.de`, set as a repo
+  secret — the code fix here makes the outage *visible*, it doesn't
+  restore `bundestag_dip` candidates.
+
 ---
 
 ## Open questions
