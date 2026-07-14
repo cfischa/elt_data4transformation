@@ -8,6 +8,7 @@ from typing import Iterator
 
 import pytest
 
+from study_scraper.discovery.base import Candidate
 from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.pipeline import run_one
@@ -98,6 +99,37 @@ def test_format_text_includes_key_sections(
     assert "lake (source_records" in text
     assert "recent runs" in text
     assert "ssoar" in text
+
+
+class _AbortingSource:
+    """Yields nothing and blows up immediately -- simulates a source that
+    dies on every request (e.g. an expired API key, issue #48)."""
+
+    source_id = "aborting"
+
+    def iter_candidates(self, topic, *, limit=None):
+        raise RuntimeError("simulated 401 Unauthorized")
+        yield  # pragma: no cover - unreachable, makes this a generator
+
+
+def test_status_counts_aborted_run_as_failed(
+    storage: PostgresStorage, topics_list
+) -> None:
+    """#48: a source whose iter_candidates raises before yielding anything
+    leaves candidates_seen=0 and errors=0 -- it must still surface as a
+    failed run (not a silently "successful" seen=0/errors=0 row)."""
+    klima = _klima(topics_list)
+    with pytest.raises(RuntimeError, match="simulated 401"):
+        run_one(source=_AbortingSource(), topic=klima, storage=storage)
+
+    report = build_status(storage)
+    assert report.total_runs == 1
+    assert report.failed_runs == 1
+    assert report.successful_runs == 0
+
+    text = format_text(report)
+    assert "ERR" in text
+    assert "simulated 401" in text
 
 
 def test_status_counts_lake_records(
