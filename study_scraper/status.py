@@ -118,14 +118,21 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                 for row in cur.fetchall()
             ]
 
+            # A run that raised out of `iter_candidates` (e.g. an
+            # unhandled 401) leaves `finished_at` NULL and `errors` at 0
+            # (pipeline.py's per-candidate error counter never ran) --
+            # count it as failed too, so a source that dies on every
+            # request doesn't read as "successful" here (#48).
             cur.execute(
                 f"""
                 SELECT
-                    COUNT(*)                                     AS total,
-                    COUNT(*) FILTER (WHERE errors = 0)           AS successful,
-                    COUNT(*) FILTER (WHERE errors > 0)           AS failed,
-                    COALESCE(SUM(candidates_seen), 0)            AS seen,
-                    COALESCE(SUM(candidates_kept), 0)            AS kept
+                    COUNT(*)                                                AS total,
+                    COUNT(*) FILTER (
+                        WHERE errors = 0 AND finished_at IS NOT NULL)       AS successful,
+                    COUNT(*) FILTER (
+                        WHERE errors > 0 OR finished_at IS NULL)            AS failed,
+                    COALESCE(SUM(candidates_seen), 0)                       AS seen,
+                    COALESCE(SUM(candidates_kept), 0)                       AS kept
                 FROM {SCHEMA}.crawl_runs
                 """
             )
@@ -144,7 +151,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             cur.execute(
                 f"""
                 SELECT id, source_id, topic_id, started_at, finished_at,
-                       candidates_seen, candidates_kept, errors, parameters
+                       candidates_seen, candidates_kept, errors, parameters,
+                       notes
                 FROM   {SCHEMA}.crawl_runs
                 ORDER  BY started_at DESC
                 LIMIT  %s
@@ -257,12 +265,14 @@ def format_text(report: StatusReport) -> str:
     lines.append("  recent runs (newest first):")
     if report.recent_runs:
         for r in report.recent_runs:
-            err_flag = "ERR" if (r.get("errors") or 0) > 0 else "ok "
+            aborted = r.get("finished_at") is None
+            err_flag = "ERR" if (r.get("errors") or 0) > 0 or aborted else "ok "
+            note = f"  ({r['notes']})" if aborted and r.get("notes") else ""
             lines.append(
                 f"    {err_flag}  {r['source_id']:<10} {r['topic_id']:<22}  "
                 f"seen={r['candidates_seen']:>4}  kept={r['candidates_kept']:>4}  "
                 f"errors={r['errors']:>2}   "
-                f"{r['started_at'].isoformat(timespec='seconds')}"
+                f"{r['started_at'].isoformat(timespec='seconds')}{note}"
             )
     else:
         lines.append("    (none)")
