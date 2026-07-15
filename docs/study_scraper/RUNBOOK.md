@@ -44,6 +44,9 @@ python -m study_scraper run    --source ssoar    --topic klima --limit 50
 python -m study_scraper run    --source openalex --topic klima --limit 50
 python -m study_scraper ingest --source dawum
 python -m study_scraper ingest --source gesis  --limit 100
+python -m study_scraper ingest --source eurobarometer --limit 100
+#   eurobarometer is the GESIS catalog filtered to Eurobarometer waves
+#   (same endpoint as gesis, no auth) — see A24.
 python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_bal_s
 #   eurostat filters to geo=DE by default (A14.1) — without it, tables like
 #   nrg_bal_s are ~69 MB and crash json parsing. Override with --geo FR, or
@@ -117,6 +120,7 @@ python -m study_scraper run    --source ssoar    --topic klima --limit 50
 python -m study_scraper run    --source openalex --topic klima --limit 50
 python -m study_scraper ingest --source dawum
 python -m study_scraper ingest --source gesis  --limit 100
+python -m study_scraper ingest --source eurobarometer --limit 100
 python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_bal_s
 python -m study_scraper status
 ```

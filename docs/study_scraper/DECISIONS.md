@@ -498,6 +498,46 @@ This document tracks design decisions for the study scraper. Two sections:
   (`.github/workflows/scrape.yml` or equivalent) — out of this agent's
   edit scope (`.github/**`).
 
+### A24. Eurobarometer lake source = GESIS catalog, filtered (resolves #35)
+- **Date:** 2026-07-15
+- **Decision:** Add Eurobarometer as its own lake source
+  (`ingest --source eurobarometer`), implemented as the **same public
+  GESIS Knowledge Graph SPARQL endpoint** already used by A15's
+  `gesis.py` (`data.gesis.org/gesiskg/sparql`, no auth), with the
+  catalog query filtered server-side to `schema:Dataset`s whose
+  `schema:name` contains "Eurobarometer". Records are emitted under a
+  distinct `source_id="eurobarometer"` (not folded into `gesis`), so
+  coverage, license, and review-queue tracking for Eurobarometer stay
+  independent.
+- **Rationale:** GESIS is the official archive for Eurobarometer waves
+  (each wave is a ZA-numbered `schema:Dataset` in the same catalog
+  `gesis.py` already ingests), so reusing that verified, already-in-repo
+  endpoint is lower-risk than standing up a fetch against the EU
+  Commission's own Eurobarometer microsite or the general
+  `data.europa.eu` open-data portal, neither of which this agent could
+  verify has a stable no-auth JSON/CSV endpoint without live web access
+  this session. Filtering by title is a coverage-first heuristic (per
+  A12); it may need broadening (e.g. `schema:isPartOf` a Eurobarometer
+  series URI, if GESIS models one) once real catalog data is inspected.
+- **Implementation:** `study_scraper/sources/eurobarometer.py`. Same
+  shape as `gesis.py` (fixture + live SPARQL modes sharing one parser,
+  payload = sorted triples for stable hashing) but intentionally a
+  separate module rather than a `GESISSource` subclass/parameter, since
+  `GESISSource`'s catalog query has no filter hook and DAWUM/Eurostat/
+  GESIS are each already independent modules in this package. Default
+  license fallback: `"GESIS terms of use (Eurobarometer data archive)"`
+  (same access-control shape as other GESIS-archived data — metadata is
+  public, microdata bytes require GESIS account registration).
+- **Deferred (mirrors GESIS's Q19):** actual microdata download (SPSS/
+  Stata/CSV bytes for a wave) requires GESIS login and isn't covered
+  here — this source only harvests public catalog metadata.
+- **Needs-human follow-up:** the fixture
+  (`tests/study_scraper/fixtures/eurobarometer/sample.json`) uses
+  illustrative ZA numbers/DOIs, not ones verified against
+  `search.gesis.org` (no live web access this session) — worth a
+  WebSearch pass to swap in confirmed identifiers, same as A15's
+  fixture note describes for GESIS.
+
 ---
 
 ## Open questions

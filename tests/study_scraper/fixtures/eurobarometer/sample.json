@@ -1,0 +1,82 @@
+{
+  "_fixture_note": "Hand-crafted sample in the shape EurobarometerSource._iter_from_file expects (same wrapper shape as fixtures/gesis/sample.json). Titles/topics reflect real, well-known Eurobarometer waves (Standard EB autumn/winter waves, the climate-change Special EB), but the ZA study numbers and DOIs below are illustrative placeholders -- NOT verified against search.gesis.org in this session (no live web access). The production parser is the same code path live vs from-file, same as the other lake sources; the live SPARQL catalog query does the real title filtering, so replace these placeholders with confirmed ZA numbers before relying on this fixture as ground truth.",
+  "datasets": [
+    {
+      "uri": "https://data.gesis.org/datasearchkg/Dataset/10.4232/1.90001",
+      "_human_label": "Special Eurobarometer -- Climate Change, placeholder ZA",
+      "triples": [
+        {"p": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+         "o": "https://schema.org/Dataset", "type": "uri"},
+        {"p": "https://schema.org/name",
+         "o": "Special Eurobarometer: Climate Change",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/description",
+         "o": "EU-wide survey on citizens' perception of climate change as a global and personal problem, support for EU climate policy, and willingness to act. Fielded across all EU member states, incl. Germany.",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/creator",
+         "o": "European Commission, Directorate-General for Communication",
+         "type": "literal"},
+        {"p": "https://schema.org/publisher",
+         "o": "GESIS Datenarchiv", "type": "literal"},
+        {"p": "https://schema.org/datePublished",
+         "o": "2023-11-20", "type": "literal", "datatype": "http://www.w3.org/2001/XMLSchema#date"},
+        {"p": "https://schema.org/inLanguage", "o": "en", "type": "literal"},
+        {"p": "https://schema.org/identifier",
+         "o": "https://doi.org/10.4232/1.90001", "type": "uri"},
+        {"p": "https://schema.org/sameAs",
+         "o": "https://search.gesis.org/research_data/ZA9001", "type": "uri"},
+        {"p": "https://schema.org/keywords", "o": "Eurobarometer", "type": "literal"},
+        {"p": "https://schema.org/keywords", "o": "Klimaschutz", "type": "literal"},
+        {"p": "https://schema.org/keywords", "o": "Klimawandel", "type": "literal"},
+        {"p": "https://schema.org/variableMeasured",
+         "o": "QA1: Is climate change a very serious problem?", "type": "literal"},
+        {"p": "https://schema.org/license",
+         "o": "https://www.gesis.org/en/services/data-analysis/data-access/data-archive", "type": "uri"}
+      ]
+    },
+    {
+      "uri": "https://data.gesis.org/datasearchkg/Dataset/10.4232/1.90002",
+      "_human_label": "Standard Eurobarometer 100 -- Autumn 2023, placeholder ZA",
+      "triples": [
+        {"p": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+         "o": "https://schema.org/Dataset", "type": "uri"},
+        {"p": "https://schema.org/name",
+         "o": "Standard Eurobarometer 100 (Autumn 2023)",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/description",
+         "o": "Biannual EU-wide omnibus survey covering the European economic situation, EU institutions' image, and priority issues incl. energy, migration and the environment.",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/creator",
+         "o": "European Commission, Directorate-General for Communication",
+         "type": "literal"},
+        {"p": "https://schema.org/datePublished",
+         "o": "2024-02-15", "type": "literal", "datatype": "http://www.w3.org/2001/XMLSchema#date"},
+        {"p": "https://schema.org/inLanguage", "o": "en", "type": "literal"},
+        {"p": "https://schema.org/identifier",
+         "o": "https://doi.org/10.4232/1.90002", "type": "uri"},
+        {"p": "https://schema.org/sameAs",
+         "o": "https://search.gesis.org/research_data/ZA9002", "type": "uri"},
+        {"p": "https://schema.org/keywords", "o": "Eurobarometer", "type": "literal"},
+        {"p": "https://schema.org/keywords", "o": "Energiewende", "type": "literal"},
+        {"p": "https://schema.org/keywords", "o": "Migration", "type": "literal"}
+      ]
+    },
+    {
+      "uri": "https://data.gesis.org/datasearchkg/Dataset/10.4232/1.90003",
+      "_negative_control_note": "Still a real Eurobarometer wave (so it correctly matches the live title filter), but off-topic for climate/migration review -- should ingest correctly with the operator-tagged topic anyway, since lake ingestion doesn't topic-filter (mirrors gesis fixture's negative control). Also deliberately omits a license triple to exercise the default-license fallback.",
+      "triples": [
+        {"p": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+         "o": "https://schema.org/Dataset", "type": "uri"},
+        {"p": "https://schema.org/name",
+         "o": "Standard Eurobarometer 99 -- Digital Rights and Principles",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/description",
+         "o": "Survey module on EU citizens' awareness of digital rights and the European Declaration on Digital Rights and Principles.",
+         "type": "literal", "lang": "en"},
+        {"p": "https://schema.org/inLanguage", "o": "en", "type": "literal"},
+        {"p": "https://schema.org/identifier",
+         "o": "https://doi.org/10.4232/1.90003", "type": "uri"}
+      ]
+    }
+  ]
+}
