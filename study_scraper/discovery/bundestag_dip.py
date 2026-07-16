@@ -30,6 +30,7 @@ import json
 import logging
 import os
 from datetime import date, datetime
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -49,7 +50,11 @@ DEFAULT_BASE_URL = "https://search.dip.bundestag.de/api/v1"
 PUBLIC_API_KEY = "OSOegLs.PR2lwJ1dwCeje9vTj7FPOt3hvpYKtwKkhw"
 
 # How many topic keywords to query per run (one request chain each).
-_MAX_TERMS = 4
+# 8, not 4: at 4 the umbrella synonyms filled the whole budget and the
+# specific include_keywords (Wehrpflicht, Mietpreisbremse, Rentenein-
+# trittsalter — the terms the question registry depends on) were dead
+# config for every topic (audit 2026-07-11).
+_MAX_TERMS = 8
 
 
 def resolve_api_key(explicit: Optional[str] = None) -> str:
@@ -204,20 +209,32 @@ class BundestagDIPSource:
 
 def _search_terms(topic: Topic) -> List[str]:
     """Topic keywords for `f.titel`, german-locale first, deduped.
-    Synonyms lead: they are the broad umbrella terms ("Klima"), which
-    match more Drucksachen titles than narrow indicators ("CO2")."""
+
+    Synonyms and include_keywords are INTERLEAVED (syn, incl, syn, incl…):
+    synonyms are the broad umbrella terms ("Klima") that match many
+    Drucksachen titles, include_keywords are the specific terms the
+    question registry depends on (Klimaschutzgesetz, Mietpreisbremse,
+    Renteneintrittsalter). A plain synonyms-first ordering let topics
+    with many synonyms (klima has 14) fill the whole term budget, so no
+    specific term was ever queried (audit 2026-07-11)."""
     terms: List[str] = []
     seen: set = set()
+
+    def _push(term: str) -> None:
+        key = term.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            terms.append(term.strip())
+
     locales = sorted(
         topic.locales.items(), key=lambda kv: kv[0] != "de"
     )  # 'de' first — DIP titles are German
     for _lang, locale in locales:
-        for term in locale.synonyms + locale.include_keywords:
-            key = term.strip().lower()
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            terms.append(term.strip())
+        for syn, incl in zip_longest(locale.synonyms, locale.include_keywords):
+            if syn is not None:
+                _push(syn)
+            if incl is not None:
+                _push(incl)
     return terms[:_MAX_TERMS]
 
 

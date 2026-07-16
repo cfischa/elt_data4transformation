@@ -38,6 +38,12 @@ class Question(BaseModel):
     topic_id: str
     text: str
     query: str
+    # Recall aliases: alternative phrasings the answer layer should also
+    # match. The llm-v1 extractor normalizes questions to English but
+    # phrases them freely — 'conscription' shares zero tokens with
+    # 'reintroduce compulsory military service', so without aliases a
+    # question can report a coverage gap while the data sits in the DB.
+    aliases: List[str] = Field(default_factory=list)
     since_year: Optional[int] = Field(default=None)
 
     @field_validator("id", "topic_id", "text", "query")
@@ -47,6 +53,24 @@ class Question(BaseModel):
         if not value:
             raise ValueError("must not be empty")
         return value
+
+    @field_validator("aliases")
+    @classmethod
+    def _clean_aliases(cls, value: List[str]) -> List[str]:
+        cleaned = [(a or "").strip() for a in value]
+        if any(not a for a in cleaned):
+            raise ValueError("aliases must not be empty strings")
+        if any("|" in a for a in cleaned):
+            raise ValueError("aliases must not contain '|' (the separator)")
+        return cleaned
+
+    @property
+    def recall_query(self) -> str:
+        """The pipe-joined seed+aliases the answer layer searches with.
+        This exact string becomes the watch's query — one format for the
+        on-demand path (`questions answer`) and the digest loop."""
+        parts = [self.query] + [a for a in self.aliases if a]
+        return "|".join(dict.fromkeys(parts))  # order-preserving unique
 
     def watch_label(self, topic_name: Optional[str] = None) -> str:
         """Heading used for the digest section when this question is synced
@@ -62,9 +86,12 @@ def watch_spec_for(
 
     Deterministic so ``sync`` is idempotent and unit-testable without a DB:
     the same registry always produces the same ``(query, label, since_year)``.
+    The query is the pipe-joined ``recall_query`` (seed + aliases) — the
+    search layer treats '|' as OR-alternatives, so a watch answers from
+    findings phrased under any alias.
     """
     return {
-        "query": question.query,
+        "query": question.recall_query,
         "label": question.watch_label(topic_name),
         "since_year": question.since_year,
     }
@@ -137,15 +164,20 @@ def load_questions(
                     f"{path}: duplicate question id {question.id!r} "
                     f"(also under {seen_ids[question.id]!r})"
                 )
-            qkey = question.query.lower()
-            if qkey in seen_queries:
-                raise QuestionRegistryError(
-                    f"{path}: duplicate query {question.query!r} for "
-                    f"{question.id!r} (also {seen_queries[qkey]!r}); "
-                    "watches.query is UNIQUE"
-                )
+            # Uniqueness must hold across seeds AND aliases: two questions
+            # sharing any recall term would each pull the same findings
+            # into their watch — the same poll answering two "different"
+            # registry questions double-counts in every digest.
+            for term in question.recall_query.split("|"):
+                tkey = term.lower()
+                if tkey in seen_queries:
+                    raise QuestionRegistryError(
+                        f"{path}: recall term {term!r} of {question.id!r} "
+                        f"already used by {seen_queries[tkey]!r}; seeds and "
+                        "aliases must be unique across the registry"
+                    )
+                seen_queries[tkey] = question.id
             seen_ids[question.id] = topic_id
-            seen_queries[qkey] = question.id
             questions.append(question)
 
     return questions

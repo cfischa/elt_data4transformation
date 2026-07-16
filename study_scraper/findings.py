@@ -26,6 +26,14 @@ def _norm_question(q: Optional[str]) -> str:
     return re.sub(r"\s+", " ", (q or "").lower()).strip()
 
 
+def normalize_population(population: Optional[str]) -> str:
+    """Canonical population identity ('' = general/unlabeled). Shared by
+    dedup AND aggregation so both agree on what counts as the same
+    population — dedup treating 'Ostdeutsche' as distinct while the
+    aggregate pooled it into one mean was inconsistent (audit 2026-07-11)."""
+    return re.sub(r"\s+", " ", (population or "").lower()).strip()
+
+
 def dedup_finding_key(
     question: Optional[str],
     position: Optional[str],
@@ -50,8 +58,7 @@ def dedup_finding_key(
             pct = int(round(float(percentage)))
         except (TypeError, ValueError):
             pct = None
-    pop = re.sub(r"\s+", " ", (population or "").lower()).strip()
-    return (_norm_question(question), pos, pct, pop)
+    return (_norm_question(question), pos, pct, normalize_population(population))
 
 
 def _confidence(row: Dict[str, Any]) -> float:

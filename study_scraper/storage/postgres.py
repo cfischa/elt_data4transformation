@@ -828,8 +828,13 @@ class PostgresStorage:
                     WHERE  lower(a.question) LIKE %s
                       AND  s.status <> 'rejected'
                       {since_clause}
-                    ORDER  BY a.percentage DESC NULLS LAST,
-                              s.publication_date DESC NULLS LAST
+                    -- Recency first: these windows feed dedup/aggregation,
+                    -- and truncation under percentage-DESC systematically
+                    -- inflated the mean (drops low findings first). Under
+                    -- recency-DESC truncation prefers what the weights
+                    -- prefer anyway (audit 2026-07-11).
+                    ORDER  BY s.publication_date DESC NULLS LAST,
+                              a.percentage DESC NULLS LAST
                     LIMIT  %s
                     """,
                     params,
@@ -842,35 +847,162 @@ class PostgresStorage:
         """Like `search_attributions` but collapses the same finding seen
         across multiple studies to one confidence-weighted representative
         (carries `dup_count`). Dedup is read-time in Python; raw rows are
-        untouched. Fetches a wider window first so dedup has material."""
+        untouched. Fetches a wider window first so dedup has material.
+
+        `query` may carry pipe-separated recall alternatives from the
+        question registry ('conscription|military service'): the lexical
+        pass runs per alternative and unions the rows, so a finding
+        phrased under ANY alias is found. Duplicates across alternatives
+        collapse in dedupe (identical rows share a dedup key)."""
         from study_scraper.findings import dedupe_attributions
 
-        raw_rows = self.search_attributions(
-            query=query, limit=max(limit * 5, 200), since=since
-        )
+        alternatives = [a.strip() for a in query.split("|") if a.strip()] or [""]
+        window = max(limit * 5, 200)
+        raw_rows: List[Dict[str, Any]] = []
+        seen: set = set()
+        for alt in alternatives:
+            for row in self.search_attributions(
+                query=alt, limit=window, since=since
+            ):
+                # Two aliases can match the SAME physical row — drop the
+                # re-find, or dup_count (a trust signal: independently
+                # seen across studies) would inflate.
+                ident = (
+                    row.get("question"), row.get("position"),
+                    row.get("percentage"), row.get("population"),
+                    row.get("canonical_url"),
+                )
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                raw_rows.append(row)
         return dedupe_attributions(raw_rows)[:limit]
 
     def search_attributions_semantic(
         self, *, query: str, limit: int = 50, since: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Deduped attribution search with a semantic fallback.
+        """Deduped attribution search: lexical AND semantic, unioned.
 
-        Attribution questions are normalized to English (llm-v1), so a
-        German query like 'klimaschutzgesetz' finds nothing under ILIKE.
-        When the lexical pass comes up empty, fall back to ranking ALL
-        stored findings by bilingual concept similarity (clustering.py).
-        Lexical hits keep priority — they are exact evidence."""
+        Attribution questions are normalized to English (llm-v1) but
+        phrased freely, so neither pass alone answers "from ALL relevant
+        data": ILIKE misses paraphrases ('klimaschutzgesetz', 'compulsory
+        military service' vs seed 'conscription'), and the old
+        semantic-only-when-lexical-is-empty short circuit meant three
+        lexical rows suppressed thirty semantically matching ones.
+
+        Both passes always run. Lexical rows lead (exact evidence); the
+        semantic sweep ranks the DISTINCT question texts by bilingual
+        concept similarity (clustering.py) — scaling with phrasing
+        variety, not row count (the previous top-N-by-percentage window
+        went blind as the corpus grew) — and rows for matching texts not
+        already found lexically are appended best-match-first."""
         from study_scraper.clustering import semantic_filter
+        from study_scraper.findings import dedupe_attributions
 
-        rows = self.search_attributions_deduped(
+        lexical = self.search_attributions_deduped(
             query=query, limit=limit, since=since
         )
-        if rows:
-            return rows
-        broad = self.search_attributions_deduped(
-            query="", limit=max(limit * 10, 500), since=since
+        have = {(r.get("question") or "").lower() for r in lexical}
+        candidates = [
+            {"question": q}
+            for q in self.list_distinct_attribution_questions(since=since)
+            if q.lower() not in have
+        ]
+        matched = semantic_filter(query, candidates)
+        if not matched:
+            return lexical[:limit]
+        sem_rows = self.search_attributions_for_questions(
+            [m["question"] for m in matched],
+            since=since,
+            limit=max(limit * 5, 200),
         )
-        return semantic_filter(query, broad)[:limit]
+        return (lexical + dedupe_attributions(sem_rows))[:limit]
+
+    def list_distinct_attribution_questions(
+        self, *, since: Optional[int] = None
+    ) -> List[str]:
+        """Distinct attribution question texts (non-rejected studies) —
+        the candidate pool for the semantic sweep. A few hundred distinct
+        phrasings stand in for arbitrarily many rows."""
+        since_clause = ""
+        params: List[Any] = []
+        if since is not None:
+            since_clause = (
+                "AND s.publication_date IS NOT NULL "
+                "AND EXTRACT(YEAR FROM s.publication_date) >= %s"
+            )
+            params.append(since)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT DISTINCT a.question
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    WHERE  s.status <> 'rejected'
+                      {since_clause}
+                    ORDER  BY a.question
+                    """,
+                    params,
+                )
+                return [row["question"] for row in cur.fetchall()]
+
+    def search_attributions_for_questions(
+        self,
+        questions: List[str],
+        *,
+        limit: int = 200,
+        since: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """All attribution rows whose question text matches one of
+        `questions` exactly (case-insensitive) — the fetch stage after the
+        semantic sweep picked which phrasings are relevant."""
+        if not questions:
+            return []
+        since_clause = ""
+        params: List[Any] = [[q.lower() for q in questions]]
+        if since is not None:
+            since_clause = (
+                "AND s.publication_date IS NOT NULL "
+                "AND EXTRACT(YEAR FROM s.publication_date) >= %s"
+            )
+            params.append(since)
+        params.append(limit)
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT a.question, a.position, a.percentage, a.population,
+                           a.confidence, a.model, a.raw,
+                           s.title, s.canonical_url, s.source_id,
+                           s.publisher, s.publication_date, n.sample_size
+                    FROM   {SCHEMA}.attributions a
+                    JOIN   {SCHEMA}.studies s ON s.id = a.study_id
+                    LEFT JOIN LATERAL (
+                        SELECT c.numeric_value AS sample_size
+                        FROM   {SCHEMA}.claims c
+                        WHERE  c.study_id = s.id
+                          AND  c.unit = 'n'
+                          AND  c.numeric_value BETWEEN 30 AND 10000000
+                        GROUP  BY c.numeric_value
+                        ORDER  BY COUNT(*) DESC, c.numeric_value DESC
+                        LIMIT  1
+                    ) n ON TRUE
+                    WHERE  lower(a.question) = ANY(%s)
+                      AND  s.status <> 'rejected'
+                      {since_clause}
+                    -- Recency first: these windows feed dedup/aggregation,
+                    -- and truncation under percentage-DESC systematically
+                    -- inflated the mean (drops low findings first). Under
+                    -- recency-DESC truncation prefers what the weights
+                    -- prefer anyway (audit 2026-07-11).
+                    ORDER  BY s.publication_date DESC NULLS LAST,
+                              a.percentage DESC NULLS LAST
+                    LIMIT  %s
+                    """,
+                    params,
+                )
+                return list(cur.fetchall())
 
     def count_attributions(self) -> int:
         with self.connection() as conn:
@@ -1200,33 +1332,63 @@ class PostgresStorage:
         query: str,
         label: Optional[str] = None,
         since_year: Optional[int] = None,
+        source: Optional[str] = None,
     ) -> int:
         """Register a standing question; returns the watch id.
-        Re-adding the same query re-activates it and updates label/since."""
+        Re-adding the same query re-activates it and updates label/since.
+        `source` marks who manages the row ('registry' for questions.yml
+        sync; NULL for manual `watch add`) — sync prunes only its own."""
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    INSERT INTO {SCHEMA}.watches (query, label, since_year)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO {SCHEMA}.watches (query, label, since_year, source)
+                    VALUES (%s, %s, %s, %s)
                     ON CONFLICT (query) DO UPDATE SET
                         label = EXCLUDED.label,
                         since_year = EXCLUDED.since_year,
+                        source = EXCLUDED.source,
                         active = TRUE
                     RETURNING id
                     """,
-                    (query, label, since_year),
+                    (query, label, since_year, source),
                 )
                 watch_id = int(cur.fetchone()["id"])
             conn.commit()
         return watch_id
+
+    def prune_watches(
+        self, *, source: str, keep_queries: List[str]
+    ) -> List[Dict[str, Any]]:
+        """Deactivate active watches managed by `source` whose query is
+        not in `keep_queries` (case-insensitive). Returns the pruned
+        rows. A registry edit changes the watch query, which upserts a
+        NEW row and would otherwise strand the old one active — silently
+        double-answering the same polls in every digest."""
+        keep = [q.lower() for q in keep_queries]
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.watches
+                    SET    active = FALSE
+                    WHERE  active
+                      AND  source = %s
+                      AND  NOT (lower(query) = ANY(%s))
+                    RETURNING id, query, label
+                    """,
+                    (source, keep),
+                )
+                pruned = list(cur.fetchall())
+            conn.commit()
+        return pruned
 
     def list_watches(self, *, active_only: bool = True) -> List[Dict[str, Any]]:
         where = "WHERE active" if active_only else ""
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT id, query, label, since_year, active, created_at "
+                    f"SELECT id, query, label, since_year, active, source, created_at "
                     f"FROM {SCHEMA}.watches {where} ORDER BY id"
                 )
                 return list(cur.fetchall())

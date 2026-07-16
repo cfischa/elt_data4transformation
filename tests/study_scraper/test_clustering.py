@@ -148,3 +148,58 @@ class TestClusterAttributions:
         out = cluster_attributions(rows)
         assert out[0]["cluster_id"] == out[1]["cluster_id"]
         assert out[0]["cluster_label"] == "Stricter climate laws"
+
+
+class TestSemanticFilterAliases:
+    """Registry recall aliases: 'a|b' queries score rows by their BEST
+    alternative. The founding case: 'conscription' shares zero tokens
+    with 'reintroduce compulsory military service' — without the alias
+    the registered question reported a coverage gap over real data."""
+
+    ROWS = [
+        {"question": "Reintroduce compulsory military service", "percentage": 58},
+        {"question": "Introduce a speed limit on the Autobahn", "percentage": 52},
+    ]
+
+    def test_seed_alone_misses_the_paraphrase(self) -> None:
+        # Documents the failure mode the aliases exist to fix.
+        assert semantic_filter("conscription", self.ROWS) == []
+
+    def test_alias_recovers_it(self) -> None:
+        out = semantic_filter("conscription|military service", self.ROWS)
+        assert [r["question"] for r in out] == [
+            "Reintroduce compulsory military service"
+        ]
+
+    def test_unrelated_rows_stay_out(self) -> None:
+        out = semantic_filter("rent control|rent cap|mietpreisbremse", self.ROWS)
+        assert out == []
+
+    def test_blank_query_matches_nothing(self) -> None:
+        assert semantic_filter("|", self.ROWS) == []
+
+    def test_single_alt_unchanged(self) -> None:
+        rows = [{"question": "Stricter climate laws"}]
+        assert semantic_filter("klimagesetz", rows) == rows
+
+
+class TestPolarityGuards:
+    """Opposite propositions must NOT share a cluster (their 'support'
+    means would average into nonsense), while REVERSAL phrasings of the
+    same proposition must stay together."""
+
+    def test_keep_vs_phase_out_split(self) -> None:
+        rows = [
+            {"question": "Keep nuclear power", "percentage": 55},
+            {"question": "Phase out nuclear power", "percentage": 61},
+        ]
+        out = cluster_attributions(rows)
+        assert out[0]["cluster_id"] != out[1]["cluster_id"]
+
+    def test_reversal_phrasing_stays_together(self) -> None:
+        rows = [
+            {"question": "Return to nuclear power", "percentage": 55},
+            {"question": "Atomausstieg rückgängig machen", "percentage": 61},
+        ]
+        out = cluster_attributions(rows)
+        assert out[0]["cluster_id"] == out[1]["cluster_id"]

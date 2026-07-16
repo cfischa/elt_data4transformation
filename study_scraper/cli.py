@@ -901,14 +901,24 @@ def questions_sync(
         return
 
     storage = _storage_from_settings()
+    current_queries: List[str] = []
     for q in registry:
         spec = watch_spec_for(q, topic_name=names.get(q.topic_id))
         wid = storage.add_watch(
             query=str(spec["query"]),
             label=str(spec["label"]),
             since_year=spec["since_year"],
+            source="registry",
         )
+        current_queries.append(str(spec["query"]))
         typer.echo(f"watch {wid:>3}  {spec['query']!r}")
+    # A registry EDIT changes the watch query, which upserts a NEW row —
+    # prune deactivates the stale registry-managed rows so every digest
+    # doesn't double-answer the same polls. Manual `watch add` rows
+    # (source NULL) are never touched.
+    pruned = storage.prune_watches(source="registry", keep_queries=current_queries)
+    for row in pruned:
+        typer.echo(f"pruned {row['id']:>2}  (stale registry watch: {row['query']!r})")
     typer.echo(f"\nsynced {len(registry)} question(s) into watches")
 
 
@@ -941,9 +951,12 @@ def questions_answer(
     storage = _storage_from_settings()
     gaps: List[str] = []
     for q in sorted(registry, key=lambda q: (q.topic_id, q.id)):
-        floor = since if since is not None else q.since_year
+        # --since TIGHTENS a question's own floor, never loosens it:
+        # a registry floor is a data-quality decision for that question.
+        floors = [y for y in (since, q.since_year) if y is not None]
+        floor = max(floors) if floors else None
         rows = storage.search_attributions_semantic(
-            query=q.query, limit=500, since=floor
+            query=q.recall_query, limit=500, since=floor
         )
         answers = aggregate_findings(rows)
         typer.echo(f"\n### [{q.topic_id}] {q.text}")

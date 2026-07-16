@@ -97,7 +97,13 @@ jobs:
         env:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
-          python -m study_scraper follow --fetch --topic klima --limit 100 || true
+          # Every topic, not just klima — reference expansion is per-topic
+          # collection and each registered question deserves it
+          # (audit 2026-07-11). Budget split keeps the step bounded.
+          TOPICS=$(python -c "from study_scraper.config import get_settings; from study_scraper.topics import load_topics; print(' '.join(t.id for t in load_topics(get_settings().topics_csv_path)))")
+          for topic in $TOPICS; do
+            timeout 300 python -m study_scraper follow --fetch --topic "$topic" --limit 40 || true
+          done
 
       - name: Fetch full documents + extract statistics
         if: steps.gate.outputs.enabled == 'true'
@@ -114,23 +120,31 @@ jobs:
           python -m study_scraper status
           python -m study_scraper status --json > scrape-status.json
 
-      - name: Opinion digest (monitoring v1)
+      - name: Answer the registered questions (registry → watches → digest)
         if: steps.gate.outputs.enabled == 'true'
         env:
           POSTGRES_URL: ${{ secrets.SCRAPER_POSTGRES_URL }}
         run: |
-          # Aggregates every active watch (see `watch add`), reports
-          # shifts >=5pts and newly tracked questions vs the previous
-          # digest, and stores the new snapshot in the DB.
-          python -m study_scraper digest --out opinion-digest.md || true
-          cat opinion-digest.md || true
+          # The product: config/topics/questions.yml is the registry of
+          # standing questions (one per topic concern). Sync materializes
+          # each as a watch (idempotent upsert), digest answers every
+          # watch from ALL relevant attributions and tracks shifts >=5pts
+          # vs the previous run, and `questions answer` writes the full
+          # per-question answers incl. coverage gaps. Deliberately NOT
+          # '|| true': if the answer layer breaks, the run must go red so
+          # the monitor agent files a ticket (self-healing philosophy).
+          python -m study_scraper questions sync
+          python -m study_scraper digest --out opinion-digest.md
+          python -m study_scraper questions answer > question-answers.md
+          cat question-answers.md
 
       - name: Upload status artifact
-        if: steps.gate.outputs.enabled == 'true'
+        if: always() && steps.gate.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: scrape-status-${{ github.run_id }}
           path: |
             scrape-status.json
             opinion-digest.md
+            question-answers.md
           retention-days: 30

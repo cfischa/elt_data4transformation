@@ -63,6 +63,13 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Attribution writes on Tue/Fri against a schema that otherwise
+      # only migrates on Mon/Thu crawls — migrate here too (idempotent),
+      # so a mid-week schema change can't break the pass.
+      - name: Migrate schema
+        if: steps.gate.outputs.enabled == 'true'
+        run: python -m study_scraper migrate
+
       # Quick visibility: how many studies are waiting before we start.
       - name: Queue size (pre)
         if: steps.gate.outputs.enabled == 'true'
@@ -110,11 +117,27 @@ jobs:
           python -m study_scraper status
           python -m study_scraper status --json > attribute-status.json || true
 
-      - name: Upload status artifact
+      # Fresh attributions just landed — THIS is when answers change, so
+      # the answer layer runs here too (the crawl-time digest works from
+      # last week's attributions; audit 2026-07-11: answers structurally
+      # lagged every attribution run). Not '|| true': a broken answer
+      # layer must turn the run red.
+      - name: Answer the registered questions (registry → watches → digest)
         if: steps.gate.outputs.enabled == 'true'
+        run: |
+          python -m study_scraper questions sync
+          python -m study_scraper digest --out opinion-digest.md
+          python -m study_scraper questions answer > question-answers.md
+          cat question-answers.md
+
+      - name: Upload status artifact
+        if: always() && steps.gate.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: attribute-status-${{ github.run_id }}
-          path: attribute-status.json
+          path: |
+            attribute-status.json
+            opinion-digest.md
+            question-answers.md
           retention-days: 30
           if-no-files-found: ignore
