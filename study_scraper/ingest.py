@@ -27,6 +27,13 @@ from study_scraper.storage import PostgresStorage
 
 LOGGER = logging.getLogger(__name__)
 
+# How often (in records) to checkpoint partial candidates_seen/kept/errors
+# to `crawl_runs` while a run is still in progress. Without this, a run
+# that's hard-killed mid-loop (e.g. by an external `timeout` wrapper) never
+# reaches the `finally` block and leaves a false-clean `seen=0 kept=0`
+# row even though real work happened.
+_CHECKPOINT_EVERY = 25
+
 
 class LakeSource(Protocol):
     """The contract for a `study_scraper/sources/` source."""
@@ -93,6 +100,18 @@ def run_lake_ingest(
                     source.source_id,
                     getattr(record, "canonical_url", "<unknown>"),
                     exc,
+                )
+            if seen % _CHECKPOINT_EVERY == 0:
+                # Persist real partial progress in case the process is
+                # killed before the loop (and `finally`, below) completes.
+                storage.record_crawl_run(
+                    run.model_copy(
+                        update={
+                            "candidates_seen": seen,
+                            "candidates_kept": kept_new,
+                            "errors": errors,
+                        }
+                    )
                 )
     finally:
         run = run.model_copy(
