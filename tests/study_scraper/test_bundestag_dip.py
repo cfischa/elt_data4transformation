@@ -69,9 +69,13 @@ class TestFromFile:
 class TestSearchTerms:
     def test_german_terms_first_and_capped(self, klima) -> None:
         terms = _search_terms(klima)
-        assert 0 < len(terms) <= 4
+        assert 0 < len(terms) <= 8
         # klima topic's German vocabulary should lead.
         assert any("klima" in t.lower() for t in terms)
+        # Cap is 8 so specific include_keywords survive the umbrella
+        # synonyms (at 4 they were dead config; audit 2026-07-11).
+        from study_scraper.discovery.bundestag_dip import _MAX_TERMS
+        assert _MAX_TERMS == 8
 
 
 class TestApiKey:

@@ -137,8 +137,58 @@ topics:
       query: "nuclear power"
 """,
     )
-    with pytest.raises(QuestionRegistryError, match="duplicate query"):
+    with pytest.raises(QuestionRegistryError, match="already used by"):
         load_questions(path, valid_topic_ids=["atomkraft", "klima"])
+
+
+def test_shared_alias_rejected(tmp_path: Path) -> None:
+    """A recall alias shared across questions would double-count the same
+    poll in two watches — rejected like a duplicate seed."""
+    path = _write(
+        tmp_path,
+        """
+topics:
+  atomkraft:
+    - id: q1
+      text: "A"
+      query: "nuclear power"
+      aliases: ["atomic energy"]
+  klima:
+    - id: q2
+      text: "B"
+      query: "climate law"
+      aliases: ["Atomic Energy"]
+""",
+    )
+    with pytest.raises(QuestionRegistryError, match="already used by"):
+        load_questions(path, valid_topic_ids=["atomkraft", "klima"])
+
+
+def test_alias_with_pipe_rejected(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        """
+topics:
+  atomkraft:
+    - id: q1
+      text: "A"
+      query: "nuclear power"
+      aliases: ["a|b"]
+""",
+    )
+    with pytest.raises(QuestionRegistryError):
+        load_questions(path, valid_topic_ids=["atomkraft"])
+
+
+def test_recall_query_joins_seed_and_aliases() -> None:
+    q = Question(
+        id="q1", topic_id="verteidigung",
+        text="Should compulsory military service be reintroduced?",
+        query="conscription", aliases=["military service", "wehrpflicht"],
+    )
+    assert q.recall_query == "conscription|military service|wehrpflicht"
+    spec = watch_spec_for(q)
+    assert spec["query"] == "conscription|military service|wehrpflicht"
 
 
 def test_empty_field_rejected(tmp_path: Path) -> None:

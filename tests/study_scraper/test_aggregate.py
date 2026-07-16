@@ -122,3 +122,42 @@ class TestFormat:
         text = format_answer(aggregate_findings(rows, today=TODAY)[0])
         assert "spread" not in text
         assert "1 poll" in text
+
+
+class TestPopulationCells:
+    """Populations are aggregation identity (like dedup): 'Ostdeutsche'
+    must not be pooled into the general-population mean."""
+
+    def test_populations_not_pooled(self) -> None:
+        import datetime as dt
+        from study_scraper.aggregate import aggregate_findings
+
+        rows = [
+            {"question": "Stricter climate laws", "position": "support",
+             "percentage": 60.0, "population": None,
+             "publication_date": dt.date(2025, 1, 1)},
+            {"question": "Stricter climate laws", "position": "support",
+             "percentage": 30.0, "population": "Ostdeutsche",
+             "publication_date": dt.date(2025, 1, 1)},
+        ]
+        answers = aggregate_findings(rows)
+        assert len(answers) == 1
+        cells = answers[0].positions
+        assert len(cells) == 2  # one per population, NOT one pooled mean
+        general = [c for c in cells if c.population == ""][0]
+        east = [c for c in cells if c.population == "ostdeutsche"][0]
+        assert general.weighted_pct == 60.0
+        assert east.weighted_pct == 30.0
+
+    def test_position_case_normalized(self) -> None:
+        import datetime as dt
+        from study_scraper.aggregate import aggregate_findings
+
+        rows = [
+            {"question": "Stricter climate laws", "position": "Support",
+             "percentage": 60.0, "publication_date": dt.date(2025, 1, 1)},
+            {"question": "Stricter climate laws", "position": "support",
+             "percentage": 62.0, "publication_date": dt.date(2025, 1, 1)},
+        ]
+        answers = aggregate_findings(rows)
+        assert len(answers[0].positions) == 1  # one cell, not two

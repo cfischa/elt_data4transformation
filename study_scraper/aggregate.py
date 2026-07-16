@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from study_scraper.clustering import DEFAULT_THRESHOLD, cluster_attributions
+from study_scraper.findings import normalize_population
 
 _HALF_LIFE_YEARS = 3.0
 _UNDATED_AGE_YEARS = 8.0
@@ -52,7 +53,12 @@ def sample_weight(n: Optional[float]) -> float:
 
 @dataclass
 class PositionAggregate:
-    """One (question-cluster, position) cell of the answer."""
+    """One (question-cluster, position, population) cell of the answer.
+
+    Population is part of the cell: dedup already treats it as identity
+    (findings.py), so pooling 'Ostdeutsche' with the general population
+    into one weighted mean here contradicted that and averaged across
+    non-comparable samples. '' = general/unlabeled population."""
 
     position: str
     weighted_pct: float
@@ -62,6 +68,7 @@ class PositionAggregate:
     year_min: Optional[int]
     year_max: Optional[int]
     total_sample: Optional[int]   # sum of known n; None if none known
+    population: str = ""
     findings: List[Dict[str, Any]] = field(repr=False, default_factory=list)
 
     @property
@@ -102,16 +109,20 @@ def aggregate_findings(
         return []
 
     clustered = cluster_attributions(usable, threshold=threshold)
-    groups: Dict[Tuple[int, str], List[Dict[str, Any]]] = {}
+    groups: Dict[Tuple[int, str, str], List[Dict[str, Any]]] = {}
     labels: Dict[int, str] = {}
     for row in clustered:
         cid = row["cluster_id"]
         labels[cid] = row["cluster_label"]
-        key = (cid, row.get("position") or "unspecified")
+        # Position lowercased to match dedup's identity ('Support' vs
+        # 'support' split cells); population part of the key (see
+        # PositionAggregate docstring).
+        position = (row.get("position") or "unspecified").strip().lower()
+        key = (cid, position, normalize_population(row.get("population")))
         groups.setdefault(key, []).append(row)
 
     by_cluster: Dict[int, List[PositionAggregate]] = {}
-    for (cid, position), members in groups.items():
+    for (cid, position, population), members in groups.items():
         w_sum = 0.0
         wx_sum = 0.0
         pcts: List[float] = []
@@ -141,6 +152,7 @@ def aggregate_findings(
                 year_min=min(years) if years else None,
                 year_max=max(years) if years else None,
                 total_sample=sum(samples) if samples else None,
+                population=population,
                 findings=members,
             )
         )
@@ -148,7 +160,10 @@ def aggregate_findings(
     position_order = {"support": 0, "oppose": 1, "neutral": 2, "unspecified": 3}
     answers: List[ClusterAnswer] = []
     for cid, positions in by_cluster.items():
-        positions.sort(key=lambda p: position_order.get(p.position, 9))
+        # General population ('') leads within each position bucket.
+        positions.sort(
+            key=lambda p: (position_order.get(p.position, 9), p.population)
+        )
         answers.append(
             ClusterAnswer(
                 label=labels[cid],
@@ -176,6 +191,8 @@ def format_answer(answer: ClusterAnswer) -> str:
             bits.append(years)
         if p.total_sample is not None:
             bits.append(f"Σn={p.total_sample:,}")
+        if p.population:
+            bits.append(f"among: {p.population}")
         lines.append(
             f"   {p.position:<11} {p.weighted_pct:5.1f}%   ({', '.join(bits)})"
         )

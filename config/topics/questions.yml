@@ -7,52 +7,67 @@
 # Each question is a neutral proposition scoped to exactly one topic id from
 # topics.csv. It is the DECLARATIVE source of a monitoring `watch`:
 #   python -m study_scraper questions sync      # upsert each as a watch
-# after which the existing crawl -> attribute -> digest loop answers it from
-# ALL relevant attributions (poll-of-polls over the whole corpus) and tracks
-# it over time. `query` is the recall seed for the answer layer (attribution
-# questions are normalised to English by the llm-v1 extractor, so English
-# seeds match best); the semantic fallback widens it to related phrasings.
+# (the scheduled crawl runs this before every digest), after which the
+# crawl -> attribute -> digest loop answers it from ALL relevant
+# attributions (poll-of-polls over the whole corpus) and tracks it over time.
+#
+# `query` is the primary recall seed; `aliases` are alternative phrasings
+# the answer layer ALSO matches (lexically and semantically). The llm-v1
+# extractor normalizes attribution questions to English but phrases them
+# freely — 'conscription' shares zero tokens with 'reintroduce compulsory
+# military service', so without aliases a question can show a coverage gap
+# while the data sits in the DB. Over-recall is fine: the answer path
+# re-clusters at the precision threshold, so unrelated findings separate.
 #
 # Rules enforced by the loader (study_scraper/questions.py):
 #   - topic_id must exist in topics.csv
-#   - question id and query must each be unique across the whole registry
-#     (watches.query is UNIQUE — two questions sharing a query would collide)
+#   - question ids unique; every seed/alias unique across the registry
+#     (a shared recall term would double-count the same poll in two watches)
+#   - aliases must not contain '|' (the alternative separator)
 
-version: "0.1.0"
+version: "0.2.0"
 
 topics:
   atomkraft:
     - id: atomkraft_keep_or_return
       text: "Should Germany keep or return to nuclear power?"
       query: "nuclear power"
+      aliases: ["nuclear energy", "atomkraft", "kernenergie"]
 
   klima:
     - id: klima_stronger_policy
       text: "Should Germany strengthen its climate-protection policy?"
       query: "climate law"
+      aliases: ["climate policy", "climate protection", "klimaschutz"]
     - id: klima_renewables_expansion
       text: "Should the expansion of renewable energy be accelerated?"
       query: "renewable energy"
+      aliases: ["renewables", "wind power", "solar energy"]
 
   migration_einwanderung:
     - id: migration_reduce
       text: "Should immigration to Germany be reduced?"
       query: "immigration"
+      aliases: ["migration policy", "asylum", "zuwanderung"]
 
   wohnen:
     - id: wohnen_rent_control
       text: "Should rents be capped to address the housing shortage?"
       query: "rent control"
+      aliases: ["rent cap", "rent brake", "mietpreisbremse", "mietendeckel"]
 
   rente:
     - id: rente_raise_retirement_age
       text: "Should the statutory retirement age be raised?"
       query: "retirement age"
+      aliases: ["pension age", "renteneintrittsalter", "rente mit 70"]
 
   verteidigung:
     - id: verteidigung_increase_spending
       text: "Should Germany increase defense spending?"
       query: "defense spending"
+      aliases: ["military spending", "defence spending", "verteidigungsausgaben"]
     - id: verteidigung_reintroduce_conscription
       text: "Should compulsory military service be reintroduced?"
       query: "conscription"
+      aliases: ["military service", "compulsory service", "wehrpflicht"]

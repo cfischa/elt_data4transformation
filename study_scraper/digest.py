@@ -56,7 +56,7 @@ class WatchDigest:
 
 
 def _flatten(answers: List[ClusterAnswer]) -> List[Dict[str, Any]]:
-    """Snapshot payload: one row per (cluster, position)."""
+    """Snapshot payload: one row per (cluster, position, population)."""
     rows: List[Dict[str, Any]] = []
     for a in answers:
         for p in a.positions:
@@ -64,6 +64,7 @@ def _flatten(answers: List[ClusterAnswer]) -> List[Dict[str, Any]]:
                 {
                     "cluster_label": a.label,
                     "position": p.position,
+                    "population": p.population,
                     "weighted_pct": round(p.weighted_pct, 1),
                     "n_findings": p.n_findings,
                 }
@@ -72,12 +73,20 @@ def _flatten(answers: List[ClusterAnswer]) -> List[Dict[str, Any]]:
 
 
 def _match_prev(
-    label: str, position: str, prev_rows: List[Dict[str, Any]]
+    label: str,
+    position: str,
+    prev_rows: List[Dict[str, Any]],
+    population: str = "",
 ) -> Optional[Dict[str, Any]]:
-    """Find last run's row for this (cluster, position), label-fuzzy."""
+    """Find last run's row for this (cluster, position, population),
+    label-fuzzy. Population must match exactly: a 55→70 'shift' that is
+    really general-population vs Ostdeutsche is sample composition, not
+    opinion change. Pre-population snapshots (no key) count as ''."""
     best: Tuple[float, Optional[Dict[str, Any]]] = (0.0, None)
     for row in prev_rows:
         if row.get("position") != position:
+            continue
+        if (row.get("population") or "") != population:
             continue
         sim = question_similarity(label, row.get("cluster_label") or "")
         if sim > best[0]:
@@ -108,7 +117,10 @@ def digest_watch(
     seen_labels: set = set()
     for row in current:
         label = row["cluster_label"]
-        prev = _match_prev(label, row["position"], prev_rows)
+        prev = _match_prev(
+            label, row["position"], prev_rows,
+            population=row.get("population") or "",
+        )
         if prev is None:
             if prev_snapshot is not None and label not in seen_labels:
                 new_questions.append(label)

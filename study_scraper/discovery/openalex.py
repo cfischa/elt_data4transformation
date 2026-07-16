@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, datetime
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -41,6 +42,9 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_BASE_URL = "https://api.openalex.org/works"
 DEFAULT_PER_PAGE = 25
 MAX_PER_PAGE = 200
+# Search-term cap: 24 quoted OR-joined terms is ~500 URL chars, and with
+# the round-robin locale interleave both languages' core terms fit.
+_MAX_SEARCH_TERMS = 24
 
 
 class OpenAlexSource:
@@ -263,11 +267,24 @@ def _build_search_query(topic: Topic) -> str:
     which returned seen=0 on live runs (issue #26, observed 2026-07-02).
     Terms must be OR-joined explicitly; multi-word terms are quoted so
     their words stay one phrase.
+
+    Terms are taken ROUND-ROBIN across locales (include_keywords before
+    synonyms within each): a plain de-then-en iteration filled the whole
+    cap with German terms, so OpenAlex — an English-dominant index —
+    never received a single English keyword for any topic, and every
+    keyword past the cap (e.g. klima's renewables terms) was dead config
+    (audit 2026-07-11).
     """
+    per_locale: List[List[str]] = [
+        loc.include_keywords + loc.synonyms
+        for loc in topic.locales.values()
+    ]
     terms: List[str] = []
     seen: set[str] = set()
-    for locale in topic.locales.values():
-        for term in locale.include_keywords + locale.synonyms:
+    for tier in zip_longest(*per_locale):
+        for term in tier:
+            if term is None:
+                continue
             key = term.strip().lower()
             if not key or key in seen:
                 continue
@@ -276,9 +293,9 @@ def _build_search_query(topic: Topic) -> str:
             if " " in cleaned:
                 cleaned = f'"{cleaned}"'
             terms.append(cleaned)
-    # Cap to keep URL length sane — most relevant signal is in the first
-    # half-dozen terms anyway.
-    return " OR ".join(terms[:8])
+    # Cap keeps the URL sane; 24 quoted terms is ~500 chars, well under
+    # URL limits, and wide enough that both languages' core terms fit.
+    return " OR ".join(terms[:_MAX_SEARCH_TERMS])
 
 
 def _reconstruct_abstract(idx: Optional[Dict[str, List[int]]]) -> Optional[str]:

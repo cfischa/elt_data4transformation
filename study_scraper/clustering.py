@@ -63,11 +63,17 @@ _CONCEPTS: Dict[str, List[str]] = {
     "miete": ["housing"],
     "wohnung": ["housing"],
     "housing": ["housing"],
+    # NOTE: no "rent" key — the map matches keys as substrings inside
+    # tokens, and 'rent' sits inside 'rente', 'current', 'different'…
+    # English rent-phrasings already share the exact token 'rent'.
+    "retirement": ["pension"],
     "verteidigung": ["defense"],
     "defense": ["defense"],
     "defence": ["defense"],
     "bundeswehr": ["defense"],
+    "military": ["military"],
     "wehrpflicht": ["conscription"],
+    "wehrdienst": ["conscription"],
     "conscription": ["conscription"],
     "gesetz": ["law"],
     "law": ["law"],
@@ -79,6 +85,21 @@ _CONCEPTS: Dict[str, List[str]] = {
     "plant": ["plant"],
     "verbot": ["ban"],
     "ban": ["ban"],
+    # Polarity guards: 'Keep nuclear power' vs 'Phase out nuclear power'
+    # scored 0.80 on shared nuclear/power tokens and merged — averaging
+    # OPPOSITE propositions under one 'support' mean (audit 2026-07-11).
+    # A phaseout/abolish concept on one side pushes such pairs below the
+    # clustering threshold (0.65 for the nuclear pair). The 'return'
+    # concept re-joins REVERSAL phrasings ('Atomausstieg rückgängig
+    # machen' == 'Return to nuclear power', 0.77) that the phaseout tag
+    # alone would wrongly split — negation flips polarity back.
+    "ausstieg": ["phaseout"],
+    "phase": ["phaseout"],
+    "abschaff": ["abolish"],
+    "abolish": ["abolish"],
+    "rückgängig": ["return"],
+    "ruckgangig": ["return"],
+    "return": ["return"],
     "energie": ["energy"],
     "energy": ["energy"],
     "kohle": ["coal"],
@@ -176,11 +197,24 @@ def semantic_filter(
     The answer layer normalizes questions to English, so a German query
     ('klimaschutzgesetz') misses them under ILIKE. The concept map folds
     both languages into shared tokens, letting the query match anyway.
+
+    `query` may carry pipe-separated alternatives ('conscription|military
+    service') — the question registry's recall aliases. A row is scored
+    by its BEST alternative: extractors phrase the same proposition many
+    ways ('reintroduce compulsory military service' shares zero tokens
+    with 'conscription'), and requiring one canonical phrasing turns real
+    data into false coverage gaps. Over-recall is fine here — the answer
+    path re-clusters at the precision threshold afterwards.
+
     Returns matching rows best-first; rows below `threshold` drop."""
-    qv = question_vector(query)
+    alternatives = [alt.strip() for alt in query.split("|") if alt.strip()]
+    if not alternatives:
+        return []
+    qvs = [question_vector(alt) for alt in alternatives]
     scored: List[tuple] = []
     for i, row in enumerate(rows):
-        sim = _cosine_sparse(qv, question_vector(row.get(key) or ""))
+        rv = question_vector(row.get(key) or "")
+        sim = max(_cosine_sparse(qv, rv) for qv in qvs)
         if sim >= threshold:
             scored.append((-sim, i, row))
     scored.sort(key=lambda t: (t[0], t[1]))
