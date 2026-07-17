@@ -605,6 +605,43 @@ project URL + service-role key (placed in `.env`, not committed), or
 
 ---
 
+### A25. `PostgresStorage` caches one connection instead of reconnecting per call (resolves #56 remaining criterion)
+- **Date:** 2026-07-17
+- **Problem:** `PostgresStorage.connection()` opened a brand-new
+  `psycopg.connect()` (fresh TCP+TLS+auth round trip to the remote
+  Supabase pooler) on *every* call — one per storage method invocation,
+  i.e. once per record in `run_lake_ingest`'s loop. That's the dominant
+  cost behind the ~1.2-1.4s/record ingest rate documented in #56: at
+  that rate, `dawum`'s ~4228 records need ~85 minutes, but the CI
+  workflow's per-command `timeout 600` (10 min) kills the process first,
+  so `dawum` has structurally never completed a full pass.
+- **Decision:** `PostgresStorage` now lazily opens one connection and
+  caches it (`self._conn`), reconnecting only if it's missing or
+  `.closed`. The `connection()` contextmanager commits on clean exit /
+  rolls back on exception itself (previously relied on `with
+  psycopg.connect(...) as conn:` doing that plus closing the socket each
+  time) so per-call transaction semantics are unchanged — only the
+  physical connection is now reused. Verified locally: against a local
+  Postgres (no network latency), reused-connection round trips are ~14x
+  faster than fresh-connection ones (0.50ms vs 7.23ms/op); against a
+  remote host the win is the whole connect+TLS+auth cost per call, i.e.
+  most of the observed ~1.2-1.4s/record.
+- **Why this is safe:** `PostgresStorage` is constructed once per CLI
+  command / Streamlit page render and driven single-threaded/sequentially
+  (`cli.py:_storage_from_settings()`, `console/_shared.py`) — no method
+  holds a cursor open across a `yield` to a caller, so there's no nested
+  or concurrent use of the cached connection within or across calls.
+- **Why not a real connection pool (`psycopg_pool`):** would add a new
+  dependency and target concurrent access this codebase doesn't have;
+  a single cached connection is the smaller, sufficient fix for a
+  single-threaded adapter.
+- **Not done here:** batching the `upsert_source_record` UPSERT itself
+  (still one round trip per record) and raising/removing the
+  `.github/workflows/scrape.yml` per-command `timeout` are both still
+  open per #56 if connection reuse alone doesn't get `dawum` under the
+  10-minute budget — out of this change's scope (`.github/**` is off
+  limits for this agent) and left for a follow-up if needed.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
