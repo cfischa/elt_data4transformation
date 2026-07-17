@@ -114,12 +114,37 @@ class PostgresStorage:
                 "(`pip install 'psycopg[binary]'`) to use PostgresStorage."
             )
         self._database_url = database_url
+        self._conn: Optional["psycopg.Connection[Any]"] = None
+
+    def _get_conn(self) -> "psycopg.Connection[Any]":
+        """Return a live connection, reconnecting if this is the first
+        call or the cached connection has dropped. A `PostgresStorage`
+        is single-threaded/single-instance-per-run (one per CLI command,
+        one per lake-ingest loop -- see `run_lake_ingest`), so caching
+        one connection here avoids a fresh TCP+TLS+auth round trip to
+        the (often remote/pooled, e.g. Supabase) DB on every call, which
+        otherwise dominates per-record latency in tight ingest loops."""
+        assert psycopg is not None  # for type checkers
+        if self._conn is None or self._conn.closed:
+            self._conn = psycopg.connect(self._database_url, row_factory=dict_row)
+        return self._conn
 
     @contextmanager
     def connection(self) -> Iterator["psycopg.Connection[Any]"]:
-        assert psycopg is not None  # for type checkers
-        with psycopg.connect(self._database_url, row_factory=dict_row) as conn:
+        conn = self._get_conn()
+        try:
             yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    def close(self) -> None:
+        """Close the cached connection, if any. Safe to call repeatedly;
+        the next `connection()` call transparently reconnects."""
+        if self._conn is not None and not self._conn.closed:
+            self._conn.close()
+        self._conn = None
 
     # ------------------------------------------------------------------
     # Migrations
