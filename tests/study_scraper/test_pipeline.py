@@ -195,7 +195,7 @@ def test_aborted_run_does_not_advance_last_crawl_finished_at(
     with storage.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT finished_at, notes, candidates_seen "
+                "SELECT finished_at, notes, candidates_seen, errors "
                 "FROM study_scraper.crawl_runs WHERE source_id = 'aborting'"
             )
             row = cur.fetchone()
@@ -203,6 +203,11 @@ def test_aborted_run_does_not_advance_last_crawl_finished_at(
     assert row["finished_at"] is None
     assert row["candidates_seen"] == 1  # the one candidate seen before the raise
     assert row["notes"] is not None and "aborted" in row["notes"]
+    # issue #48: an aborted run (e.g. a 401 mid-pagination) must count in
+    # `errors` too -- `study status` classifies runs as failed by
+    # `errors > 0` alone, so an uncounted abort read as a clean
+    # `seen=0 kept=0 errors=0` row and stayed invisible for weeks.
+    assert row["errors"] == 1
 
 
 def test_openalex_citation_graph_propagated_to_provenance(

@@ -214,6 +214,11 @@ def run_one(
         # Leave `finished_at` unset so `last_crawl_finished_at()` (used to
         # derive the next incremental `from=` watermark) skips this run
         # instead of treating a partial harvest as a clean completion.
+        # Count it in `errors` too: `study status` and friends classify
+        # runs as failed by `errors > 0`, not by `notes`/`finished_at`, so
+        # an uncounted abort reads as a clean `seen=0 kept=0 errors=0` row
+        # (e.g. a 401 from a rotated API key going unnoticed for weeks).
+        errors += 1
         aborted_note = f"aborted: {exc}"
         raise
     finally:
