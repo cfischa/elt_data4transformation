@@ -642,6 +642,27 @@ project URL + service-role key (placed in `.env`, not committed), or
   10-minute budget — out of this change's scope (`.github/**` is off
   limits for this agent) and left for a follow-up if needed.
 
+### A26. Attribution queue orders registry-topic studies first (resolves #59 item 1)
+- **Date:** 2026-07-19
+- **Problem:** `attribution_queue` (and `attribute`/`attribute-prompts`)
+  ordered purely by `fetched_at DESC`. Every scheduled run only processes
+  a fixed-size batch (`--limit`, e.g. 40 in `.github/workflows/attribute.yml`),
+  so question-less topics (steuern, bildung) consumed the same LLM budget
+  as topics with a registered question in `config/topics/questions.yml`
+  someone is actually waiting on an answer for.
+- **Decision:** `study_scraper/attribute.py`'s `_target_ids` now fetches a
+  wider window from the `attribution_queue` view (`max(limit,
+  _QUEUE_SCAN_FLOOR=500)`) and stable-sorts it with `prioritize_queue` so
+  rows whose `topic_ids` intersect the question registry's topics come
+  first; the rest keep their existing recency order behind them. No
+  schema change — the view is unchanged, the reordering happens in the
+  Python query layer. Registry loading (`_registry_topic_ids`) is
+  best-effort: a missing/malformed `questions.yml` just disables
+  prioritization rather than breaking attribution.
+- **Not done here:** actually raising `--limit`/cadence so the queue
+  trends toward zero (issue #49) — that's a `.github/workflows/
+  attribute.yml` change, out of this agent's edit scope.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
