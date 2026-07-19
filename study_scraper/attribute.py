@@ -18,13 +18,19 @@ idempotent).
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from study_scraper.extractors import llm_v1
 from study_scraper.storage import PostgresStorage
 
 
 LOGGER = logging.getLogger(__name__)
+
+# The queue view has no LIMIT-independent notion of priority, so we scan
+# well beyond the requested batch size before reordering — otherwise a
+# plain `LIMIT limit` would already have cut the registry-topic studies
+# out before prioritize_queue ever sees them.
+_QUEUE_SCAN_FLOOR = 500
 
 
 def build_prompt_for_study(study: Dict[str, Any]) -> str:
@@ -124,6 +130,42 @@ def apply_responses(
     return results
 
 
+def prioritize_queue(
+    rows: List[Dict[str, Any]], registry_topic_ids: Set[str]
+) -> List[Dict[str, Any]]:
+    """Stable-sort `attribution_queue` rows so studies whose `topic_ids`
+    intersect the question registry come first; question-less topics
+    fill the remainder in their existing (recency) order.
+
+    A scheduled run only ever attributes a fixed-size batch, so without
+    this a topic nobody has a registered question for (e.g. steuern,
+    bildung) competes for the same LLM budget as a topic someone is
+    actually waiting on an answer for (issue #59).
+    """
+    if not registry_topic_ids:
+        return rows
+
+    def _has_registry_topic(row: Dict[str, Any]) -> bool:
+        return not registry_topic_ids.isdisjoint(row.get("topic_ids") or [])
+
+    return sorted(rows, key=lambda r: 0 if _has_registry_topic(r) else 1)
+
+
+def _registry_topic_ids() -> Set[str]:
+    """Topic ids with at least one registered question. Best-effort: an
+    unset or malformed registry just disables prioritization rather than
+    breaking attribution."""
+    from study_scraper.config import get_settings
+    from study_scraper.questions import QuestionRegistryError, load_questions
+
+    settings = get_settings()
+    try:
+        registry = load_questions(settings.questions_yaml_path)
+    except (FileNotFoundError, QuestionRegistryError):
+        return set()
+    return {q.topic_id for q in registry}
+
+
 def _target_ids(
     storage: PostgresStorage,
     *,
@@ -132,5 +174,8 @@ def _target_ids(
 ) -> List[str]:
     if study_id is not None:
         return [study_id]
-    rows = storage.query_view("attribution_queue", limit=limit)
-    return [r["id"] for r in rows]
+    rows = storage.query_view(
+        "attribution_queue", limit=max(limit, _QUEUE_SCAN_FLOOR)
+    )
+    rows = prioritize_queue(rows, _registry_topic_ids())
+    return [r["id"] for r in rows[:limit]]

@@ -205,6 +205,59 @@ def test_extract_live_with_injected_client_uses_prompt_cache() -> None:
 
 
 # --------------------------------------------------------------------------
+# Pure: queue prioritization (issue #59 — registry topics go first)
+# --------------------------------------------------------------------------
+
+
+def test_prioritize_queue_moves_registry_topics_first() -> None:
+    from study_scraper.attribute import prioritize_queue
+
+    rows = [
+        {"id": "a", "topic_ids": ["bildung"]},
+        {"id": "b", "topic_ids": ["klima"]},
+        {"id": "c", "topic_ids": ["steuern"]},
+        {"id": "d", "topic_ids": ["klima", "bildung"]},
+    ]
+    out = prioritize_queue(rows, {"klima"})
+    assert [r["id"] for r in out] == ["b", "d", "a", "c"]
+
+
+def test_prioritize_queue_noop_without_registry_topics() -> None:
+    from study_scraper.attribute import prioritize_queue
+
+    rows = [{"id": "a", "topic_ids": []}, {"id": "b", "topic_ids": ["klima"]}]
+    assert prioritize_queue(rows, set()) == rows
+
+
+def test_prioritize_queue_handles_missing_topic_ids() -> None:
+    from study_scraper.attribute import prioritize_queue
+
+    rows = [{"id": "a"}, {"id": "b", "topic_ids": ["klima"]}]
+    out = prioritize_queue(rows, {"klima"})
+    assert [r["id"] for r in out] == ["b", "a"]
+
+
+def test_target_ids_scans_beyond_limit_to_surface_priority_studies(monkeypatch) -> None:
+    """A plain `LIMIT limit` would cut the registry-topic study out before
+    it could ever be prioritized — `_target_ids` must scan a wider window
+    first."""
+    from study_scraper import attribute
+
+    monkeypatch.setattr(attribute, "_registry_topic_ids", lambda: {"klima"})
+    rows = [{"id": f"s{i}", "topic_ids": ["bildung"]} for i in range(10)]
+    rows.append({"id": "priority", "topic_ids": ["klima"]})
+
+    class _FakeStorage:
+        def query_view(self, view_name, *, limit=50):
+            assert view_name == "attribution_queue"
+            return rows[:limit]
+
+    ids = attribute._target_ids(_FakeStorage(), limit=3, study_id=None)
+    assert ids[0] == "priority"
+    assert len(ids) == 3
+
+
+# --------------------------------------------------------------------------
 # Integration: storage + queue + search + offline apply
 # --------------------------------------------------------------------------
 
