@@ -34,6 +34,12 @@ RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 _DEFAULT_MAX_ATTEMPTS = 4
 _DEFAULT_BASE_DELAY = 0.5
 _MAX_BACKOFF = 30.0
+# Upstream Retry-After is honoured (it's a legitimate signal, unlike our own
+# backoff guess), but uncapped it can stall a whole job: OpenAlex has been
+# observed sending Retry-After values in the tens of minutes under sustained
+# rate limiting, and three retries at that scale alone burn hours. Cap it
+# well above our own backoff ceiling but still bounded.
+_MAX_RETRY_AFTER = 120.0
 
 
 class RetryableResponse(Exception):
@@ -68,7 +74,7 @@ def _wait_seconds(state: Any, base_delay: float) -> float:
     backoff with full jitter, capped."""
     exc = state.outcome.exception() if state.outcome else None
     if isinstance(exc, RetryableResponse) and exc.retry_after is not None:
-        return exc.retry_after
+        return min(exc.retry_after, _MAX_RETRY_AFTER)
     attempt = max(1, state.attempt_number)
     ceiling = min(base_delay * (2 ** (attempt - 1)), _MAX_BACKOFF)
     return random.uniform(0.0, ceiling)  # full jitter
