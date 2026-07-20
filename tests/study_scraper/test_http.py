@@ -79,6 +79,25 @@ def test_honours_retry_after_header() -> None:
     assert slept == [7.0]  # exact Retry-After, not backoff
 
 
+def test_caps_large_retry_after_header() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # OpenAlex-style large Retry-After (tens of minutes) — must not
+            # be honoured verbatim or a single 429 can stall the whole job.
+            return httpx.Response(429, headers={"Retry-After": "3000"})
+        return httpx.Response(200)
+
+    sleep, slept = _recording_sleeper()
+    with _client(handler) as client:
+        resp = get_with_retry(client, "https://x.test/g", sleep=sleep)
+
+    assert resp.status_code == 200
+    assert slept == [120.0]  # capped, not the raw 3000s
+
+
 def test_retries_transport_error_then_succeeds() -> None:
     calls = {"n": 0}
 

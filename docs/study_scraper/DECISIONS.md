@@ -663,6 +663,28 @@ project URL + service-role key (placed in `.env`, not committed), or
   trends toward zero (issue #49) — that's a `.github/workflows/
   attribute.yml` change, out of this agent's edit scope.
 
+### A27. Cap honoured `Retry-After` instead of trusting it uncapped (resolves #53)
+- **Date:** 2026-07-20
+- **Problem:** `study_scraper/http.py::_wait_seconds` slept for the exact
+  `Retry-After` value a 429/503 response sent, with no ceiling — unlike
+  the exponential-backoff branch a few lines below it, which is capped at
+  `_MAX_BACKOFF=30s`. The 2026-07-13 `scheduled-scrape` run stalled ~2.5h
+  on a single OpenAlex request under sustained 429s (OpenAlex is known to
+  send large `Retry-After` values, e.g. tens of minutes) and the job burned
+  its full 5h GH Actions timeout before being force-cancelled.
+- **Decision:** honoured `Retry-After` is now `min(retry_after,
+  _MAX_RETRY_AFTER)` with `_MAX_RETRY_AFTER=120.0`. Kept deliberately above
+  `_MAX_BACKOFF` (30s) since an explicit upstream signal is more trustworthy
+  than our own backoff guess and shouldn't be squashed to the same ceiling,
+  but still bounded so one rate-limited request can't consume a job's whole
+  budget — worst case is `max_attempts - 1` capped waits per call (e.g. 3 ×
+  120s = 6 min), not hours.
+- **Not done here:** bounding *cumulative* retry time across the whole
+  `request_with_retry` call (the issue's second suggestion) — the per-wait
+  cap already collapses the observed multi-hour stall to single-digit
+  minutes, so the added complexity of a running-total budget wasn't needed
+  to fix the reported incident.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
