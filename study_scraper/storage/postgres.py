@@ -770,6 +770,10 @@ class PostgresStorage:
         Idempotent per (study, model): delete existing rows from this
         model, re-insert. Other models' attributions are untouched, so
         an llm-v1 re-run doesn't disturb a future llm-v2 pass.
+
+        Also records an `attribution_attempts` row regardless of yield,
+        so a study that produced zero triples is remembered as "tried"
+        and `attribution_queue` stops re-selecting it every run (#49).
         """
         rows = [
             (
@@ -803,6 +807,17 @@ class PostgresStorage:
                         """,
                         rows,
                     )
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.attribution_attempts (
+                        study_id, model, found, attempted_at
+                    ) VALUES (%s, %s, %s, now())
+                    ON CONFLICT (study_id, model) DO UPDATE
+                        SET found = EXCLUDED.found,
+                            attempted_at = EXCLUDED.attempted_at
+                    """,
+                    (study_id, model, len(rows)),
+                )
             conn.commit()
         return len(rows)
 

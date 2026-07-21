@@ -685,6 +685,31 @@ project URL + service-role key (placed in `.env`, not committed), or
   minutes, so the added complexity of a running-total budget wasn't needed
   to fix the reported incident.
 
+### A28. `attribution_attempts` — no-signal studies leave the queue too (mechanism flagged on #49)
+- **Date:** 2026-07-21
+- **Problem:** `attribution_queue` (A21/migration 0008) only excludes a
+  study once it has an `attributions` row. `upsert_attributions` never
+  writes a row when the LLM pass finds zero attributable triples for a
+  study, so a no-signal study never leaves the queue — it gets
+  re-selected (and re-billed against the fixed per-run batch, `--limit
+  40` in `.github/workflows/attribute.yml`) on every subsequent run,
+  forever, crowding out studies that haven't been tried yet. The
+  monitor agent traced this as the likely reason net-new attributions
+  per `scheduled-attribute` run kept falling (33 → 14 → 9 → 1) even as
+  the queue and claims kept growing (#49, 2026-07-21 update).
+- **Decision:** migration 0011 adds `attribution_attempts(study_id,
+  model, found, attempted_at)`. `PostgresStorage.upsert_attributions`
+  now upserts an attempt row every call, regardless of yield.
+  `attribution_queue` excludes studies with a recorded attempt whose
+  `found = 0`, in addition to the existing "has an attribution" check.
+  Model-blind, like the existing attributions check — retrying a
+  no-signal study with a different/future model isn't handled
+  differently here.
+- **Not done here:** raising `--limit`/cadence so the queue trends
+  toward zero even for studies that *do* yield triples (issue #49's
+  original ask) — that's still a `.github/workflows/attribute.yml`
+  change, out of this agent's edit scope.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

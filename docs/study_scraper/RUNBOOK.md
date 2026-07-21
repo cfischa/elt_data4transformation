@@ -167,6 +167,11 @@ query directly. Studies with claims but no attribution sit in the
 `attribution_queue`. Two ways to process it — both write the same
 `attributions` table; pick by your cost preference.
 
+A study that's tried and yields zero triples is recorded in
+`attribution_attempts` and leaves the queue too — it won't be
+re-selected (and re-billed) on every subsequent run just because it
+never got an attribution row (see A28).
+
 ### 3.5a Option A — live API (you chose this)
 
 Costs Anthropic tokens against your `ANTHROPIC_API_KEY`.
