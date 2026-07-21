@@ -282,6 +282,7 @@ def storage():
 def _clean(storage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
+            cur.execute("TRUNCATE study_scraper.attribution_attempts CASCADE")
             cur.execute("TRUNCATE study_scraper.attributions CASCADE")
             cur.execute("TRUNCATE study_scraper.claims CASCADE")
             cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
@@ -352,6 +353,44 @@ def test_upsert_attributions_idempotent_per_model(storage) -> None:
     apply_responses(storage=storage, responses={s.id: resp})
     apply_responses(storage=storage, responses={s.id: resp})  # re-run
     assert storage.count_attributions() == 1  # not 2
+
+
+def test_no_signal_study_leaves_queue_after_attempt(storage) -> None:
+    """A study the LLM pass finds zero triples for must not be
+    re-selected on every subsequent run (#49): the queue should exclude
+    it once an attempt is recorded, even with no attribution rows."""
+    from study_scraper.attribute import apply_responses
+
+    s = _seed_study_with_claim(
+        storage, title="No Signal", abstract="42% agree with something vague.")
+    empty_response = json.dumps({"attributions": []})
+
+    results = apply_responses(storage=storage, responses={s.id: empty_response})
+    assert results[0]["attributions"] == 0
+    assert storage.count_attributions() == 0
+
+    rows = storage.query_view("attribution_queue", limit=10)
+    assert s.id not in {r["id"] for r in rows}
+
+
+def test_no_signal_attempt_is_idempotent_per_model(storage) -> None:
+    from study_scraper.attribute import apply_responses
+
+    s = _seed_study_with_claim(
+        storage, title="No Signal Twice", abstract="10% agree with something vague.")
+    empty_response = json.dumps({"attributions": []})
+
+    apply_responses(storage=storage, responses={s.id: empty_response})
+    apply_responses(storage=storage, responses={s.id: empty_response})  # re-run
+
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM study_scraper.attribution_attempts "
+                "WHERE study_id = %s",
+                (s.id,),
+            )
+            assert cur.fetchone()["c"] == 1
 
 
 def test_search_attributions_since_filters_old_and_undated(storage) -> None:
