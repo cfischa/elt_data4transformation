@@ -20,6 +20,7 @@ from study_scraper.sources.dawum import DAWUMSource
 from study_scraper.sources.eurobarometer import EurobarometerSource
 from study_scraper.sources.eurostat import EurostatSource
 from study_scraper.sources.gesis import GESISSource
+from study_scraper.sources.govdata import GovDataSource, topic_query_terms
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage, StorageError, resolve_database_url
 from study_scraper.topics import Topic, load_topics
@@ -582,9 +583,11 @@ def ingest(
     ),
     topic: Optional[str] = typer.Option(
         None, "--topic",
-        help="Optional operator tag applied to every record this run "
-             "captures. Lake sources don't topic-filter; this is just "
-             "metadata for downstream views.",
+        help="Operator tag applied to every record this run captures "
+             "(metadata for downstream views). Most lake sources don't "
+             "topic-filter; govdata is the exception -- in live mode "
+             "(no --from-file) it's required and its include_keywords "
+             "become the package_search query terms.",
     ),
     code: List[str] = typer.Option(
         [], "--code",
@@ -621,10 +624,25 @@ def ingest(
             from_file=from_file,
             filters={"geo": geo} if geo else {},
         )
+    elif source == "govdata":
+        queries: List[str] = []
+        if not from_file:
+            if not topic:
+                raise typer.BadParameter(
+                    "govdata requires --topic <id> (its include_keywords "
+                    "become the search terms) or --from-file PATH."
+                )
+            settings = get_settings()
+            topics = load_topics(settings.topics_csv_path)
+            matched = next((t for t in topics if t.id == topic), None)
+            if matched is None:
+                raise typer.BadParameter(f"unknown topic id {topic!r}")
+            queries = topic_query_terms(matched)
+        src = GovDataSource(from_file=from_file, queries=queries)
     else:
         raise typer.BadParameter(
             f"unknown lake source {source!r}; "
-            f"supported: dawum, gesis, eurobarometer, eurostat"
+            f"supported: dawum, gesis, eurobarometer, eurostat, govdata"
         )
     storage = _storage_from_settings()
     topic_ids = [topic] if topic else None

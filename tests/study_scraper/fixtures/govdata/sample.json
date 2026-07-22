@@ -1,0 +1,70 @@
+{
+  "_fixture_note": "Hand-crafted sample in the real CKAN `package_search` response shape (https://www.govdata.de/ckan/api/3/action/package_search?q=...). Dataset ids/titles are illustrative placeholders, not verified against a live govdata.de call in this session (no live web access) -- same caveat as A24's eurobarometer fixture. The production parser (GovDataSource._build_record) is the same code path live vs from-file.",
+  "help": "https://www.govdata.de/ckan/api/3/action/help_show?name=package_search",
+  "success": true,
+  "result": {
+    "count": 3,
+    "results": [
+      {
+        "id": "8f2b6f1a-1111-4a11-9a11-111111111111",
+        "name": "steueraufkommen-nach-steuerart-2024",
+        "title": "Steueraufkommen nach Steuerart 2024",
+        "notes": "Jährliche Übersicht des Steueraufkommens nach Steuerart (u.a. Einkommensteuer, Körperschaftsteuer, Erbschaftsteuer) für die Bundesrepublik Deutschland.",
+        "license_id": "dl-de-by-2.0",
+        "license_title": "Datenlizenz Deutschland – Namensnennung – Version 2.0",
+        "license_url": "https://www.govdata.de/dl-de/by-2-0",
+        "metadata_created": "2024-03-01T00:00:00",
+        "metadata_modified": "2024-03-15T09:12:00",
+        "organization": {
+          "name": "statistisches-bundesamt",
+          "title": "Statistisches Bundesamt (Destatis)"
+        },
+        "tags": [{"name": "Steuern"}, {"name": "Erbschaftsteuer"}],
+        "resources": [
+          {"url": "https://www.destatis.de/govdata/steueraufkommen-2024.csv",
+           "format": "CSV", "name": "Steueraufkommen 2024 (CSV)"}
+        ],
+        "extras": [{"key": "geographic_coverage", "value": "DE"}]
+      },
+      {
+        "id": "8f2b6f1a-2222-4a11-9a11-222222222222",
+        "name": "co2-emissionen-bundeslaender-2023",
+        "title": "CO2-Emissionen nach Bundesländern 2023",
+        "notes": "Jährliche CO2-Emissionsdaten je Bundesland, aufgeschlüsselt nach Sektor.",
+        "license_id": "cc-zero",
+        "license_title": "Creative Commons CC Zero (CC0)",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "metadata_created": "2023-06-01T00:00:00",
+        "metadata_modified": "2024-01-10T11:00:00",
+        "organization": {
+          "name": "umweltbundesamt",
+          "title": "Umweltbundesamt (UBA)"
+        },
+        "tags": [{"name": "Klimaschutz"}, {"name": "Emissionen"}],
+        "resources": [
+          {"url": "https://www.umweltbundesamt.de/govdata/co2-2023.xlsx",
+           "format": "XLSX", "name": "CO2-Emissionen 2023 (XLSX)"}
+        ],
+        "extras": [{"key": "geographic_coverage", "value": "DE"}]
+      },
+      {
+        "id": "8f2b6f1a-3333-4a11-9a11-333333333333",
+        "name": "kommunale-haushaltsdaten-musterstadt",
+        "title": "Kommunale Haushaltsdaten Musterstadt",
+        "notes": "Haushaltsplan und -abschluss der Stadt Musterstadt (Platzhalter, kein Lizenzfeld gesetzt).",
+        "metadata_created": "2022-09-01T00:00:00",
+        "metadata_modified": "2022-09-01T00:00:00",
+        "organization": {
+          "name": "stadt-musterstadt",
+          "title": "Stadt Musterstadt"
+        },
+        "tags": [{"name": "Haushalt"}],
+        "resources": [
+          {"url": "https://www.musterstadt.de/govdata/haushalt-2022.csv",
+           "format": "CSV", "name": "Haushalt 2022 (CSV)"}
+        ],
+        "extras": []
+      }
+    ]
+  }
+}
