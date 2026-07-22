@@ -710,6 +710,43 @@ project URL + service-role key (placed in `.env`, not committed), or
   original ask) — that's still a `.github/workflows/attribute.yml`
   change, out of this agent's edit scope.
 
+### A29. GovData.de (CKAN `package_search`) as a new government lake source (resolves #64)
+- **Date:** 2026-07-22
+- **Decision:** Add GovData.de as a lake source (`ingest --source
+  govdata`), reading CKAN's free, unauthenticated `package_search`
+  action (`https://www.govdata.de/ckan/api/3/action/package_search`).
+  Live mode is topic-driven — unlike DAWUM/GESIS/Eurobarometer (which
+  ingest a whole catalog) or Eurostat (explicit `--code` list), GovData
+  is searched per topic using that topic's `include_keywords` (not
+  synonyms — the specific terms, e.g. "Erbschaftssteuer", keep results
+  relevant; mirrors `bundestag_dip._search_terms`'s reasoning but
+  simpler since CKAN's `q=` full-text search doesn't need the
+  synonym/include interleaving DIP's `f.titel` exact-match needed).
+  `--topic <id>` is therefore required in live mode (checked the same
+  way `--code` is required for eurostat); `--from-file` bypasses it.
+- **Rationale:** GovData is our first working pure-government source
+  (`bundestag_dip` is discovery-only and still broken pending a
+  `DIP_API_KEY` rotation, #48) — fills the "government" slot in
+  GOAL.md's source-coverage bar. CKAN is free/no-auth/widely-used
+  (also powers Open.NRW and other state portals), so low risk of the
+  endpoint disappearing.
+- **Implementation:** `study_scraper/sources/govdata.py`. Same
+  fixture + live shape as the other lake sources; the fixture is the
+  literal CKAN response shape (`{"result": {"count", "results"}}`),
+  not a custom wrapper, since `package_search`'s JSON is already a
+  convenient one-page-per-file shape. Each record captures its own
+  `license_title`/`license_id` (default fallback: "Data License Germany
+  2.0 (dl-de/by-2-0)", CKAN's stated default) rather than a hardcoded
+  blanket license, since datasets can override it. Full dataset payload
+  (incl. `resources` download URLs) preserved as-is per A14.
+- **Deferred (per #64, coverage-first like A12):** filtering obviously
+  irrelevant hits (non-DE, non-dataset resource types) — the lake
+  ingest lands raw; filtering is a later view/step.
+- **Needs-human follow-up:** wiring `govdata` into the scheduled
+  `.github/workflows/scrape.yml` crawl step is out of this agent's edit
+  scope (same gap as #65 for eurobarometer) — flag separately once this
+  lands.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

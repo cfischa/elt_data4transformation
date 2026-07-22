@@ -51,6 +51,10 @@ python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_b
 #   eurostat filters to geo=DE by default (A14.1) — without it, tables like
 #   nrg_bal_s are ~69 MB and crash json parsing. Override with --geo FR, or
 #   --geo "" for all countries (huge tables are skipped by the size guard).
+python -m study_scraper ingest --source govdata --topic steuern
+#   govdata (CKAN package_search, no auth) is topic-driven in live mode:
+#   --topic's include_keywords become the search terms (A29). Repeat per
+#   topic id to cover more of the catalog.
 
 # 0g. Pull full documents + extract statistics from the full text
 python -m study_scraper fulltext --limit 50
@@ -122,6 +126,7 @@ python -m study_scraper ingest --source dawum
 python -m study_scraper ingest --source gesis  --limit 100
 python -m study_scraper ingest --source eurobarometer --limit 100
 python -m study_scraper ingest --source eurostat --code env_air_gge --code nrg_bal_s
+python -m study_scraper ingest --source govdata --topic steuern
 python -m study_scraper status
 ```
 
