@@ -1362,6 +1362,22 @@ class PostgresStorage:
                 )
                 return list(cur.fetchall())
 
+    def list_study_urls(self) -> List[Dict[str, Any]]:
+        """Every kept study's canonical_url plus the landing_page_url /
+        pdf_url captured into provenance (per #38's domain audit)."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT canonical_url,
+                           provenance ->> 'landing_page_url' AS landing_page_url,
+                           provenance ->> 'pdf_url'          AS pdf_url
+                    FROM   {SCHEMA}.studies
+                    WHERE  status = 'kept'
+                    """
+                )
+                return list(cur.fetchall())
+
     # ------------------------------------------------------------------
     # Monitoring v1: watches + snapshots (migration 0009)
     # ------------------------------------------------------------------

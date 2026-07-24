@@ -1139,6 +1139,27 @@ def audit(
     )
 
 
+@app.command("sources-audit")
+def sources_audit(
+    limit: int = typer.Option(
+        20, "--limit", help="Max unknown domains to show."
+    ),
+) -> None:
+    """Domain-audit source discovery (Phase 5d, issue #38): group kept
+    studies' URLs by registrable domain and list the domains we have no
+    dedicated source for, ranked by frequency — candidates for the next
+    scraper to build. Read-only, pure aggregation over the DB."""
+    from study_scraper.domain_audit import audit_domains
+
+    storage = _storage_from_settings()
+    stats = audit_domains(storage, limit=limit)
+    if not stats:
+        typer.echo("(no unknown domains found)")
+        return
+    for stat in stats:
+        typer.echo(f"{stat.hits:>5}  {stat.domain:<32} {stat.example_url}")
+
+
 @review_app.command("auto")
 def review_auto(
     topic: Optional[str] = typer.Option(None, "--topic"),
