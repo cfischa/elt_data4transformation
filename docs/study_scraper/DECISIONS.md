@@ -747,6 +747,29 @@ project URL + service-role key (placed in `.env`, not committed), or
   scope (same gap as #65 for eurobarometer) — flag separately once this
   lands.
 
+### A30. Domain-audit source discovery: exclude `doi.org` alongside existing-source domains (resolves #38)
+- **Date:** 2026-07-24
+- **Decision:** `study_scraper sources-audit` groups every kept study's
+  `canonical_url` + provenance `landing_page_url`/`pdf_url` by an
+  eTLD+1-approximated registrable domain (`domain_audit.normalize_domain`
+  — last two dot-labels after stripping scheme/port/credentials/`www.`;
+  no public-suffix-list dependency, good enough for the mostly
+  `*.de`/`*.org`/`*.com` hosts this project sees) and lists the domains
+  not already covered by a dedicated source (`domain_audit.KNOWN_DOMAINS`:
+  openalex.org, ssoar.info, bundestag.de, dawum.de, gesis.org, europa.eu,
+  govdata.de), ranked by hit count.
+- **Rationale:** `doi.org` is added to the exclusion set even though no
+  source is "dedicated" to it. OpenAlex's `canonical_url` is frequently a
+  DOI URL (`doi.org/10.xxxx`, a redirector/identifier, not a content
+  host), so without excluding it `doi.org` would dominate the report by
+  sheer volume while being useless as a "candidate source" — the actual
+  publisher domain is what `landing_page_url`/`pdf_url` already surface
+  separately for the same study.
+- **Implementation:** `study_scraper/domain_audit.py` (pure
+  `normalize_domain` + `audit_domains(storage, limit=...)`);
+  `PostgresStorage.list_study_urls()`; CLI `sources-audit [--limit]`.
+  Read-only, pure aggregation — no schema change.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

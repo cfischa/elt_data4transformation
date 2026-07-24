@@ -130,9 +130,11 @@ statistics breadth*. Ranked by yield per effort:
 8. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
-9. **Domain-audit source discovery** (issue #38) **[now]** — Phase 5d:
-   walk stored study/reference URLs, group unknown domains, surface them
-   as candidate sources (report + dock list). Plus: the product agent now
+9. **Domain-audit source discovery** (issue #38) **[done, CLI]** — Phase
+   5d: `study_scraper sources-audit [--limit]` walks stored study/
+   reference URLs, groups by registrable domain, and surfaces domains
+   with no dedicated source, ranked by frequency (see DECISIONS.md A30).
+   Dock/Streamlit surface still open. Plus: the product agent now
    scouts via WebSearch each run.
 10. **Polling-institute press releases** **[now, larger]** — Forsa, INSA,
     infratest dimap (ARD-DeutschlandTrend), Allensbach, YouGov DE, Civey
