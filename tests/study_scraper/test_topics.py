@@ -97,6 +97,94 @@ class TestLoadTopics:
             load_topics(path)
 
 
+class TestLoadTopicsRotation:
+    """Issue #71: scrape.yml's per-topic crawl loop takes its order
+    straight from load_topics(), so a fixed CSV order always puts the
+    same topics last and a rate-limited source always starves them.
+    Rotating by GITHUB_RUN_NUMBER (always set by Actions) fixes this
+    without touching the workflow file, which is out of agent scope --
+    and, unlike an earlier day-based revision of this fix, never fires
+    outside Actions, so it can't corrupt the console's Topics editor
+    (which reads via load_topics() and writes back in that same order,
+    see TestLoadTopicsRotationConsoleSafety below)."""
+
+    def _four_topic_csv(self, tmp_path: Path) -> Path:
+        return write_csv(
+            tmp_path,
+            "a,A,d,de,,,\n"
+            "b,B,d,de,,,\n"
+            "c,C,d,de,,,\n"
+            "d,D,d,de,,,\n",
+        )
+
+    def test_no_rotation_outside_github_actions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("GITHUB_RUN_NUMBER", raising=False)
+        path = self._four_topic_csv(tmp_path)
+        topics = load_topics(path)
+        assert [t.id for t in topics] == ["a", "b", "c", "d"]
+
+    def test_rotates_by_run_number_inside_github_actions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = self._four_topic_csv(tmp_path)
+
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "0")
+        assert [t.id for t in load_topics(path)] == ["a", "b", "c", "d"]
+
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "1")
+        assert [t.id for t in load_topics(path)] == ["b", "c", "d", "a"]
+
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "3")
+        assert [t.id for t in load_topics(path)] == ["d", "a", "b", "c"]
+
+        # wraps around
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "5")
+        assert [t.id for t in load_topics(path)] == ["b", "c", "d", "a"]
+
+    def test_rotation_never_drops_or_duplicates_a_topic(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = self._four_topic_csv(tmp_path)
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "137")
+        topics = load_topics(path)
+        assert sorted(t.id for t in topics) == ["a", "b", "c", "d"]
+
+    def test_single_topic_csv_is_unaffected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GITHUB_RUN_NUMBER", "42")
+        path = write_csv(tmp_path, "foo,Name,Desc,de,a,,\n")
+        topics = load_topics(path)
+        assert [t.id for t in topics] == ["foo"]
+
+
+class TestLoadTopicsRotationConsoleSafety:
+    """Regression test for the bug an adversarial review caught in an
+    earlier (day-based, unconditional) revision of this fix: the
+    console's Topics editor reads via load_topics() and writes topics
+    back to disk in that exact order on save. Since Streamlit is a
+    human-launched process, GITHUB_RUN_NUMBER is never set there, so
+    load_topics() must return the literal CSV order in that context."""
+
+    def test_load_topics_matches_csv_order_when_not_in_actions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("GITHUB_RUN_NUMBER", raising=False)
+        path = write_csv(
+            tmp_path,
+            "a,A,d,de,,,\n"
+            "b,B,d,de,,,\n"
+            "c,C,d,de,,,\n",
+        )
+        # Simulates console/pages/1_Topics.py's save path: read, then
+        # write back in the same order load_topics() returned.
+        topics = load_topics(path)
+        ordered_ids = [t.id for t in topics]
+        assert ordered_ids == ["a", "b", "c"]
+
+
 class TestTopicHelpers:
     def test_primary_name_prefers_de(self) -> None:
         topic = Topic.model_validate(

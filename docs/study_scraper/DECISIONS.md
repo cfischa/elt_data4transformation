@@ -801,6 +801,49 @@ project URL + service-role key (placed in `.env`, not committed), or
   `study_scraper/cli.py` wires `politeness_delay` from
   `Settings.http_politeness_delay_seconds`. No schema/workflow change.
 
+### A32. Rotate topic-crawl order by GITHUB_RUN_NUMBER inside load_topics() (closes the structural half of #71)
+- **Date:** 2026-07-30
+- **Problem:** `rente`/`verteidigung` are always the last two topics in
+  `.github/workflows/scrape.yml`'s per-topic loop, so they always absorb
+  the accumulated OpenAlex rate-limit pressure from the 6 topics
+  processed before them in the same scheduled run — A31 made each
+  individual OpenAlex call more resilient but didn't change which two
+  topics take the brunt of it.
+- **First attempt (superseded):** an earlier revision of this fix rotated
+  `load_topics()`'s return order by `today.toordinal() % len(topics)`
+  unconditionally. Adversarial review caught a real bug: `console/pages/
+  1_Topics.py`'s "Save changes to topics.csv" button reads topics via
+  `load_topics(csv_path)` and writes them back in that same order,
+  intending to preserve the file's original row order. With unconditional
+  day-based rotation, every Save on a non-zero-offset day silently
+  scrambled `config/topics/topics.csv`'s on-disk order — the console's
+  one caller that treats `load_topics()`'s order as ground truth to
+  persist, not just to iterate.
+- **Decision:** rotate by `int(os.environ["GITHUB_RUN_NUMBER"]) %
+  len(topics)` instead of by date, and only when that variable is
+  present. `GITHUB_RUN_NUMBER` is set automatically by every GitHub
+  Actions job (no workflow edit needed) and increments once per
+  scheduled run, giving the same spreading effect as day-rotation across
+  consecutive runs. Gating on it means the rotation is a no-op anywhere
+  outside an Actions job — local/interactive CLI use, the test suite, and
+  critically the console (which only ever runs as a human-launched
+  Streamlit process, never inside Actions) all see the literal,
+  unmodified CSV order. This removes the console bug at the root instead
+  of requiring every caller to opt out explicitly.
+- **Why the workflow's `.github/workflows/scrape.yml`/`config/topics/
+  topics.csv` weren't touched:** the crawl loop's topic order isn't
+  hardcoded there — it's computed via `TOPICS=$(python -c "...
+  load_topics(get_settings().topics_csv_path)...")` with no extra
+  arguments, so whatever `load_topics()` returns for that exact call is
+  what the loop uses. That's the only lever inside `study_scraper/**`
+  that reaches the workflow's loop order without an out-of-scope edit.
+- **Implementation:** `study_scraper/topics.py` (`load_topics`);
+  `tests/study_scraper/test_topics.py::TestLoadTopicsRotation` (no-op
+  outside Actions, deterministic rotation + wrap-around, membership
+  preserved). Complements A31 rather than replacing it: A31 makes each
+  topic's OpenAlex call more resilient; A32 stops the same two topics
+  from always being the ones that need that resilience.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
