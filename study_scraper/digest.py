@@ -94,6 +94,51 @@ def _match_prev(
     return best[1] if best[0] >= DEFAULT_THRESHOLD else None
 
 
+def diff_snapshots(
+    current_rows: List[Dict[str, Any]],
+    prev_payload: Optional[List[Dict[str, Any]]],
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Compare a flattened snapshot (`_flatten` output) against an earlier
+    one and return `(shifts, new_questions)`.
+
+    `prev_payload=None` means there is no earlier snapshot at all (first
+    run) — always reported as no news, distinct from an earlier snapshot
+    that happened to hold zero rows. Shared by `digest_watch` (compares
+    freshly-computed answers to the last saved snapshot) and the console
+    Questions page (compares the two most recent saved snapshots,
+    read-only, without recomputing or saving anything).
+    """
+    if prev_payload is None:
+        return [], []
+
+    shifts: List[Dict[str, Any]] = []
+    new_questions: List[str] = []
+    seen_labels: set = set()
+    for row in current_rows:
+        label = row["cluster_label"]
+        prev = _match_prev(
+            label, row["position"], prev_payload,
+            population=row.get("population") or "",
+        )
+        if prev is None:
+            if label not in seen_labels:
+                new_questions.append(label)
+        else:
+            delta = row["weighted_pct"] - float(prev["weighted_pct"])
+            if abs(delta) >= SHIFT_POINTS:
+                shifts.append(
+                    {
+                        "cluster_label": label,
+                        "position": row["position"],
+                        "from_pct": float(prev["weighted_pct"]),
+                        "to_pct": row["weighted_pct"],
+                        "delta": round(delta, 1),
+                    }
+                )
+        seen_labels.add(label)
+    return shifts, sorted(set(new_questions))
+
+
 def digest_watch(
     storage: Any,
     watch: Dict[str, Any],
@@ -109,34 +154,10 @@ def digest_watch(
     current = _flatten(answers)
 
     prev_snapshot = storage.latest_watch_snapshot(watch["id"])
-    prev_rows = list(prev_snapshot["payload"]) if prev_snapshot else []
     prev_count = int(prev_snapshot["findings_count"]) if prev_snapshot else 0
+    prev_payload = list(prev_snapshot["payload"]) if prev_snapshot else None
 
-    shifts: List[Dict[str, Any]] = []
-    new_questions: List[str] = []
-    seen_labels: set = set()
-    for row in current:
-        label = row["cluster_label"]
-        prev = _match_prev(
-            label, row["position"], prev_rows,
-            population=row.get("population") or "",
-        )
-        if prev is None:
-            if prev_snapshot is not None and label not in seen_labels:
-                new_questions.append(label)
-        else:
-            delta = row["weighted_pct"] - float(prev["weighted_pct"])
-            if abs(delta) >= SHIFT_POINTS:
-                shifts.append(
-                    {
-                        "cluster_label": label,
-                        "position": row["position"],
-                        "from_pct": float(prev["weighted_pct"]),
-                        "to_pct": row["weighted_pct"],
-                        "delta": round(delta, 1),
-                    }
-                )
-        seen_labels.add(label)
+    shifts, new_questions = diff_snapshots(current, prev_payload)
 
     if save:
         storage.save_watch_snapshot(
@@ -151,7 +172,7 @@ def digest_watch(
         previous_count=prev_count,
         answers=answers,
         shifts=shifts,
-        new_questions=sorted(set(new_questions)),
+        new_questions=new_questions,
         first_run=prev_snapshot is None,
     )
 

@@ -23,6 +23,7 @@ from study_scraper.topics import Topic, TopicLocale, load_topics
 CONSOLE_DIR = Path(__file__).resolve().parents[2] / "study_scraper" / "console"
 PAGE_FILES = [
     CONSOLE_DIR / "Home.py",
+    CONSOLE_DIR / "pages" / "0_Questions.py",
     CONSOLE_DIR / "pages" / "1_Topics.py",
     CONSOLE_DIR / "pages" / "2_Review.py",
     CONSOLE_DIR / "pages" / "3_Lake.py",
