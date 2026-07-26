@@ -1478,6 +1478,25 @@ class PostgresStorage:
                 row = cur.fetchone()
                 return dict(row) if row else None
 
+    def list_watch_snapshots(
+        self, watch_id: int, *, limit: int = 2
+    ) -> List[Dict[str, Any]]:
+        """Most recent snapshots for a watch, newest first. Lets a caller
+        diff the two latest without recomputing or saving a new one."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT id, watch_id, taken_at, findings_count, payload
+                    FROM   {SCHEMA}.watch_snapshots
+                    WHERE  watch_id = %s
+                    ORDER  BY taken_at DESC, id DESC
+                    LIMIT  %s
+                    """,
+                    (watch_id, limit),
+                )
+                return [dict(row) for row in cur.fetchall()]
+
     def save_watch_snapshot(
         self, watch_id: int, *, findings_count: int, payload: List[Dict[str, Any]]
     ) -> None:

@@ -14,6 +14,7 @@ import pytest
 
 from study_scraper.digest import (
     SHIFT_POINTS,
+    diff_snapshots,
     digest_watch,
     format_digest_markdown,
     run_digest,
@@ -63,6 +64,10 @@ class FakeStorage:
             {"watch_id": watch_id, "findings_count": findings_count,
              "payload": payload}
         )
+
+    def list_watch_snapshots(self, watch_id: int, *, limit: int = 2):
+        snaps = self.snapshots.get(watch_id) or []
+        return list(reversed(snaps))[:limit]
 
 
 def test_first_run_stores_baseline_and_reports_no_shift() -> None:
@@ -126,6 +131,41 @@ def test_watch_since_year_filters_findings() -> None:
     assert d.findings_count == 1
 
 
+def test_diff_snapshots_no_prev_payload_reports_no_news() -> None:
+    """`prev_payload=None` (no earlier snapshot at all) must not be
+    confused with an earlier snapshot that held zero rows."""
+    current = [{"cluster_label": "Q", "position": "support",
+                "weighted_pct": 60.0, "population": "", "n_findings": 3}]
+    shifts, new_questions = diff_snapshots(current, None)
+    assert shifts == [] and new_questions == []
+
+
+def test_diff_snapshots_empty_prev_payload_reports_new_question() -> None:
+    """An earlier snapshot with zero rows IS a real baseline — anything
+    in the current payload is a genuinely new question."""
+    current = [{"cluster_label": "Q", "position": "support",
+                "weighted_pct": 60.0, "population": "", "n_findings": 3}]
+    shifts, new_questions = diff_snapshots(current, [])
+    assert shifts == [] and new_questions == ["Q"]
+
+
+def test_diff_snapshots_matches_digest_watch_shift() -> None:
+    """Reading the last two saved snapshots and diffing them (the console
+    page's read-only path) must agree with the live digest_watch shift."""
+    store = FakeStorage([_finding("Return to nuclear power", "support", 55)])
+    run_digest(store, today=TODAY)
+    store.findings = [_finding("Return to nuclear power", "support", 65)]
+    [d] = run_digest(store, today=TODAY)
+
+    snaps = store.list_watch_snapshots(1, limit=2)
+    assert len(snaps) == 2
+    shifts, new_questions = diff_snapshots(
+        list(snaps[0]["payload"]), list(snaps[1]["payload"])
+    )
+    assert shifts == d.shifts
+    assert new_questions == d.new_questions
+
+
 def test_dry_run_saves_nothing() -> None:
     store = FakeStorage([_finding("Q", "support", 50)])
     run_digest(store, today=TODAY, save=False)
@@ -186,6 +226,14 @@ def test_watch_roundtrip_and_snapshot() -> None:
     snap = store.latest_watch_snapshot(wid)
     assert snap["findings_count"] == 3
     assert snap["payload"][0]["weighted_pct"] == 60.0
+
+    store.save_watch_snapshot(wid, findings_count=5, payload=[
+        {"cluster_label": "Q", "position": "support",
+         "weighted_pct": 70.0, "n_findings": 5},
+    ])
+    recent = store.list_watch_snapshots(wid, limit=2)
+    assert [s["findings_count"] for s in recent] == [5, 3]
+    assert store.list_watch_snapshots(wid, limit=1)[0]["findings_count"] == 5
 
     assert store.remove_watch(wid) is True
     assert store.list_watches() == []

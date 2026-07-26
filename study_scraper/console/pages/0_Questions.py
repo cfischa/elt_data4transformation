@@ -22,6 +22,7 @@ import streamlit as st
 from study_scraper.aggregate import aggregate_findings
 from study_scraper.config import get_settings
 from study_scraper.console._shared import storage_or_error
+from study_scraper.digest import diff_snapshots
 from study_scraper.questions import QuestionRegistryError, load_questions
 from study_scraper.topics import load_topics
 
@@ -164,21 +165,46 @@ for q, answers in results:
 st.subheader("Tracking over time")
 watches = storage.list_watches()
 tracked = []
+shift_rows = []
 for w in watches:
-    snap = storage.latest_watch_snapshot(w["id"])
-    if snap:
-        tracked.append(
+    label = w.get("label") or w["query"]
+    snaps = storage.list_watch_snapshots(w["id"], limit=2)
+    if not snaps:
+        continue
+    latest = snaps[0]
+    prev_payload = list(snaps[1]["payload"]) if len(snaps) > 1 else None
+    shifts, new_questions = diff_snapshots(
+        list(latest.get("payload") or []), prev_payload
+    )
+    tracked.append(
+        {
+            "Watch": label,
+            "Last digest": str(latest["taken_at"])[:16],
+            "Findings": latest["findings_count"],
+            "Tracked cells": len(latest.get("payload") or []),
+            "Shifts": len(shifts),
+            "New questions": len(new_questions),
+        }
+    )
+    for s in shifts:
+        shift_rows.append(
             {
-                "Watch": w.get("label") or w["query"],
-                "Last digest": str(snap["taken_at"])[:16],
-                "Findings": snap["findings_count"],
-                "Tracked cells": len(snap.get("payload") or []),
+                "Watch": label,
+                "Cluster": s["cluster_label"],
+                "Position": s["position"],
+                "From %": s["from_pct"],
+                "To %": s["to_pct"],
+                "Δ pts": s["delta"],
             }
         )
 if tracked:
     st.dataframe(tracked, use_container_width=True, hide_index=True)
 else:
     st.caption("No digest snapshots yet — the first scheduled digest creates them.")
+
+if shift_rows:
+    st.markdown("**Shifts since the previous digest (≥5 pts):**")
+    st.dataframe(shift_rows, use_container_width=True, hide_index=True)
 st.caption(
     "≥5-point moves per (cluster, position, population) are flagged in "
     "each scheduled digest run (opinion-digest.md artifact) against the "
