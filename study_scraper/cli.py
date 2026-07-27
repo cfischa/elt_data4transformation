@@ -138,7 +138,11 @@ def run(
             )
         ctx = SSOARSource(from_file=from_file, since=since)
     elif source == "openalex":
-        ctx = OpenAlexSource(from_file=from_file)
+        settings = get_settings()
+        ctx = OpenAlexSource(
+            from_file=from_file,
+            politeness_delay=settings.http_politeness_delay_seconds,
+        )
     elif source == "bundestag_dip":
         from study_scraper.discovery.bundestag_dip import BundestagDIPSource
 

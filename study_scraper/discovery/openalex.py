@@ -25,15 +25,16 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import date, datetime
 from itertools import zip_longest
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import httpx
 
 from study_scraper.discovery.base import Candidate, DiscoverySource
-from study_scraper.http import get_with_retry
+from study_scraper.http import get_with_retry, polite_sleep
 from study_scraper.topics import Topic
 
 
@@ -45,6 +46,14 @@ MAX_PER_PAGE = 200
 # Search-term cap: 24 quoted OR-joined terms is ~500 URL chars, and with
 # the round-robin locale interleave both languages' core terms fit.
 _MAX_SEARCH_TERMS = 24
+# OpenAlex has been observed 429-throttling topics processed late in a
+# multi-topic run (issue #71): by the time the last couple of topics start,
+# earlier topics' pagination has already spent the shared rate-limit budget.
+# Retry harder than the shared HTTP default (http.py's 4 attempts / 30s
+# backoff ceiling) since each topic still has minutes of unused per-command
+# timeout budget in the scheduled crawl.
+_MAX_ATTEMPTS = 8
+_BASE_DELAY = 1.0
 
 
 class OpenAlexSource:
@@ -63,11 +72,18 @@ class OpenAlexSource:
         user_agent: str = "study-scraper/0.0.1 (+https://github.com/cfischa/elt_data4transformation)",
         per_page: int = DEFAULT_PER_PAGE,
         work_ids: Optional[List[str]] = None,
+        politeness_delay: float = 0.0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._base_url = base_url
         self._from_file = from_file
         self._mailto = mailto  # Joining the "polite pool" gets better rate limits
         self._per_page = min(per_page, MAX_PER_PAGE)
+        # Small pause between successive paginated requests (not before the
+        # first one) so a single topic's crawl doesn't burst OpenAlex and
+        # eat into the rate-limit budget later topics in the same run need.
+        self._politeness_delay = politeness_delay
+        self._sleep = sleep
         # Reference-follower mode (Phase 5d): fetch these specific works
         # instead of running a keyword search. IDs are openalex.org URLs
         # or bare W-ids; up to ~50 per request (OpenAlex OR-filter cap).
@@ -121,10 +137,21 @@ class OpenAlexSource:
 
         yielded = 0
         cursor = "*"
+        page = 0
         while True:
+            if page > 0:
+                polite_sleep(self._politeness_delay, sleep=self._sleep)
+            page += 1
             params["cursor"] = cursor
             LOGGER.info("OpenAlex request: %s", params)
-            resp = get_with_retry(self._client, self._base_url, params=params)
+            resp = get_with_retry(
+                self._client,
+                self._base_url,
+                params=params,
+                max_attempts=_MAX_ATTEMPTS,
+                base_delay=_BASE_DELAY,
+                sleep=self._sleep,
+            )
             resp.raise_for_status()
             payload = resp.json()
             for cand in self._parse_payload(payload, topic=topic, limit=None):
