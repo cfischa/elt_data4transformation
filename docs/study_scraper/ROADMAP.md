@@ -12,49 +12,56 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Re-prioritized 2026-07-20: collection just took its biggest jump yet
-(2,593 → 4,880 studies since 07-13) while the two consumption-side
-pipes stayed flat or got worse. See issue #8 for the live metrics
-behind this reorder.
+Re-prioritized 2026-07-27: collection has nearly stalled (4,880 → 5,005
+studies, +2.6% vs the prior week's +88%) because both catalog sources
+are now degraded — `bundestag_dip` still 401s on every request and
+OpenAlex is structurally rate-limiting the two last-processed topics.
+The in-scope, code-fixable item (#71) is promoted to the top since it's
+the only lever on the coverage number that doesn't need a maintainer
+action. See issue #8 for the live metrics behind this reorder.
 
-1. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
-   is at 5,412 rows (was 4,369 on 07-13, +992 in the 2026-07-20 crawl
-   alone) against only **56 attributions ever written**. The gap is
-   now ~4,700 unattributed claims and widening every crawl.
-   `scheduled-attribute` runs twice-weekly at `--limit 40` — the
-   developer agent confirmed (2026-07-19) the fix requires editing
-   `.github/workflows/attribute.yml`, which is out of both agents'
-   edit scope. **Needs the maintainer** to raise the cadence/limit
-   directly, or authorize an agent to touch `.github/**` for this one
-   change. This is still the single biggest lever: 4,880 collected
-   studies are only as useful as the structured `(question, position,
-   %)` triples we actually extract from them.
-2. **Scheduled-scrape reliability** (issue #53) **[now, priority:high,
-   new 2026-07-20]** — 3 consecutive `scheduled-scrape` runs
-   (07-13, 07-16, 07-20) have stalled for hours on an unbounded
-   `Retry-After` wait in `study_scraper/http.py::_wait_seconds` when
-   OpenAlex 429s, burning most/all of the 5h job budget. Cap the
-   honoured `Retry-After` the same way the exponential-backoff branch
-   already is. Pure code fix, in scope, no dependencies — promoted
-   ahead of item 3 because a stalling crawl risks silently reducing
-   collection frequency, which undermines the coverage-first goal.
+1. **OpenAlex 429s structurally starve `rente`/`verteidigung`**
+   (issue #71, **new 2026-07-27, priority:high, [now]**) — these are
+   processed last in `topics.csv`'s per-topic loop, so they absorb all
+   the rate-limit pressure the other 6 topics already triggered in the
+   same run; they're now the two lowest-covered topics by a wide margin
+   (285, 143 vs 685–899 for the rest) and have been for 3+ consecutive
+   scheduled runs. Rotate topic order per run and/or retry
+   rate-limited topics at the end with a cooldown. Pure code fix, no
+   dependencies.
+2. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
+   is at 5,763 rows and climbing every crawl; `attributions` has been
+   flat at **57 since 2026-07-21** — six days, two scheduled runs, zero
+   net-new triples. The #68 no-signal fix (migration 0011) is working
+   (the queue drains on zero-yield runs: 371→334→353 instead of
+   stalling), so the queue mechanism is healthy; the only remaining
+   lever is `scheduled-attribute`'s twice-weekly/`--limit 40` cadence in
+   `.github/workflows/attribute.yml`, out of both agents' edit scope.
+   Still the single biggest lever on the *answering* half of the goal.
 3. **`bundestag_dip` still fully broken** (issue #48, reopened
-   2026-07-20) **[needs-human]** — the silent-401 visibility fix
-   landed (now shows `errors=1` instead of a clean `seen=0` row), but
-   the source has **0 studies ever ingested**. It's our only
-   pure-government source, blocking the GOAL.md source-coverage
+   2026-07-20) **[needs-human]** — 24/24 runs since reopening still
+   401. Only pure-government source; blocks the GOAL.md source-coverage
    category requirement. Needs a fresh `DIP_API_KEY` (free, mail to
    infoline.id3@bundestag.de) set as a repo secret.
-4. **Topic-content gap** (issue #50, bumped to **priority:high**
-   2026-07-20 — 3+ weeks overdue) **[now]** — maintainer's 2026-06-26
-   ask (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
-   topic) never landed. Pure `topics.csv` + `questions.yml` change, no
-   code risk, no blockers — just hasn't been picked up.
-5. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
+4. **Topic-content gap** (issue #50, priority:high, open since
+   2026-06-26 — a month) **[needs-human]** — maintainer's ask
+   (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
+   topic) needs `config/topics/topics.csv` + `questions.yml`, both
+   outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
+   neither agent can build it as scoped.
+5. **Two built sources stuck at 0 live records, same root cause**
+   — Eurobarometer (issue #65, open since 07-20) and **GovData.de**
+   (issue #74, **new 2026-07-27**, code shipped in PR #69 on 07-22).
+   Both just need one line each added to `.github/workflows/
+   scrape.yml`'s crawl step — out of agent edit scope. GovData is
+   worth prioritizing once actioned: as a whole-of-government CKAN
+   catalog it may surface structured Rentenversicherung/Bundeswehr
+   datasets that would help the two weakest topics (see item 1).
+6. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
    `env_air_gge` (and `nrg_bal_s`) lake payloads into typed rows
    (geo, year, value), like `dawum_poll_results`, so the numbers are
    queryable. Still only 3 lake rows total (2 codes × geo=DE) so this
-   stays lower-value until the code list grows — keep it after 1–4.
+   stays lower-value until the code list grows — keep it after 1–5.
 
 ## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
@@ -99,14 +106,16 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-07-20 live DB): **catalog** OpenAlex (4,548) +
-SSOAR (332) — academic, openalex dominates volume; **lake** DAWUM
-(vote intention, 3,868 rows), GESIS KG (survey catalog, 500), Eurostat
+Current coverage (2026-07-27 live DB): **catalog** OpenAlex (4,564) +
+SSOAR (441) — academic, openalex dominates volume; **lake** DAWUM
+(vote intention, 3,875 rows), GESIS KG (survey catalog, 500), Eurostat
 (official stats, 3 — thin by design), **Eurobarometer (0 — built,
-never run, see #65)**. **Bundestag DIP is wired but has 0 studies ever**
-— see #48 (reopened). The representativeness gaps are *government
-coverage* (the one category with zero working sources) and *official
-statistics breadth*. Ranked by yield per effort:
+never run, see #65) and GovData.de (0 — built, never run, see #74**,
+new this week). **Bundestag DIP is wired but has 0 studies ever** —
+see #48 (reopened, 24/24 runs since still 401). The representativeness
+gaps are *government coverage* (the one category with zero live
+sources despite two built) and *official statistics breadth*. Ranked
+by yield per effort:
 
 5. **Eurobarometer** (issue #35) **[done, code — but see #65]** — shipped
    2026-07-15 as A24 (`study_scraper/sources/eurobarometer.py`, GESIS KG
@@ -119,14 +128,29 @@ statistics breadth*. Ranked by yield per effort:
    request (0 records ingested, now visible as `errors>0` — the
    silent-failure half of #48 is fixed). Needs a fresh personal key
    (free by mail to infoline.id3@bundestag.de).
-7. **GovData.de (CKAN)** (issue #64, **new, scouted 2026-07-20**)
-   **[now]** — Germany's cross-government open-data catalog (federal +
-   state + municipal metadata in one CKAN instance); free, no-auth
-   `package_search` REST API, "Data License Germany 2.0" with
-   per-dataset overrides captured explicitly. Broader fix for the
-   government-category gap than #48 alone — one integration can surface
-   BMAS/UBA/BAMF/Destatis datasets we'd otherwise need N separate
-   scrapers for.
+7. **GovData.de (CKAN)** (issue #64, shipped PR #69 2026-07-22)
+   **[done, code — but see #74, new 2026-07-27]** — Germany's
+   cross-government open-data catalog (federal + state + municipal
+   metadata in one CKAN instance); free, no-auth `package_search` REST
+   API, "Data License Germany 2.0" with per-dataset overrides captured
+   explicitly. **Never actually run**: same gap as Eurobarometer — not
+   in `scrape.yml`'s crawl step, 0 live records 5 days after shipping.
+   Once wired, may also help close the `rente`/`verteidigung` coverage
+   gap (item 1 in P1) by surfacing Rentenversicherung/Bundeswehr-
+   adjacent government datasets without a bespoke scraper.
+
+### Scouted and rejected this round (2026-07-27)
+
+- **ZMSBw "Sicherheits- und verteidigungspolitisches Meinungsbild"**
+  — Bundeswehr's own annual defense-opinion survey since 1996
+  (Germany's longest such series, directly on-topic for
+  `verteidigung`). Already GESIS-archived (ZA7613) but as microdata
+  behind GESIS login — same gap as Q19 (ALLBUS/Politbarometer), not
+  newly actionable.
+- **Deutsche Rentenversicherung statistics** ("Aktuelle Daten",
+  "Rentenversicherung in Zeitreihen") — no API found, PDF/publication
+  downloads only. Tier-3 by the structured-data-first rule (A13); not
+  worth a bespoke source ahead of GovData.de (#74) actually running.
 8. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
@@ -211,3 +235,9 @@ for our verification layers):
 - Attribution queue reorders registry-topic studies first (A26, #59
   item 1) — landed 2026-07-19; items 2 (console Questions page) and 3
   (lake→answers mapping proposal) still open.
+- Retry-After cap (#53, PR #67), no-signal studies stop re-clogging the
+  attribution queue (#68, PR #68, migration 0011), GovData.de source
+  built (#64, PR #69 — but see #74, not wired into the crawl),
+  `sources-audit` candidate-domain discovery (#38, PR #70), dock
+  Questions page shows real last-digest shifts (PR #73) — all landed
+  2026-07-20 through 2026-07-26.
