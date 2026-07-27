@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import Callable, List
 
+import httpx
 import pytest
 
 from study_scraper.discovery.openalex import (
@@ -123,6 +125,69 @@ class TestOpenAlexFromFile:
         with OpenAlexSource(from_file=FIXTURE) as src:
             cands = list(src.iter_candidates(klima, limit=2))
         assert len(cands) == 2
+
+
+def _recording_sleeper() -> "tuple[Callable[[float], None], List[float]]":
+    slept: List[float] = []
+    return (lambda s: slept.append(s)), slept
+
+
+class TestOpenAlexLiveRateLimiting:
+    """Issue #71: topics processed late in a multi-topic run were seeing
+    OpenAlex 429s exhaust the shared HTTP default of 4 retry attempts, so
+    they landed 0 candidates while earlier topics succeeded. These exercise
+    the live-request path (MockTransport) rather than the from_file fixture
+    path used above."""
+
+    def test_politeness_delay_applied_between_pages_not_before_first(
+        self, klima
+    ) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(
+                    200, json={"results": [], "meta": {"next_cursor": "page2"}}
+                )
+            return httpx.Response(
+                200, json={"results": [], "meta": {"next_cursor": None}}
+            )
+
+        sleep, slept = _recording_sleeper()
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with OpenAlexSource(
+            client=client, politeness_delay=0.3, sleep=sleep
+        ) as src:
+            list(src.iter_candidates(klima))
+
+        assert calls["n"] == 2
+        assert slept == [0.3]  # once, between the two page requests
+
+    def test_retries_beyond_shared_http_default_before_giving_up(
+        self, klima
+    ) -> None:
+        # http.py's shared get_with_retry default is 4 attempts; OpenAlex
+        # needs more headroom since a run's later topics inherit rate-limit
+        # pressure from earlier ones (issue #71). 5 x 429 then success would
+        # exhaust the shared default but must succeed via OpenAlexSource.
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] <= 5:
+                return httpx.Response(429, text="slow down")
+            return httpx.Response(
+                200, json={"results": [], "meta": {"next_cursor": None}}
+            )
+
+        sleep, _ = _recording_sleeper()
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with OpenAlexSource(client=client, sleep=sleep) as src:
+            cands = list(src.iter_candidates(klima))
+
+        assert cands == []
+        assert calls["n"] == 6
 
 
 class TestHelpers:

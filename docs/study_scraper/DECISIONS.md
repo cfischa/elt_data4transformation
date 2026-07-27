@@ -770,6 +770,37 @@ project URL + service-role key (placed in `.env`, not committed), or
   `PostgresStorage.list_study_urls()`; CLI `sources-audit [--limit]`.
   Read-only, pure aggregation — no schema change.
 
+### A31. OpenAlex: per-page politeness delay + higher retry budget for topics late in a run (partial fix for #71)
+- **Date:** 2026-07-27
+- **Decision:** `OpenAlexSource` now takes `politeness_delay` (a pause
+  before each paginated request after the first, wired from the CLI to
+  the existing `http_politeness_delay_seconds` setting) and always calls
+  `get_with_retry` with a higher retry budget than the shared HTTP default
+  (`_MAX_ATTEMPTS=8`, `_BASE_DELAY=1.0` vs. `http.py`'s 4/0.5) rather than
+  changing the shared default.
+- **Rationale:** `rente`/`verteidigung` are always the last two topics
+  processed in `.github/workflows/scrape.yml`'s per-topic loop (order
+  comes from `config/topics/topics.csv`) and consistently lose most/all of
+  their OpenAlex candidates to 429s that the shared HTTP default (4
+  attempts, ~30s backoff ceiling) can't absorb — see #71. Fixing the root
+  cause (reordering topics, or retrying failed topics at the end of the
+  run with a cooldown) needs a `.github/workflows/scrape.yml` and/or
+  `config/topics/topics.csv` edit, both outside this agent's scope fence
+  (`docs/study_scraper/AGENTS.md`). Each per-topic OpenAlex invocation has
+  a 900s timeout budget in the workflow and was previously giving up
+  after only ~3 short backoff waits; spending more of that idle budget on
+  retries (still bounded — `http.py`'s existing `_MAX_RETRY_AFTER=120`
+  cap on `Retry-After` still applies) and slowing OpenAlex's own request
+  burst rate both reduce 429 pressure without any out-of-scope edit. This
+  does not fully resolve #71 (the structural last-in-loop disadvantage
+  remains) — left open for a maintainer to reorder topics or add
+  end-of-run retry orchestration in the workflow file.
+- **Implementation:** `study_scraper/discovery/openalex.py`
+  (`politeness_delay`/`sleep` ctor params, per-page `polite_sleep` in the
+  cursor loop, `_MAX_ATTEMPTS`/`_BASE_DELAY` passed to `get_with_retry`);
+  `study_scraper/cli.py` wires `politeness_delay` from
+  `Settings.http_politeness_delay_seconds`. No schema/workflow change.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
