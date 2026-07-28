@@ -29,6 +29,7 @@ PAGE_FILES = [
     CONSOLE_DIR / "pages" / "3_Lake.py",
     CONSOLE_DIR / "pages" / "4_Attributions.py",
     CONSOLE_DIR / "pages" / "5_Sources.py",
+    CONSOLE_DIR / "pages" / "6_Candidate_Sources.py",
 ]
 
 
