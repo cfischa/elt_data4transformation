@@ -154,11 +154,12 @@ by yield per effort:
 8. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
    reuses the SSOAR OAI parser almost verbatim; widens the catalog far
    beyond SSOAR. Fixture + unit tests, no live call in CI.
-9. **Domain-audit source discovery** (issue #38) **[done, CLI]** — Phase
+9. **Domain-audit source discovery** (issue #38) **[done]** — Phase
    5d: `study_scraper sources-audit [--limit]` walks stored study/
    reference URLs, groups by registrable domain, and surfaces domains
    with no dedicated source, ranked by frequency (see DECISIONS.md A30).
-   Dock/Streamlit surface still open. Plus: the product agent now
+   Dock/Streamlit surface shipped (issue #77): "Candidate sources" page
+   reuses `audit_domains` verbatim. Plus: the product agent now
    scouts via WebSearch each run.
 10. **Polling-institute press releases** **[now, larger]** — Forsa, INSA,
     infratest dimap (ARD-DeutschlandTrend), Allensbach, YouGov DE, Civey
@@ -241,3 +242,5 @@ for our verification layers):
   `sources-audit` candidate-domain discovery (#38, PR #70), dock
   Questions page shows real last-digest shifts (PR #73) — all landed
   2026-07-20 through 2026-07-26.
+- Dock "Candidate sources" page surfaces `sources-audit`'s unknown-domain
+  ranking (#38 dock half, #77) — landed 2026-07-28.
