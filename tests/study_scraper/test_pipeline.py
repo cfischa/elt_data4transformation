@@ -210,6 +210,62 @@ def test_aborted_run_does_not_advance_last_crawl_finished_at(
     assert row["errors"] == 1
 
 
+class _DoiDedupSource:
+    """Two candidates sharing a DOI under different external ids --
+    simulates the same study being (re)discovered from a second source
+    or URL, which triggers upsert_study's DOI-dedup short-circuit and
+    rewrites `study.id` in place (issue #79)."""
+
+    source_id = "doi_dedup_test"
+
+    def iter_candidates(self, topic, *, limit=None):
+        yield Candidate(
+            source_id=self.source_id,
+            external_id="a",
+            canonical_url="https://example.org/doi-dedup-a",
+            title="Kommunaler Klimaschutz und Energiewende Umfrage",
+            abstract="62 Prozent der Befragten befürworten den Klimaschutz.",
+            doi="10.9999/dedup-fixture-79",
+        )
+        yield Candidate(
+            source_id=self.source_id,
+            external_id="b",
+            canonical_url="https://example.org/doi-dedup-b",
+            title="Kommunaler Klimaschutz und Energiewende Umfrage (Reprint)",
+            abstract="55 Prozent der Befragten lehnen weitere Maßnahmen ab.",
+            doi="10.9999/dedup-fixture-79",
+        )
+
+
+def test_claims_survive_doi_dedup(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """issue #79: a candidate that DOI-dedups onto an existing study must
+    not raise claims_study_id_fkey -- its claims must land under the
+    canonical (post-dedup) study id, not the pre-dedup one that was never
+    inserted."""
+    run = run_one(source=_DoiDedupSource(), topic=klima_topic, storage=storage)
+    assert run.errors == 0
+
+    rows = storage.list_studies(limit=100)
+    matching = [r for r in rows if r["doi"] == "10.9999/dedup-fixture-79"]
+    assert len(matching) == 1  # second candidate deduped onto the first
+    canonical_id = matching[0]["id"]
+
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT study_id FROM study_scraper.claims WHERE study_id = %s",
+                (canonical_id,),
+            )
+            claim_rows = cur.fetchall()
+    # `upsert_claims` replaces the prior extractor pass for a study, so
+    # only the second (deduped) candidate's claim remains -- but it must
+    # be attributed to the canonical id, not silently dropped/rejected.
+    assert len(claim_rows) >= 1
+    assert all(r["study_id"] == canonical_id for r in claim_rows)
+
+
 def test_openalex_citation_graph_propagated_to_provenance(
     storage: PostgresStorage, klima_topic
 ) -> None:

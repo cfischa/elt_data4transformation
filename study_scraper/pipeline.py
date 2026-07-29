@@ -181,6 +181,12 @@ def run_one(
                 )
                 if match.score < min_score:
                     storage.upsert_study(study, status="pending")
+                    # upsert_study may have deduped `study` onto an
+                    # existing row and rewritten study.id in place; the
+                    # claims were extracted against the pre-dedup id, so
+                    # re-stamp them or the INSERT violates claims_study_id_fkey.
+                    for claim in claims:
+                        claim.study_id = study.id
                     storage.upsert_claims(study.id, claims)
                     pending_count += 1
                     LOGGER.info(
@@ -192,6 +198,8 @@ def run_one(
                     )
                     continue
                 is_new = storage.upsert_study(study, status="kept")
+                for claim in claims:
+                    claim.study_id = study.id
                 storage.upsert_claims(study.id, claims)
                 kept_ids.append((study.id, is_new))
                 LOGGER.info(
