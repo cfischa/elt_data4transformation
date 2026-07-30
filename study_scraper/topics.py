@@ -7,11 +7,21 @@ Per DECISIONS.md A4 the topics sheet is `config/topics/topics.csv`:
 List-valued columns are pipe-separated (`|`). Multiple rows per topic id
 are allowed — one row per language. The loader groups rows by `id` and
 returns one `Topic` object per id with per-language keyword sets.
+
+Per DECISIONS.md A32, inside a scheduled GitHub Actions run the returned
+order is rotated by `GITHUB_RUN_NUMBER` rather than fixed to CSV order:
+`.github/workflows/scrape.yml` derives its per-topic crawl loop straight
+from `load_topics()`'s return order, so whichever topics sit last in the
+CSV always absorb a scheduled run's accumulated OpenAlex rate-limit
+pressure. Rotating spreads that tail fairly across topics over
+consecutive runs instead. Outside Actions (tests, interactive CLI use,
+the console's Topics editor) the literal CSV order is preserved.
 """
 
 from __future__ import annotations
 
 import csv
+import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping
 
@@ -84,7 +94,14 @@ class TopicCSVError(ValueError):
 
 
 def load_topics(path: Path) -> List[Topic]:
-    """Load topics from a CSV file; group rows by `id`, one locale per row."""
+    """Load topics from a CSV file; group rows by `id`, one locale per row.
+
+    Order is the CSV row order, EXCEPT inside a scheduled GitHub Actions
+    run (detected via the `GITHUB_RUN_NUMBER` variable Actions always
+    sets), where the returned list is cyclically rotated by that run
+    number (see module docstring, A32) so the same topics don't always
+    land last in a per-topic crawl loop.
+    """
     if not path.exists():
         raise FileNotFoundError(f"topics CSV not found: {path}")
 
@@ -114,7 +131,12 @@ def load_topics(path: Path) -> List[Topic]:
             synonyms=row["synonyms"],
         )
 
-    return [Topic(id=topic_id, locales=by_id[topic_id]) for topic_id in order]
+    topics = [Topic(id=topic_id, locales=by_id[topic_id]) for topic_id in order]
+    run_number = os.environ.get("GITHUB_RUN_NUMBER")
+    if run_number is not None and topics:
+        offset = int(run_number) % len(topics)
+        topics = topics[offset:] + topics[:offset]
+    return topics
 
 
 def _read_rows(path: Path) -> Iterable[Mapping[str, str]]:
