@@ -150,6 +150,7 @@ def run_one(
 
     kept_ids: List[tuple[str, bool]] = []
     pending_count = 0
+    duplicate_count = 0
     seen = 0
     errors = 0
     aborted_note: Optional[str] = None
@@ -180,7 +181,9 @@ def run_one(
                     abstract=study.abstract,
                 )
                 if match.score < min_score:
-                    storage.upsert_study(study, status="pending")
+                    is_new_pending = storage.upsert_study(study, status="pending")
+                    if not is_new_pending:
+                        duplicate_count += 1
                     # upsert_study may have deduped `study` onto an
                     # existing row and rewritten study.id in place; the
                     # claims were extracted against the pre-dedup id, so
@@ -198,6 +201,8 @@ def run_one(
                     )
                     continue
                 is_new = storage.upsert_study(study, status="kept")
+                if not is_new:
+                    duplicate_count += 1
                 for claim in claims:
                     claim.study_id = study.id
                 storage.upsert_claims(study.id, claims)
@@ -232,6 +237,7 @@ def run_one(
     finally:
         params_out = dict(run.parameters)
         params_out["pending"] = pending_count
+        params_out["duplicates"] = duplicate_count
         update: Dict[str, Any] = {
             "candidates_seen": seen,
             "candidates_kept": len(kept_ids),

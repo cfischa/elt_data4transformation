@@ -41,6 +41,10 @@ class StatusReport:
     recent_runs: List[Dict[str, Any]]
     candidates_seen_total: int
     candidates_kept_total: int
+    # Candidates seen this run that deduped onto an already-stored study
+    # (DOI or title-similarity match, see storage.upsert_study) rather
+    # than landing as a new row -- the "waste" of a re-fetch (issue #82).
+    duplicates_total: int = 0
 
     @property
     def pending_count(self) -> int:
@@ -59,6 +63,15 @@ class StatusReport:
         if self.candidates_seen_total == 0:
             return None
         return self.candidates_kept_total / self.candidates_seen_total
+
+    @property
+    def duplicate_rate(self) -> Optional[float]:
+        """Share of seen candidates that were already-known studies
+        (re-fetches) rather than new discoveries -- crawl spend that
+        yielded no new coverage."""
+        if self.candidates_seen_total == 0:
+            return None
+        return self.duplicates_total / self.candidates_seen_total
 
 
 def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusReport:
@@ -125,7 +138,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                     COUNT(*) FILTER (WHERE errors = 0)           AS successful,
                     COUNT(*) FILTER (WHERE errors > 0)           AS failed,
                     COALESCE(SUM(candidates_seen), 0)            AS seen,
-                    COALESCE(SUM(candidates_kept), 0)            AS kept
+                    COALESCE(SUM(candidates_kept), 0)            AS kept,
+                    COALESCE(SUM((parameters->>'duplicates')::int), 0) AS duplicates
                 FROM {SCHEMA}.crawl_runs
                 """
             )
@@ -205,6 +219,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         recent_runs=recent_runs,
         candidates_seen_total=int(run_row["seen"]),
         candidates_kept_total=int(run_row["kept"]),
+        duplicates_total=int(run_row["duplicates"]),
     )
 
 
@@ -224,6 +239,9 @@ def format_text(report: StatusReport) -> str:
     lines.append(f"  candidates seen / kept     : "
                  f"{report.candidates_seen_total} / {report.candidates_kept_total}"
                  + (f"  ({report.keep_rate:.1%})" if report.keep_rate is not None else ""))
+    lines.append(f"  duplicates (already known) : {report.duplicates_total}"
+                 + (f"  ({report.duplicate_rate:.1%} of seen)"
+                    if report.duplicate_rate is not None else ""))
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:
