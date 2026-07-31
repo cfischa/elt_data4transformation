@@ -27,7 +27,7 @@ report = build_status(storage, recent_n=20)
 
 # ---- top-line counters ----------------------------------------------------
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Studies", f"{report.total_studies}")
 col2.metric("With quantitative data", f"{report.studies_with_quant}")
 col3.metric(
@@ -47,6 +47,15 @@ col4.metric(
     help=(
         f"{report.candidates_kept_total} kept of "
         f"{report.candidates_seen_total} candidates seen"
+    ),
+)
+dup = "—" if report.duplicate_rate is None else f"{report.duplicate_rate:.0%}"
+col5.metric(
+    "Duplicate rate",
+    dup,
+    help=(
+        f"{report.duplicates_total} of {report.candidates_seen_total} "
+        f"candidates seen were already-known studies (re-fetch waste)"
     ),
 )
 

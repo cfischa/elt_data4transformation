@@ -59,6 +59,8 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.total_studies == 0
     assert report.total_runs == 0
     assert report.keep_rate is None
+    assert report.duplicate_rate is None
+    assert report.duplicates_total == 0
 
 
 def test_status_after_two_source_run(
@@ -85,6 +87,25 @@ def test_status_after_two_source_run(
     assert 0.0 < report.keep_rate <= 1.0
 
 
+def test_status_reports_duplicate_rate(
+    storage: PostgresStorage, topics_list
+) -> None:
+    """issue #82: re-crawling the same fixture dedups every candidate onto
+    the studies the first run already kept; `status` must surface that as
+    crawl waste, not silently absorb it into `candidates_kept`."""
+    klima = _klima(topics_list)
+    with SSOARSource(from_file=FIXTURES / "ssoar" / "klima_records.xml") as src:
+        first = run_one(source=src, topic=klima, storage=storage)
+    with SSOARSource(from_file=FIXTURES / "ssoar" / "klima_records.xml") as src:
+        run_one(source=src, topic=klima, storage=storage)
+
+    report = build_status(storage)
+    # The second run's 6 kept candidates all dedup onto the first run's.
+    assert report.duplicates_total == first.candidates_kept == 6
+    assert report.duplicate_rate is not None
+    assert 0.0 < report.duplicate_rate < 1.0
+
+
 def test_format_text_includes_key_sections(
     storage: PostgresStorage, topics_list
 ) -> None:
@@ -97,6 +118,7 @@ def test_format_text_includes_key_sections(
     assert "studies per source" in text
     assert "lake (source_records" in text
     assert "recent runs" in text
+    assert "duplicates" in text
     assert "ssoar" in text
 
 

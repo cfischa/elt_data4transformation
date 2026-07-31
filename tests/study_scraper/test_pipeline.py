@@ -266,6 +266,20 @@ def test_claims_survive_doi_dedup(
     assert all(r["study_id"] == canonical_id for r in claim_rows)
 
 
+def test_duplicate_candidates_counted_in_run_parameters(
+    storage: PostgresStorage, klima_topic
+) -> None:
+    """issue #82: a candidate that dedups onto an existing study (DOI or
+    title match) must be counted so `status`/`status --json` can report
+    crawl waste, not silently disappear from the run's bookkeeping."""
+    run = run_one(source=_DoiDedupSource(), topic=klima_topic, storage=storage)
+
+    # 2 candidates seen, 1 new study kept, 1 deduped onto it.
+    assert run.candidates_seen == 2
+    assert run.candidates_kept == 2  # both land in kept_ids (one is a dup)
+    assert run.parameters["duplicates"] == 1
+
+
 def test_openalex_citation_graph_propagated_to_provenance(
     storage: PostgresStorage, klima_topic
 ) -> None:
