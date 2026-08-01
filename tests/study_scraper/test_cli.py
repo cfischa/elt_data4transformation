@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from study_scraper import __version__
-from study_scraper.cli import app
+from study_scraper.cli import _resolve_eurostat_codes, app
 
 
 @pytest.fixture()
@@ -59,3 +59,28 @@ def test_python_dash_m_entrypoint_resolves() -> None:
     import study_scraper.__main__  # noqa: F401
 
     assert Path(study_scraper.__main__.__file__).name == "__main__.py"
+
+
+class TestResolveEurostatCodes:
+    def test_explicit_code_wins(self) -> None:
+        assert _resolve_eurostat_codes(["nrg_cb_e"], None) == ["nrg_cb_e"]
+
+    def test_falls_back_to_configured_default(self) -> None:
+        assert _resolve_eurostat_codes([], None) == ["env_air_gge", "nrg_bal_s"]
+
+    def test_from_file_bypasses_default_even_when_empty(self) -> None:
+        # --from-file supplies its own codes via the fixture payload;
+        # no fallback (and no error) should kick in.
+        assert _resolve_eurostat_codes([], Path("fixture.json")) == []
+
+    def test_raises_when_no_code_and_no_default(self, monkeypatch) -> None:
+        from study_scraper import cli as cli_module
+        from study_scraper.config import Settings
+
+        monkeypatch.setattr(
+            cli_module, "get_settings", lambda: Settings(
+                _env_file=None, eurostat_default_codes=""
+            )
+        )
+        with pytest.raises(Exception, match="eurostat requires"):
+            _resolve_eurostat_codes([], None)

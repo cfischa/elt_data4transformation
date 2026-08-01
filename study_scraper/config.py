@@ -9,7 +9,7 @@ live sources requires real credentials.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,6 +37,15 @@ class Settings(BaseSettings):
         default=REPO_ROOT / "config" / "topics" / "questions.yml",
         description="Registry of standing questions, each scoped to a topic. "
         "The declarative source of the monitoring watches.",
+    )
+
+    # Eurostat dataset codes used by `ingest --source eurostat` when the
+    # operator doesn't pass `--code` explicitly. Comma-separated so it stays
+    # a plain env var like the rest of Settings (no new config file).
+    eurostat_default_codes: str = Field(
+        default="env_air_gge,nrg_bal_s",
+        description="Comma-separated Eurostat dataset codes used as the "
+        "`ingest --source eurostat` default when --code isn't passed.",
     )
 
     # Storage — Supabase primary (per DECISIONS.md A7). When unset, the
@@ -78,6 +87,10 @@ class Settings(BaseSettings):
     @property
     def has_supabase(self) -> bool:
         return bool(self.supabase_url) and bool(self.supabase_service_key)
+
+    @property
+    def eurostat_codes(self) -> List[str]:
+        return [c.strip() for c in self.eurostat_default_codes.split(",") if c.strip()]
 
 
 _settings: Optional[Settings] = None

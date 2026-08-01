@@ -32,6 +32,27 @@ app = typer.Typer(
 )
 
 
+def _resolve_eurostat_codes(
+    explicit: List[str], from_file: Optional[Path]
+) -> List[str]:
+    """Dataset codes for `ingest --source eurostat`.
+
+    Explicit `--code` wins; otherwise falls back to the configured default
+    list (`Settings.eurostat_default_codes`) so operators don't have to
+    pass codes at every call site.
+    """
+    if from_file or explicit:
+        return list(explicit)
+    codes = get_settings().eurostat_codes
+    if not codes:
+        raise typer.BadParameter(
+            "eurostat requires --code <dataset_code> (repeatable), "
+            "--from-file PATH, or a configured default "
+            "(Settings.eurostat_default_codes)."
+        )
+    return codes
+
+
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
@@ -618,13 +639,8 @@ def ingest(
     elif source == "eurobarometer":
         src = EurobarometerSource(from_file=from_file)
     elif source == "eurostat":
-        if not from_file and not code:
-            raise typer.BadParameter(
-                "eurostat requires --code <dataset_code> (repeatable) "
-                "or --from-file PATH."
-            )
         src = EurostatSource(
-            codes=code,
+            codes=_resolve_eurostat_codes(code, from_file),
             from_file=from_file,
             filters={"geo": geo} if geo else {},
         )

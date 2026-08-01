@@ -844,6 +844,34 @@ project URL + service-role key (placed in `.env`, not committed), or
   topic's OpenAlex call more resilient; A32 stops the same two topics
   from always being the ones that need that resilience.
 
+### A33. Eurostat default dataset codes live in `Settings`, not a new config file (resolves #84)
+
+- **Date:** 2026-08-01
+- **Problem:** `ingest --source eurostat` (live mode) required `--code` on
+  every invocation or it raised `BadParameter` — the dataset-code list
+  wasn't config-driven anywhere, unlike topics (`topics.csv`) or
+  questions (`questions.yml`). ROADMAP.md's "config-driven crawling" item
+  called this out as the remaining piece of that pattern.
+- **Decision:** added `Settings.eurostat_default_codes` (comma-separated
+  str, default `"env_air_gge,nrg_bal_s"` — the two codes already in use)
+  and an `eurostat_codes` property that splits/strips it. `cli.py`'s new
+  `_resolve_eurostat_codes(explicit, from_file)` helper falls back to
+  `get_settings().eurostat_codes` only when `--code` is empty and
+  `--from-file` isn't used; explicit `--code` still wins.
+- **Why not a `config/` file (matching `topics.csv`'s pattern):**
+  `config/**` is outside this agent's edit scope (same restriction noted
+  on #50) — adding a new file there isn't buildable by this agent. A
+  `Settings` field with an env-var override achieves the same "don't
+  hardcode codes at the call site" goal without a new file, at the cost
+  of not being a maintainer-editable CSV the way `topics.csv` is. If the
+  maintainer wants the CSV-editable version later, this field's default
+  can be swapped for a `config/`-backed path the same way
+  `topics_csv_path`/`questions_yaml_path` work.
+- **Not done here:** simplifying `.github/workflows/scrape.yml`'s eurostat
+  invocation to drop its explicit `--code` args (out of this agent's edit
+  scope) — this change only makes that simplification *possible* later,
+  it doesn't apply it.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
