@@ -1180,6 +1180,36 @@ def sources_audit(
         typer.echo(f"{stat.hits:>5}  {stat.domain:<32} {stat.example_url}")
 
 
+@app.command("eurostat-table")
+def eurostat_table(
+    code: str = typer.Option(..., "--code", help="Eurostat dataset code."),
+    limit: int = typer.Option(
+        50, "--limit", help="Max flattened rows to show."
+    ),
+) -> None:
+    """Flatten a Eurostat JSON-stat lake payload into typed rows (issue
+    #86): one row per dimension combination + value, instead of the raw
+    nested JSON captured in `source_records.payload` (A14)."""
+    from study_scraper.jsonstat import flatten_jsonstat
+
+    storage = _storage_from_settings()
+    payload = storage.get_source_record_payload(
+        source_id="eurostat", source_record_id=code
+    )
+    if payload is None:
+        typer.echo(f"(no kept eurostat payload for code {code!r})")
+        return
+    shown = 0
+    for row in flatten_jsonstat(payload):
+        if shown >= limit:
+            break
+        dims = "  ".join(f"{k}={v}" for k, v in row.items() if k != "value")
+        typer.echo(f"{row['value']!s:>12}  {dims}")
+        shown += 1
+    if shown == 0:
+        typer.echo(f"(no data points decoded for {code!r})")
+
+
 @review_app.command("auto")
 def review_auto(
     topic: Optional[str] = typer.Option(None, "--topic"),
