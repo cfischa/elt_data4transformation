@@ -1294,6 +1294,29 @@ class PostgresStorage:
                 )
                 return list(cur.fetchall())
 
+    def get_source_record_payload(
+        self, *, source_id: str, source_record_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """The latest kept `payload` for one (source_id, source_record_id)
+        lake row — e.g. a Eurostat dataset code's raw JSON-stat body, for
+        the typed-row projection in `jsonstat.py` (issue #86)."""
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT payload
+                    FROM   {SCHEMA}.source_records
+                    WHERE  source_id = %s
+                      AND  source_record_id = %s
+                      AND  status = 'kept'
+                    ORDER  BY fetched_at DESC
+                    LIMIT  1
+                    """,
+                    (source_id, source_record_id),
+                )
+                row = cur.fetchone()
+                return row["payload"] if row else None
+
     def query_view(
         self, view_name: str, *, limit: int = 50
     ) -> List[Dict[str, Any]]:

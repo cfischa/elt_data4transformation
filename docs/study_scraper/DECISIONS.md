@@ -872,6 +872,40 @@ project URL + service-role key (placed in `.env`, not committed), or
   scope) — this change only makes that simplification *possible* later,
   it doesn't apply it.
 
+### A34. Eurostat JSON-stat typed projection lives in Python, not a SQL view (resolves #86)
+
+- **Date:** 2026-08-02
+- **Problem:** ROADMAP.md P1 item 6 asked for a typed-row projection of
+  the Eurostat JSON-stat 2.0 payloads `eurostat.py` stores as-is in
+  `source_records.payload` (A14), matching the `dawum_polls`/
+  `dawum_poll_results` lake-then-view pattern (migration 0005).
+- **Decision:** decoding JSON-stat's `id`/`size`/`dimension`/`value`
+  encoding (a linear index over an N-dimensional category space, with
+  a sparse-object *or* dense-array `value`) into typed rows in pure SQL
+  would need per-dataset mixed-radix index arithmetic over `jsonb` —
+  correct but fragile, hard to unit-test, and would need one bespoke
+  view per dataset shape (env_air_gge and nrg_bal_s already differ).
+  Shipped instead as `study_scraper/jsonstat.py::flatten_jsonstat`, a
+  pure Python decoder generic over any JSON-stat 2.0 payload, backed by
+  `PostgresStorage.get_source_record_payload` (fetches the raw payload
+  for one lake row) and surfaced via `eurostat-table --code <code>`.
+- **Why not a SQL view:** the decode logic is the same regardless of
+  which dataset code it runs against — a Python function tested against
+  small hand-built fixtures (dense array, sparse object, a dimension
+  Eurostat elides from `dimension` entirely, both `category.index` shapes)
+  is easier to verify correct than N per-dataset SQL views, and doesn't
+  grow with the dataset-code list the way per-table views would (see A33
+  — that list is still just 2 codes). If a dataset's typed rows need to
+  be *joined* against other tables in SQL later, a view wrapping this
+  same decode logic (e.g. via a set-returning PL/pgSQL function, as
+  migration 0006 already does for title similarity) is the natural next
+  step — not precluded by this shape.
+- **Not done here:** wiring `flatten_jsonstat` into `export.py` or a
+  console page — the CLI command is the "queryable" surface #86 asked
+  for; a dock page can follow once there's an actual access pattern
+  (same "views added when the pattern demands it" rule from migration
+  0005's design note, applied to this Python-side equivalent).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

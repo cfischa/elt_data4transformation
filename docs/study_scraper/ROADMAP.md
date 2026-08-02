@@ -57,11 +57,11 @@ action. See issue #8 for the live metrics behind this reorder.
    worth prioritizing once actioned: as a whole-of-government CKAN
    catalog it may surface structured Rentenversicherung/Bundeswehr
    datasets that would help the two weakest topics (see item 1).
-6. **Eurostat typed SQL view(s)** — a migration projecting the JSON-stat
-   `env_air_gge` (and `nrg_bal_s`) lake payloads into typed rows
-   (geo, year, value), like `dawum_poll_results`, so the numbers are
-   queryable. Still only 3 lake rows total (2 codes × geo=DE) so this
-   stays lower-value until the code list grows — keep it after 1–5.
+6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
+   `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
+   `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
+   labels + value); `eurostat-table --code <code>` is the queryable
+   surface. Python, not a SQL view — see DECISIONS.md A34 for why.
 
 ## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
