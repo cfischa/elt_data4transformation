@@ -906,6 +906,46 @@ project URL + service-role key (placed in `.env`, not committed), or
   (same "views added when the pattern demands it" rule from migration
   0005's design note, applied to this Python-side equivalent).
 
+### A35. `bundestag_dip` switched to the no-key `bundestag.de/dip-api` mirror (resolves #48, informs #89)
+
+- **Date:** 2026-08-03
+- **Problem:** `search.dip.bundestag.de/api/v1` — the canonical DIP host
+  `bundestag_dip.py` called — has 401'd on every request for 5+ weeks
+  (#48): the shared public key published in the DIP docs rotated/expired,
+  and a personal key needs a maintainer to email
+  infoline.id3@bundestag.de. Result: `bundestag_dip` produced 0 studies
+  across 64 crawl runs. #89 asked whether `bundestag.de/services/opendata`
+  (bulk Plenarprotokoll/Drucksache XML/JSON dumps) could be a no-key
+  hedge.
+- **Finding:** the opendata page's "XML/JSON-Version zum Herunterladen"
+  links resolve to `https://www.bundestag.de/dip-api/api/v1/...` —
+  the *same* DIP backend, mirrored on the public bundestag.de web host,
+  reachable with no `apikey` at all. Verified live (2026-08-03):
+  `GET /dip-api/api/v1/drucksache?f.titel=Klimaschutz&format=json`
+  returns the identical schema (`numFound`, `documents`, `cursor`,
+  `fundstelle`, `urheber`, ...) as the official host, with working
+  `f.titel` filtering and cursor pagination (confirmed two full pages,
+  no id overlap, cursor advances) — and it isn't disallowed by
+  `bundestag.de/robots.txt`.
+- **Decision:** changed `bundestag_dip.py`'s `DEFAULT_BASE_URL` from
+  `https://search.dip.bundestag.de/api/v1` to
+  `https://www.bundestag.de/dip-api/api/v1`. No parser changes needed —
+  `_doc_to_candidate` already expects exactly this response shape.
+  `apikey`/`DIP_API_KEY` resolution is kept (harmless extra param against
+  the mirror) so `base_url` can be pointed back at the official host with
+  a personal key if the mirror ever goes away.
+- **Why this over #89's original bulk-XML-dump proposal:** the bulk
+  Plenarprotokoll/Drucksache dumps are per-document full-text files with
+  no server-side topic filter — using them would mean downloading and
+  regex-filtering the whole electoral period locally, a much larger and
+  more fragile lift than reusing the existing `f.titel`-filtered,
+  cursor-paginated parser this module already has. The mirror gives the
+  exact same search-by-topic behavior #48 already relied on, just without
+  the broken key.
+- **base-search.net (#88) does NOT have an equivalent no-key mirror** —
+  checked and rejected separately; see the #88 comment thread (its API
+  requires a registered access key/IP-allowlist, unlike this one).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

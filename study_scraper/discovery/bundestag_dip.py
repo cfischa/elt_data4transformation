@@ -7,15 +7,24 @@ decides. This source ingests the parliament half: Drucksachen
 (Anträge, Gesetzentwürfe, Antworten) matched to topic keywords, as
 catalog-style candidates flowing through the normal topic filter.
 
-API: DIP (Dokumentations- und Informationssystem für Parlamentsmaterialien),
-`https://search.dip.bundestag.de/api/v1` — structured JSON REST.
+API: DIP (Dokumentations- und Informationssystem für Parlamentsmaterialien).
+The canonical host, `https://search.dip.bundestag.de/api/v1`, requires an
+`apikey` query parameter and has 401'd on the shared public key for 5+
+weeks (issue #48). Investigating a no-key alternative (issue #89) turned
+up `https://www.bundestag.de/dip-api/api/v1` — the same DIP backend,
+mirrored on the bundestag.de web host to serve the "XML/JSON-Version zum
+Herunterladen" links on https://www.bundestag.de/services/opendata.
+Confirmed live (2026-08-03): identical response schema (`numFound`,
+`documents`, `cursor`, `fundstelle`, `urheber`, ...), same `f.titel`
+filter and cursor pagination, no `apikey` needed, not disallowed by
+bundestag.de's robots.txt. This module now defaults to that mirror.
 
-Auth: an API key sent as the `apikey` query parameter. The Bundestag
-PUBLISHES a shared public key in the API documentation
-(https://dip.bundestag.de/über-dip/hilfe/api) and rotates it every year
-or two; a personal key is free by mail to infoline.id3@bundestag.de.
-Resolution order here: explicit `api_key=` arg → `DIP_API_KEY` env var
-→ the published public key below (may age out — then set DIP_API_KEY).
+Auth: an API key sent as the `apikey` query parameter — no longer
+required against the bundestag.de mirror (harmless to send; ignored).
+Kept only so `DEFAULT_BASE_URL` can still be overridden back to the
+official host with a personal key if the mirror ever goes away.
+Resolution order: explicit `api_key=` arg → `DIP_API_KEY` env var → the
+published public key below.
 
 Two modes share one parser (house pattern):
   1. Live — GET /drucksache with `f.titel` per topic keyword,
@@ -42,11 +51,11 @@ from study_scraper.topics import Topic
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://search.dip.bundestag.de/api/v1"
+DEFAULT_BASE_URL = "https://www.bundestag.de/dip-api/api/v1"
 
-# The documented shared key (DIP help page, valid into 2026 per the
-# docs at time of writing). Rotates: if live calls return 401, fetch
-# the current one from the help page or request a personal key.
+# Kept for DIP_API_KEY resolution / callers that override base_url back
+# to the official host. The documented shared key (DIP help page); rotates
+# and is not needed against DEFAULT_BASE_URL above.
 PUBLIC_API_KEY = "OSOegLs.PR2lwJ1dwCeje9vTj7FPOt3hvpYKtwKkhw"
 
 # How many topic keywords to query per run (one request chain each).
