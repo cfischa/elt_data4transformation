@@ -9,9 +9,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import httpx
 import pytest
 
 from study_scraper.discovery.bundestag_dip import (
+    DEFAULT_BASE_URL,
     PUBLIC_API_KEY,
     BundestagDIPSource,
     _search_terms,
@@ -85,3 +87,25 @@ class TestApiKey:
         monkeypatch.setenv("DIP_API_KEY", "personal-key")
         assert resolve_api_key() == "personal-key"
         assert resolve_api_key("explicit") == "explicit"
+
+
+class TestNoKeyMirror:
+    """Issue #48/#89: `search.dip.bundestag.de` 401s on the shared public
+    key; `www.bundestag.de/dip-api` mirrors the same DIP backend (it
+    serves the opendata page's download links) without needing a key."""
+
+    def test_default_base_url_is_the_no_key_mirror(self) -> None:
+        assert DEFAULT_BASE_URL == "https://www.bundestag.de/dip-api/api/v1"
+
+    def test_live_request_hits_the_mirror_host(self, klima) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            return httpx.Response(200, json={"documents": [], "cursor": None})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with BundestagDIPSource(client=client) as src:
+            list(src.iter_candidates(klima, limit=1))
+
+        assert seen["url"].startswith("https://www.bundestag.de/dip-api/api/v1/")
