@@ -12,56 +12,68 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Re-prioritized 2026-07-27: collection has nearly stalled (4,880 → 5,005
-studies, +2.6% vs the prior week's +88%) because both catalog sources
-are now degraded — `bundestag_dip` still 401s on every request and
-OpenAlex is structurally rate-limiting the two last-processed topics.
-The in-scope, code-fixable item (#71) is promoted to the top since it's
-the only lever on the coverage number that doesn't need a maintainer
-action. See issue #8 for the live metrics behind this reorder.
+Re-prioritized 2026-08-03: #71 (OpenAlex 429s starving `rente`/
+`verteidigung`) shipped and is confirmed working live — both topics
+roughly doubled/tripled (285→590, 143→521) and overall studies grew
++15.8% this week, the best growth since the 07-13 jump. With that lever
+pulled, the next-biggest in-scope gap is structural, not a bugfix: only
+2 of the 5+ built sources feed the `studies` table GOAL.md's
+topic-coverage criterion counts. See issue #8 for the live metrics
+behind this reorder.
 
-1. **OpenAlex 429s structurally starve `rente`/`verteidigung`**
-   (issue #71, **new 2026-07-27, priority:high, [now]**) — these are
-   processed last in `topics.csv`'s per-topic loop, so they absorb all
-   the rate-limit pressure the other 6 topics already triggered in the
-   same run; they're now the two lowest-covered topics by a wide margin
-   (285, 143 vs 685–899 for the rest) and have been for 3+ consecutive
-   scheduled runs. Rotate topic order per run and/or retry
-   rate-limited topics at the end with a cooldown. Pure code fix, no
-   dependencies.
-2. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
-   is at 5,763 rows and climbing every crawl; `attributions` has been
-   flat at **57 since 2026-07-21** — six days, two scheduled runs, zero
-   net-new triples. The #68 no-signal fix (migration 0011) is working
-   (the queue drains on zero-yield runs: 371→334→353 instead of
-   stalling), so the queue mechanism is healthy; the only remaining
-   lever is `scheduled-attribute`'s twice-weekly/`--limit 40` cadence in
+1. **BASE (OAI-PMH academic aggregator) as a third catalog source**
+   (issue #88, **new 2026-08-03, priority:high, [now]**) — `GOAL.md`'s
+   topic-coverage bar (≥50 studies/topic from ≥3 sources) is currently
+   unreachable at any volume because only `openalex`+`ssoar` populate
+   `studies`; lake sources (dawum/gesis/eurostat) don't count and
+   `bundestag_dip` has never produced a row (see item 3). BASE reuses
+   the SSOAR OAI-PMH parser almost verbatim, no auth needed — pure code,
+   no dependencies.
+2. **`bundestag.de` Open-Data XML dumps as a no-key DIP alternative**
+   (issue #89, **new 2026-08-03, priority:med, [now, research spike]**)
+   — scouted this week: `bundestag.de/services/opendata` serves
+   Drucksachen/Plenarprotokolle as XML/JSON with no API key, unlike the
+   still-broken DIP REST API (item 4). Investigate fit against the lake
+   pattern (A14); ship a minimal source if viable, write up why not if
+   not — either way stops re-scouting this gap weekly.
+3. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
+   is at 7,110 rows and climbing every crawl; `attributions` crept from
+   57 (07-21) to only **71** (08-03) — 13 days, ~1/day. The #68
+   no-signal fix keeps the queue itself healthy (358, draining on
+   zero-yield runs), so the only remaining lever is
+   `scheduled-attribute`'s cadence/`--limit` in
    `.github/workflows/attribute.yml`, out of both agents' edit scope.
-   Still the single biggest lever on the *answering* half of the goal.
-3. **`bundestag_dip` still fully broken** (issue #48, reopened
-   2026-07-20) **[needs-human]** — 24/24 runs since reopening still
-   401. Only pure-government source; blocks the GOAL.md source-coverage
-   category requirement. Needs a fresh `DIP_API_KEY` (free, mail to
-   infoline.id3@bundestag.de) set as a repo secret.
-4. **Topic-content gap** (issue #50, priority:high, open since
-   2026-06-26 — a month) **[needs-human]** — maintainer's ask
+   Still the single biggest lever on the *answering* half of the goal —
+   3 straight weekly updates with no movement.
+4. **`bundestag_dip` still fully broken** (issue #48, reopened
+   2026-07-20) **[needs-human]** — 64/64 runs ever still 401, 0 studies
+   ever. Only pure-government catalog source via the REST API; needs a
+   fresh `DIP_API_KEY` (free, mail to infoline.id3@bundestag.de) set as
+   a repo secret. See item 2 for a no-key hedge being explored in
+   parallel.
+5. **Topic-content gap** (issue #50, priority:high, open since
+   2026-06-26 — 5+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
    topic) needs `config/topics/topics.csv` + `questions.yml`, both
    outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
    neither agent can build it as scoped.
-5. **Two built sources stuck at 0 live records, same root cause**
+6. **Two built sources stuck at 0 live records, same root cause**
    — Eurobarometer (issue #65, open since 07-20) and **GovData.de**
-   (issue #74, **new 2026-07-27**, code shipped in PR #69 on 07-22).
+   (issue #74, open since 07-27, code shipped in PR #69 on 07-22).
    Both just need one line each added to `.github/workflows/
    scrape.yml`'s crawl step — out of agent edit scope. GovData is
    worth prioritizing once actioned: as a whole-of-government CKAN
    catalog it may surface structured Rentenversicherung/Bundeswehr
-   datasets that would help the two weakest topics (see item 1).
-6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
+   datasets that would help the two weakest topics.
+7. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
    labels + value); `eurostat-table --code <code>` is the queryable
    surface. Python, not a SQL view — see DECISIONS.md A34 for why.
+8. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
+   (issue #71) **[done 2026-07-30]** — topic-crawl order now rotates by
+   `GITHUB_RUN_NUMBER` (A32). Confirmed working live 2026-08-03: both
+   topics' openalex counts roughly doubled/tripled week over week.
 
 ## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
@@ -106,16 +118,19 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-07-27 live DB): **catalog** OpenAlex (4,564) +
-SSOAR (441) — academic, openalex dominates volume; **lake** DAWUM
-(vote intention, 3,875 rows), GESIS KG (survey catalog, 500), Eurostat
-(official stats, 3 — thin by design), **Eurobarometer (0 — built,
-never run, see #65) and GovData.de (0 — built, never run, see #74**,
-new this week). **Bundestag DIP is wired but has 0 studies ever** —
-see #48 (reopened, 24/24 runs since still 401). The representativeness
-gaps are *government coverage* (the one category with zero live
-sources despite two built) and *official statistics breadth*. Ranked
-by yield per effort:
+Current coverage (2026-08-03 live DB): **catalog** OpenAlex (5,266) +
+SSOAR (528) — academic, openalex dominates volume, both still the
+*only two* sources feeding the `studies` table (see P1 item 1); **lake**
+DAWUM (vote intention, 3,886 rows), GESIS KG (survey catalog, 500),
+Eurostat (official stats, 3 — thin by design), **Eurobarometer (0 —
+built, never run, see #65) and GovData.de (0 — built, never run, see
+#74)**. **Bundestag DIP is wired but has 0 studies ever** — see #48
+(reopened, 64/64 runs ever still 401; #89 explores a no-key
+alternative). The representativeness gaps are *government coverage*
+(the one category with zero live sources despite two built) and
+*catalog-source diversity* (only openalex+ssoar count toward
+GOAL.md's ≥3-sources-per-topic bar; see #88). Ranked by yield per
+effort:
 
 5. **Eurobarometer** (issue #35) **[done, code — but see #65]** — shipped
    2026-07-15 as A24 (`study_scraper/sources/eurobarometer.py`, GESIS KG
@@ -127,7 +142,9 @@ by yield per effort:
    scheduled crawl, but the hardcoded public API key now 401s on every
    request (0 records ingested, now visible as `errors>0` — the
    silent-failure half of #48 is fixed). Needs a fresh personal key
-   (free by mail to infoline.id3@bundestag.de).
+   (free by mail to infoline.id3@bundestag.de). #89 explores
+   `bundestag.de/services/opendata`'s no-key XML dumps as a hedge in
+   parallel.
 7. **GovData.de (CKAN)** (issue #64, shipped PR #69 2026-07-22)
    **[done, code — but see #74, new 2026-07-27]** — Germany's
    cross-government open-data catalog (federal + state + municipal
@@ -139,21 +156,33 @@ by yield per effort:
    gap (item 1 in P1) by surfacing Rentenversicherung/Bundeswehr-
    adjacent government datasets without a bespoke scraper.
 
-### Scouted and rejected this round (2026-07-27)
+### Scouted this round (2026-08-03)
 
+- **`bundestag.de/services/opendata`** — Plenarprotokolle +
+  Drucksachen from the 1st electoral period onward, as XML/JSON
+  **file downloads, no API key**. Different shape than the DIP REST
+  API (bulk dumps vs. a searchable query) but no maintainer action
+  needed to start. **Filed as #89** — a research spike, not a
+  guaranteed ship (bulk size vs. topic-scoped filtering needs
+  checking first).
+- **Deutsche Rentenversicherung / `statistikportal.de` Open Data**
+  (re-checked, pension-specific) — publication downloads (PDF/XLSX,
+  e.g. "Rentenversicherung in Zeitreihen") and a research-data center
+  (FDZ-RV) that's account-gated for microdata. No standalone free API
+  beyond what Destatis GENESIS already covers. Not newly actionable;
+  same bucket as GENESIS (item 11, needs-human registration).
 - **ZMSBw "Sicherheits- und verteidigungspolitisches Meinungsbild"**
-  — Bundeswehr's own annual defense-opinion survey since 1996
-  (Germany's longest such series, directly on-topic for
-  `verteidigung`). Already GESIS-archived (ZA7613) but as microdata
-  behind GESIS login — same gap as Q19 (ALLBUS/Politbarometer), not
-  newly actionable.
-- **Deutsche Rentenversicherung statistics** ("Aktuelle Daten",
-  "Rentenversicherung in Zeitreihen") — no API found, PDF/publication
-  downloads only. Tier-3 by the structured-data-first rule (A13); not
-  worth a bespoke source ahead of GovData.de (#74) actually running.
-8. **BASE** **[now]** — OAI-PMH academic aggregator (Bielefeld);
-   reuses the SSOAR OAI parser almost verbatim; widens the catalog far
-   beyond SSOAR. Fixture + unit tests, no live call in CI.
+  (re-checked, defense-specific) — still the same finding as 07-27:
+  GESIS-archived (ZA7613) but microdata behind login. Not newly
+  actionable.
+
+### Scouted and rejected 2026-07-27
+
+8. **BASE** **[now — filed as #88, 2026-08-03]** — OAI-PMH academic
+   aggregator (Bielefeld); reuses the SSOAR OAI parser almost
+   verbatim; widens the catalog far beyond SSOAR, and is now the
+   fastest path to a third `studies`-table source (see P1 item 1).
+   Fixture + unit tests, no live call in CI.
 9. **Domain-audit source discovery** (issue #38) **[done]** — Phase
    5d: `study_scraper sources-audit [--limit]` walks stored study/
    reference URLs, groups by registrable domain, and surfaces domains
@@ -244,3 +273,8 @@ for our verification layers):
   2026-07-20 through 2026-07-26.
 - Dock "Candidate sources" page surfaces `sources-audit`'s unknown-domain
   ranking (#38 dock half, #77) — landed 2026-07-28.
+- Topic-crawl rotation (#71, A32) — landed 2026-07-30, **confirmed working
+  live 2026-08-03** (rente/verteidigung roughly doubled/tripled). Claims
+  FK-violation-on-dedup fix (#79), crawl duplicate-rate metric (#82),
+  Eurostat config-driven default codes (#84, A33) and JSON-stat typed
+  projection (#86, A34, PR #87) — all landed 2026-07-29 through 08-02.
