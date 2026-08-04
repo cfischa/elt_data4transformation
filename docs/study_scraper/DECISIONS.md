@@ -946,6 +946,37 @@ project URL + service-role key (placed in `.env`, not committed), or
   checked and rejected separately; see the #88 comment thread (its API
   requires a registered access key/IP-allowlist, unlike this one).
 
+### A36. `status` distinguishes an aborted run from an in-progress one by `notes`, not `finished_at IS NULL` alone
+
+- **Date:** 2026-08-04
+- **Problem:** `pipeline.py::run_one` leaves `finished_at` NULL and sets
+  `notes = "aborted: ..."` when a source raises mid-crawl (e.g. #48's
+  401s), so `build_status`/`status --json` needed to count those rows as
+  failed rather than a silently "successful" `seen=0 errors=0` row. An
+  earlier draft of this fix flagged *any* `finished_at IS NULL` row as
+  failed, but `ingest.py::run_lake_ingest` also leaves `finished_at` NULL
+  for the entire duration of a healthy, still-running lake ingest (it
+  inserts the `crawl_runs` row early so `discovery_run_id` has an FK
+  target, then fills in `finished_at` in a `finally` block once the run
+  completes) — that in-progress window was misreported as `ERR`, which
+  would make `agent-monitor.yml`'s scheduled `status` check file spurious
+  tickets for a long-running (worst case ~4h+) `dawum` ingest.
+- **Decision:** a run only counts as aborted/failed via the
+  `finished_at IS NULL` path when `notes` also starts with `aborted:`
+  (`COALESCE(notes, '') LIKE 'aborted:%'` in SQL; the equivalent
+  `str.startswith` check in `format_text`) — `errors > 0` still fails a
+  run independently of `notes`. `COALESCE` is required because plain
+  `notes LIKE 'aborted:%'` evaluates to SQL `NULL` (not `false`) when
+  `notes IS NULL`, which silently drops the row from *both* the
+  `successful` and `failed` filtered counts — caught by
+  `test_status_does_not_flag_in_progress_lake_run_as_failed` run against
+  real Postgres before this fix.
+- **Note re #48:** the issue this originally tracked is now closed by a
+  different, unrelated fix (#91 — `bundestag_dip` switched to a no-key
+  mirror), so this PR no longer references it as a maintainer-action
+  tracking issue; the aborted-vs-failed distinction stands on its own as
+  general pipeline-observability correctness.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

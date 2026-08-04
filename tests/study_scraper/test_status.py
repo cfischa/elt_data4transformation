@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -11,6 +13,7 @@ import pytest
 from study_scraper.discovery.base import Candidate
 from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
+from study_scraper.models import CrawlRun
 from study_scraper.pipeline import run_one
 from study_scraper.status import build_status, format_text
 from study_scraper.storage import PostgresStorage
@@ -152,6 +155,32 @@ def test_status_counts_aborted_run_as_failed(
     text = format_text(report)
     assert "ERR" in text
     assert "simulated 401" in text
+
+
+def test_status_does_not_flag_in_progress_lake_run_as_failed(
+    storage: PostgresStorage,
+) -> None:
+    """`ingest.py::run_lake_ingest` inserts its `crawl_runs` row early
+    (finished_at=None, no `notes`) so `discovery_run_id` has an FK target
+    before iteration starts, then fills in `finished_at` once the run
+    completes. That in-progress window must read as healthy, not as an
+    aborted run -- only a `notes` value starting `aborted:` (set by
+    `pipeline.py::run_one` when a source raises mid-run) means failure."""
+    run = CrawlRun(
+        id=str(uuid.uuid4()),
+        source_id="dawum",
+        topic_id="__lake__",
+        started_at=datetime.now(timezone.utc),
+    )
+    storage.record_crawl_run(run)
+
+    report = build_status(storage)
+    assert report.total_runs == 1
+    assert report.failed_runs == 0
+    assert report.successful_runs == 1
+
+    text = format_text(report)
+    assert "ERR" not in text
 
 
 def test_status_counts_lake_records(

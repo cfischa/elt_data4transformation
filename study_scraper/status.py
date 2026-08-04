@@ -148,11 +148,13 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                     COUNT(*)                                                AS total,
                     COUNT(*) FILTER (
                         WHERE errors = 0
-                          AND NOT (finished_at IS NULL AND notes LIKE 'aborted:%'))
+                          AND NOT (finished_at IS NULL
+                                    AND COALESCE(notes, '') LIKE 'aborted:%'))
                                                                              AS successful,
                     COUNT(*) FILTER (
                         WHERE errors > 0
-                           OR (finished_at IS NULL AND notes LIKE 'aborted:%'))
+                           OR (finished_at IS NULL
+                                AND COALESCE(notes, '') LIKE 'aborted:%'))
                                                                              AS failed,
                     COALESCE(SUM(candidates_seen), 0)                       AS seen,
                     COALESCE(SUM(candidates_kept), 0)                       AS kept,
