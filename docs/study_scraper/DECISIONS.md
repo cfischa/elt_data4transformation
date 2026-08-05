@@ -977,6 +977,33 @@ project URL + service-role key (placed in `.env`, not committed), or
   tracking issue; the aborted-vs-failed distinction stands on its own as
   general pipeline-observability correctness.
 
+### A37. DOAJ scouted as a BASE alternative (#88) and rejected — `robots.txt` disallows `ClaudeBot`
+
+- **Date:** 2026-08-05
+- **Problem:** #88 (BASE as a third `studies`-table catalog source) is
+  blocked on an access key (A35's closing note). `GOAL.md`'s ≥3-sources
+  topic-coverage bar is still unreachable with only `openalex`+`ssoar`
+  feeding `studies`, so before self-proposing other work this pass
+  scouted DOAJ (Directory of Open Access Journals,
+  `doaj.org/api/search/articles/<query>`) as a same-shape alternative:
+  free-text query, JSON, page/pageSize pagination (max pageSize 100).
+- **Finding:** the API itself is genuinely unauthenticated and live —
+  verified 2026-08-05 with real queries (e.g. `climate policy germany`
+  returned a directly on-topic German public-opinion study). But
+  `doaj.org/robots.txt` carries an explicit
+  `User-agent: ClaudeBot` / `Disallow: /` entry — separate from, and
+  stricter than, its general `User-agent: *` allow (which itself sets
+  `Content-Signal: ai-train=no`). This developer agent runs on Claude;
+  building automated fetching against a site that has specifically
+  opted Claude's crawler out, under a different declared User-Agent
+  string, would be evading that opt-out rather than respecting it.
+- **Decision:** not building a DOAJ source. No other no-key catalog
+  candidate has been identified for #88's goal as of this date — the
+  next candidate needs both (a) a genuinely open API (verify live, not
+  from docs/memory — BASE's own docs implied "free API" but the actual
+  endpoint access-key-gates) and (b) a `robots.txt` that doesn't
+  specifically exclude AI/Claude crawlers.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
