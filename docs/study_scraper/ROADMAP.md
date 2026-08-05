@@ -22,20 +22,26 @@ topic-coverage criterion counts. See issue #8 for the live metrics
 behind this reorder.
 
 1. **BASE (OAI-PMH academic aggregator) as a third catalog source**
-   (issue #88, **new 2026-08-03, priority:high, [now]**) — `GOAL.md`'s
-   topic-coverage bar (≥50 studies/topic from ≥3 sources) is currently
-   unreachable at any volume because only `openalex`+`ssoar` populate
-   `studies`; lake sources (dawum/gesis/eurostat) don't count and
-   `bundestag_dip` has never produced a row (see item 3). BASE reuses
-   the SSOAR OAI-PMH parser almost verbatim, no auth needed — pure code,
-   no dependencies.
+   (issue #88, priority:high) **[needs-human — resolved 2026-08-03,
+   not buildable]** — verified live twice (2026-08-03 and again
+   2026-08-05): `api.base-search.net/cgi-bin/BaseHttpSearchInterface.fcgi`
+   is access-key/IP-allowlist gated (`Access denied for IP address ...`
+   for any unregistered caller), not "no auth, no registration" as this
+   item originally claimed; no OAI-PMH re-harvest interface exists for
+   BASE's merged index either. See the #88 comment thread and
+   DECISIONS.md A35's closing note. `GOAL.md`'s ≥3-sources topic-coverage
+   bar is still structurally unreachable (only `openalex`+`ssoar` feed
+   `studies`) — DOAJ was scouted 2026-08-05 as an alternative and also
+   rejected (its `robots.txt` disallows `ClaudeBot` specifically); see
+   DECISIONS.md A37. No other no-key catalog candidate identified yet.
 2. **`bundestag.de` Open-Data XML dumps as a no-key DIP alternative**
-   (issue #89, **new 2026-08-03, priority:med, [now, research spike]**)
-   — scouted this week: `bundestag.de/services/opendata` serves
-   Drucksachen/Plenarprotokolle as XML/JSON with no API key, unlike the
-   still-broken DIP REST API (item 4). Investigate fit against the lake
-   pattern (A14); ship a minimal source if viable, write up why not if
-   not — either way stops re-scouting this gap weekly.
+   (issue #89, priority:med) **[done 2026-08-03 — via a different fix,
+   issue left open]** — investigated as scoped; found something better
+   along the way (`bundestag.de/dip-api/api/v1`, a no-key mirror of the
+   *same* DIP backend `bundestag_dip.py` already calls) and shipped that
+   instead of a new bulk-dump source. See DECISIONS.md A35 and PR #91
+   (merged 2026-08-03, closed #48). #89 itself was never closed since
+   PR #91 only referenced `Closes #48` — no remaining work here.
 3. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
    is at 7,110 rows and climbing every crawl; `attributions` crept from
    57 (07-21) to only **71** (08-03) — 13 days, ~1/day. The #68
@@ -178,11 +184,11 @@ effort:
 
 ### Scouted and rejected 2026-07-27
 
-8. **BASE** **[now — filed as #88, 2026-08-03]** — OAI-PMH academic
-   aggregator (Bielefeld); reuses the SSOAR OAI parser almost
-   verbatim; widens the catalog far beyond SSOAR, and is now the
-   fastest path to a third `studies`-table source (see P1 item 1).
-   Fixture + unit tests, no live call in CI.
+8. **BASE** **[needs-human — filed as #88, rejected 2026-08-03/05]** —
+   turned out not to be the OAI-PMH, no-auth source this assumed:
+   BASE's only public interface is access-key/IP-allowlist gated (see
+   P1 item 1, DECISIONS.md A35/A37). No third `studies`-table source
+   identified yet.
 9. **Domain-audit source discovery** (issue #38) **[done]** — Phase
    5d: `study_scraper sources-audit [--limit]` walks stored study/
    reference URLs, groups by registrable domain, and surfaces domains
