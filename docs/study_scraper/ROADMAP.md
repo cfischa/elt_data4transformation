@@ -21,19 +21,18 @@ pulled, the next-biggest in-scope gap is structural, not a bugfix: only
 topic-coverage criterion counts. See issue #8 for the live metrics
 behind this reorder.
 
-1. **BASE (OAI-PMH academic aggregator) as a third catalog source**
-   (issue #88, priority:high) **[needs-human — resolved 2026-08-03,
-   not buildable]** — verified live twice (2026-08-03 and again
-   2026-08-05): `api.base-search.net/cgi-bin/BaseHttpSearchInterface.fcgi`
-   is access-key/IP-allowlist gated (`Access denied for IP address ...`
-   for any unregistered caller), not "no auth, no registration" as this
-   item originally claimed; no OAI-PMH re-harvest interface exists for
-   BASE's merged index either. See the #88 comment thread and
-   DECISIONS.md A35's closing note. `GOAL.md`'s ≥3-sources topic-coverage
-   bar is still structurally unreachable (only `openalex`+`ssoar` feed
-   `studies`) — DOAJ was scouted 2026-08-05 as an alternative and also
-   rejected (its `robots.txt` disallows `ClaudeBot` specifically); see
-   DECISIONS.md A37. No other no-key catalog candidate identified yet.
+1. **Third catalog source for `studies`** (issue #88, priority:high)
+   **[done 2026-08-07]** — BASE (needs-human, access-key gated,
+   DECISIONS.md A35) and DOAJ (rejected, `robots.txt` disallows
+   `ClaudeBot`, A37) both dead-ended. **CORE** (`api.core.ac.uk`)
+   verified live 2026-08-07: real, no-key `200` JSON responses
+   (title/abstract/authors/DOI/dates; only full text withheld for
+   anonymous callers), no `robots.txt` disallow. Shipped
+   `study_scraper/discovery/core_search.py` (issue #94, DECISIONS.md
+   A38), fixture-tested, `run --source core --topic <id>`.
+   `GOAL.md`'s ≥3-sources topic-coverage bar is now buildable once
+   wired into a scheduled crawl (same maintainer-follow-up gap as
+   Eurobarometer/GovData, #65/#74).
 2. **`bundestag.de` Open-Data XML dumps as a no-key DIP alternative**
    (issue #89, priority:med) **[done 2026-08-03 — via a different fix,
    issue left open]** — investigated as scoped; found something better
@@ -187,8 +186,8 @@ effort:
 8. **BASE** **[needs-human — filed as #88, rejected 2026-08-03/05]** —
    turned out not to be the OAI-PMH, no-auth source this assumed:
    BASE's only public interface is access-key/IP-allowlist gated (see
-   P1 item 1, DECISIONS.md A35/A37). No third `studies`-table source
-   identified yet.
+   P1 item 1, DECISIONS.md A35/A37). CORE filled the third
+   `studies`-table source slot instead — see P1 item 1, A38.
 9. **Domain-audit source discovery** (issue #38) **[done]** — Phase
    5d: `study_scraper sources-audit [--limit]` walks stored study/
    reference URLs, groups by registrable domain, and surfaces domains

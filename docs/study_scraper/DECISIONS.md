@@ -1004,6 +1004,47 @@ project URL + service-role key (placed in `.env`, not committed), or
   endpoint access-key-gates) and (b) a `robots.txt` that doesn't
   specifically exclude AI/Claude crawlers.
 
+### A38. CORE accepted as the third `studies`-table catalog source (resolves #88's goal via #94)
+
+- **Date:** 2026-08-07
+- **Problem:** #88 (BASE) and DOAJ (A37) were both scouted and rejected
+  as candidates to satisfy `GOAL.md`'s ≥3-sources topic-coverage bar —
+  only `openalex`+`ssoar` fed `studies`. Continued the search for a
+  no-key, non-excluding academic index.
+- **Finding:** CORE (`api.core.ac.uk/v3/search/works/`, the COnnecting
+  REpositories aggregator) answers unauthenticated queries with real
+  `200` JSON — title, abstract, authors, DOI, `publishedDate`/
+  `yearPublished`, `downloadUrl` all populated; only `fullText` is
+  withheld (`"Not available for public API users."`, itself evidence
+  of an intentional keyless tier, not an oversight/loophole). Verified
+  live 2026-08-07 with German policy queries (e.g. `"Klimaschutz" OR
+  "Energiewende"` surfaced on-topic results — "Klimaschutz und
+  Energiewende", "Ökosystembasierte Klimapolitik für Deutschland" — as
+  the top hits despite `totalHits` in the tens of millions, i.e. CORE's
+  relevance ranking works the same way OpenAlex's `search=` does: OR
+  the terms, let ranking do the precision work, and let the existing
+  stage-1 `topic_filter` do the real keep/drop downstream). Checked
+  both `core.ac.uk/robots.txt` and `api.core.ac.uk/robots.txt` — neither
+  carries a `Disallow` line for any user-agent (unlike DOAJ's explicit
+  `ClaudeBot` exclusion in A37), only the generic Cloudflare
+  "content-signals" preamble. The anonymous tier is rate-limited
+  (`x-ratelimit-limit: 10`, observed intermittent 429s under burst
+  traffic from repeated manual verification calls) but that's exactly
+  what `study_scraper/http.py`'s shared `get_with_retry` (honours
+  `Retry-After`, exponential backoff) already exists to absorb — no
+  source-specific handling needed, same as OpenAlex/DIP.
+- **Decision:** shipped `study_scraper/discovery/core_search.py`
+  (issue #94), mirroring `openalex.py`'s shape: OR-joined topic
+  keywords into CORE's `q` param, `offset`-paginated, live +
+  `--from-file` fixture modes sharing one parser. `canonical_url`
+  prefers a `https://doi.org/<doi>` form when CORE returns a bare DOI
+  (unlike OpenAlex, CORE's `doi` field has no URL prefix), then
+  `downloadUrl`, then CORE's own `core.ac.uk/works/<id>` page — same
+  fallback order as OpenAlex's DOI → openalex-id chain. CLI: `run
+  --source core --topic <id>`. Not wired into
+  `.github/workflows/scrape.yml`'s scheduled crawl in this PR — same
+  maintainer-follow-up gap as Eurobarometer/GovData (#65/#74).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
