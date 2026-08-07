@@ -1,0 +1,72 @@
+{
+  "totalHits": 3,
+  "limit": 25,
+  "offset": 0,
+  "results": [
+    {
+      "id": 266729884,
+      "title": "Ökosystembasierte Klimapolitik für Deutschland",
+      "abstract": "Die Leistungen der Natur können zur Lösung des Klimaproblems beitragen, indem sie gezielt für den Klimaschutz und die Anpassung an den Klimawandel genutzt werden.",
+      "authors": [
+        {"name": "Röder, Norbert"},
+        {"name": "Schröter-Schlaack, Christoph"}
+      ],
+      "doi": "10.1007/978-3-658-05578-3_12",
+      "documentType": "chapter",
+      "downloadUrl": "",
+      "fullText": "Not available for public API users.",
+      "language": {"code": "de", "name": "German"},
+      "publisher": "",
+      "publishedDate": "2016-10-24T01:00:00+01:00",
+      "yearPublished": 2016,
+      "dataProviders": [
+        {"id": 984, "name": "EconStor (ZBW Kiel)"}
+      ],
+      "links": [
+        {"type": "display", "url": "https://core.ac.uk/works/266729884"}
+      ]
+    },
+    {
+      "id": 44690409,
+      "title": "Klimapolitik trotz(t) Trump : globaler Klimaschutz nach dem Ausstieg der USA aus dem Pariser Abkommen",
+      "abstract": "US-Präsident Donald Trump verkündete, dass er das Pariser Klimaabkommen kündigen wolle. Was bedeutet dieser Schritt der USA für den globalen Klimaschutz?",
+      "authors": [
+        {"name": "Obergassel, Wolfgang"},
+        {"name": "Ott, Hermann E."},
+        {"name": "Hermwille, Lukas"}
+      ],
+      "doi": null,
+      "documentType": "",
+      "downloadUrl": "https://core.ac.uk/download/553024823.pdf",
+      "fullText": "Not available for public API users.",
+      "language": {"code": "de", "name": "German"},
+      "publisher": "",
+      "publishedDate": "2017-06-01T00:00:00+00:00",
+      "yearPublished": 2017,
+      "dataProviders": [
+        {"id": 1030, "name": "SSOAR - Social Science Open Access Repository"},
+        {"id": 847, "name": "Publikationsserver des Wuppertal Instituts für Klima, Umwelt, Energie"}
+      ],
+      "links": [
+        {"type": "download", "url": "https://core.ac.uk/download/553024823.pdf"},
+        {"type": "display", "url": "https://core.ac.uk/works/95423123"}
+      ]
+    },
+    {
+      "id": 158306103,
+      "title": "Soziale Gerechtigkeit in der Klimapolitik",
+      "abstract": "",
+      "authors": [],
+      "doi": null,
+      "documentType": "",
+      "downloadUrl": "",
+      "fullText": "Not available for public API users.",
+      "language": null,
+      "publisher": "",
+      "publishedDate": "",
+      "yearPublished": 2015,
+      "dataProviders": [],
+      "links": []
+    }
+  ]
+}

@@ -168,10 +168,18 @@ def run(
         from study_scraper.discovery.bundestag_dip import BundestagDIPSource
 
         ctx = BundestagDIPSource(from_file=from_file)
+    elif source == "core":
+        from study_scraper.discovery.core_search import CoreSearchSource
+
+        settings = get_settings()
+        ctx = CoreSearchSource(
+            from_file=from_file,
+            politeness_delay=settings.http_politeness_delay_seconds,
+        )
     else:
         raise typer.BadParameter(
             f"unknown source {source!r}; supported: ssoar, openalex, "
-            f"bundestag_dip"
+            f"bundestag_dip, core"
         )
 
     with ctx as src:
