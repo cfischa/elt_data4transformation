@@ -228,20 +228,26 @@ effort:
 
 Adopted checklist from incremental-crawl / scraping best practice
 (conditional GET, fingerprinting, politeness — see AGENTS/ACCURACY docs
-for our verification layers):
+for our verification layers). All items below have shipped:
 
-- **Fetch only what changed**: conditional GET (ETag/Last-Modified → 304)
-  and content-hash fingerprints; we already hash payloads for idempotent
-  upserts, but we re-download everything — item 4 closes this.
-- **Politeness & backoff**: jittered delays, exponential backoff on
-  429/503, robots.txt as a floor — item 1 closes this.
-- **Two-layer bookkeeping**: "already scheduled" keys vs response metadata
-  (etag, last fetch, checksum) — falls out of items 1+4.
-- **Measure waste**: track duplicate rate / bytes fetched vs kept per run
-  (extend `status --json`) so crawl spend is visible. **[now, small]**
-- **Config-driven crawling**: topics now flow from `topics.csv` into the
-  scheduled crawl automatically (done 2026-07-04); move the Eurostat code
-  list into config too. **[now, small]**
+- **Fetch only what changed** **[done, #34/PR #47]** — conditional GET
+  (`fulltext.py` sends `If-None-Match`/`If-Modified-Since` and treats a
+  `304` response as unchanged) and content-hash fingerprints
+  (`content_hash` stored and used for idempotent upserts in
+  `storage/postgres.py`).
+- **Politeness & backoff** **[done, #32]** — `study_scraper/http.py`'s
+  shared `request_with_retry` gives every fetcher jittered exponential
+  backoff and honours `Retry-After` on 429/503; `config.
+  respect_robots_txt` is the robots.txt floor.
+- **Two-layer bookkeeping** **[done]** — falls out of the two items
+  above (etag/last-fetch/checksum metadata alongside the "already
+  scheduled" keys).
+- **Measure waste** **[done, #82/PR #83]** — `status --json` reports
+  `duplicates_total`/`duplicate_rate` per run (crawl spend is visible;
+  bytes-fetched-vs-kept was not added, not needed to close this item).
+- **Config-driven crawling** **[done, #84/PR #85]** — topics flow from
+  `topics.csv` into the scheduled crawl (2026-07-04) and the Eurostat
+  dataset-code list is config-driven too.
 
 ## P3 — other [needs-human]
 
