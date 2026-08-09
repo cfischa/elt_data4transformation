@@ -59,7 +59,11 @@ before they start.
 7. [ ] **Destatis GENESIS lake source** (free registration needed) — NOT
    sandbox-buildable (credentials).
 8. [ ] **UBA / BAMF structured downloads** (XLSX/CSV lake sources).
-9. [ ] **Per-table SQL views** as access patterns surface.
+9. [x] **Per-table SQL views** as access patterns surface —
+   `attribution_queue` (migration 0008), `dawum_polls`/
+   `dawum_poll_results` (Phase 5c), Eurostat JSON-stat typed
+   projection (`flatten_jsonstat`, DECISIONS.md A34, `eurostat-table`
+   CLI).
 10. [x] **Dock: Sources page** — PR #11.
 11. [ ] **Eval harness (Phase 7)** — needs maintainer-curated gold set
     (see ACCURACY.md "Needs the maintainer").
@@ -232,12 +236,19 @@ These pull metadata structured enough to ingest as `studies`. They do
 NOT carry full text. Useful for the catalog, less useful for the data
 question.
 
-- [ ] **BASE** — OAI-PMH; same parser as SSOAR.
-- [ ] **CORE** — REST API.
-- [ ] **Bundestag DIP** — REST API at
-      `https://search.dip.bundestag.de/api/v1/`, free key by email.
-      Some Drucksachen carry structured indicators; most are PDF
-      attachments and thus tier-3 utility.
+- [x] **BASE** — investigated and **rejected** 2026-08-03/05: only
+      public interface is access-key/IP-allowlist gated, no OAI-PMH
+      re-harvest endpoint like SSOAR's. See DECISIONS.md A35/A37,
+      issue #88 (`needs-human`).
+- [x] **CORE** — REST API, shipped 2026-08-07:
+      `study_scraper/discovery/core_search.py`, fixture-tested,
+      `run --source core --topic <id>`. No auth needed (full text
+      withheld for anonymous callers, metadata is not). See
+      DECISIONS.md A38, issue #94 (closed).
+- [x] **Bundestag DIP** — built, wired into the scheduled crawl, and
+      switched to the no-key `bundestag.de/dip-api` mirror of
+      `search.dip.bundestag.de/api/v1` 2026-08-03 after the shared
+      public key expired. See DECISIONS.md A35, issues #48/#89, PR #91.
 
 ### Tier 3: Unstructured sources (PDF / HTML) — DEFERRED per A13
 
