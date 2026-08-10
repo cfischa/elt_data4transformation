@@ -1045,6 +1045,37 @@ project URL + service-role key (placed in `.env`, not committed), or
   `.github/workflows/scrape.yml`'s scheduled crawl in this PR — same
   maintainer-follow-up gap as Eurobarometer/GovData (#65/#74).
 
+### A39. robots.txt actually enforced, scoped to `fulltext.py` only (self-propose)
+
+- **Date:** 2026-08-10
+- **Problem:** `Settings.respect_robots_txt` (`config.py`, default `True`)
+  has existed since #32/#43 and `ROADMAP.md`'s "Production craft"
+  section claimed it as "the robots.txt floor" for politeness — but no
+  code anywhere ever read it. It was dead config; nothing checked
+  robots.txt before fetching.
+- **Decision:** enforce it, but only in `study_scraper/fulltext.py`'s
+  `fetch_url` (the reference-follower/PDF/HTML fetch loop), not inside
+  the discovery source clients (`ssoar.py`, `openalex.py`, `dawum.py`,
+  `eurostat.py`, `gesis.py`, `core_search.py`, `bundestag_dip.py`).
+  `fulltext.py` is the one path in this codebase that behaves like a
+  general web crawler — it fetches arbitrary publisher/think-tank hosts
+  discovered from `canonical_url`/`doi`, exactly the case robots.txt
+  exists for. The discovery sources instead call their own documented,
+  intentionally-public APIs (OAI-PMH, REST, SPARQL) at a handful of
+  fixed hosts we already researched individually (see A35/A37/A38) —
+  robots.txt doesn't meaningfully apply there and adding the check
+  would just be one more thing that can 404-and-silently-pass or block
+  a legitimate API call.
+- **Implementation:** `study_scraper/http.py::robots_allowed` fetches
+  `{scheme}://{host}/robots.txt` fresh per call (no cross-call cache,
+  matching this module's existing per-request-client design) and
+  fails open — missing/unreachable/unparsable robots.txt means
+  allowed, the standard opt-out convention. `fetch_url` raises
+  `RobotsDisallowed`, which `run_fulltext` catches as a distinct
+  `robots_disallowed` status (retried next run, like `fetch_error`,
+  rather than permanently flagged like `no_fetchable_url` — a host's
+  robots.txt can change).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

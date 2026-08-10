@@ -16,6 +16,7 @@ from study_scraper.http import (
     get_with_retry,
     polite_sleep,
     request_with_retry,
+    robots_allowed,
 )
 
 
@@ -172,3 +173,51 @@ def test_retryable_status_set() -> None:
     assert 503 in RETRYABLE_STATUS
     assert 404 not in RETRYABLE_STATUS
     assert 200 not in RETRYABLE_STATUS
+
+
+class TestRobotsAllowed:
+    def test_disallowed_path(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == "/robots.txt"
+            return httpx.Response(200, text="User-agent: *\nDisallow: /private/\n")
+
+        with _client(handler) as client:
+            assert not robots_allowed(
+                client, "https://x.test/private/doc.pdf", user_agent="study-scraper"
+            )
+
+    def test_allowed_path(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text="User-agent: *\nDisallow: /private/\n")
+
+        with _client(handler) as client:
+            assert robots_allowed(
+                client, "https://x.test/public/doc.pdf", user_agent="study-scraper"
+            )
+
+    def test_missing_robots_txt_allows(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404)
+
+        with _client(handler) as client:
+            assert robots_allowed(client, "https://x.test/a.pdf", user_agent="ua")
+
+    def test_unreachable_robots_txt_allows(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("down", request=request)
+
+        with _client(handler) as client:
+            assert robots_allowed(client, "https://x.test/a.pdf", user_agent="ua")
+
+    def test_fetches_robots_txt_at_host_root(self) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["url"] = str(request.url)
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+
+        with _client(handler) as client:
+            robots_allowed(
+                client, "https://x.test/deep/path/doc.pdf?x=1", user_agent="ua"
+            )
+        assert seen["url"] == "https://x.test/robots.txt"

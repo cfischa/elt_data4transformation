@@ -166,14 +166,14 @@ before they start.
 - [x] **Milestone:** 6 verified climate-relevant SSOAR studies
       persisted to Postgres (maintainer goal "3 studies in DB"
       exceeded). Idempotent re-runs confirmed.
-- [ ] HTTP fetcher polish: tenacity retries, robots.txt check, custom
-      backoff on 429. Deferred — current SSOAR client is a thin
-      `httpx.Client` without retries. Bring in when adding OpenAlex
-      (which has stricter rate limits).
-- [ ] PDF + HTML artifact download. Deferred — Phase 4 captures
-      metadata + abstract from OAI Dublin Core, which is enough for
-      topical relevance. Full-text fetching lands when stage-2
-      semantic scoring needs it (Phase 6).
+- [x] HTTP fetcher polish: tenacity retries + custom backoff on 429
+      (`study_scraper/http.py`, #32/#43) shared by every source client;
+      robots.txt check (DECISIONS.md A39, 2026-08-10) scoped to
+      `fulltext.py`'s general-purpose document fetch loop — the
+      discovery source clients call documented APIs, not general web
+      crawling, see A39.
+- [x] PDF + HTML artifact download — `study_scraper/fulltext.py` (A20),
+      shipped 2026-06-11.
 
 ## Phase 5 — Second + third source (in progress)
 

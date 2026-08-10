@@ -9,8 +9,10 @@ and `fetch_url`'s 304 short-circuit.
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from study_scraper.fulltext import conditional_headers, fetch_url
+from study_scraper.http import RobotsDisallowed
 
 
 class TestConditionalHeaders:
@@ -90,4 +92,43 @@ class TestFetchUrlConditionalGet:
             transport=httpx.MockTransport(handler),
         )
         assert seen["if_none_match"] is None
+        assert content == b"hello"
+
+
+class TestFetchUrlRobotsTxt:
+    def test_raises_when_disallowed(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nDisallow: /doc.pdf\n")
+            return httpx.Response(200, content=b"should not be fetched")
+
+        with pytest.raises(RobotsDisallowed):
+            fetch_url(
+                "https://example.org/doc.pdf",
+                transport=httpx.MockTransport(handler),
+            )
+
+    def test_allowed_when_robots_permits(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nDisallow: /private/\n")
+            return httpx.Response(200, content=b"hello")
+
+        content, _content_type, _resp = fetch_url(
+            "https://example.org/doc.pdf",
+            transport=httpx.MockTransport(handler),
+        )
+        assert content == b"hello"
+
+    def test_respect_robots_txt_false_skips_the_check(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                return httpx.Response(200, text="User-agent: *\nDisallow: /doc.pdf\n")
+            return httpx.Response(200, content=b"hello")
+
+        content, _content_type, _resp = fetch_url(
+            "https://example.org/doc.pdf",
+            transport=httpx.MockTransport(handler),
+            respect_robots_txt=False,
+        )
         assert content == b"hello"

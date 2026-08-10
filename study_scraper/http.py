@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import random
 import time
+import urllib.robotparser
 from typing import Any, Callable, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from tenacity import (
@@ -134,3 +136,31 @@ def polite_sleep(
     host. No-op for non-positive delays."""
     if delay and delay > 0:
         sleep(delay)
+
+
+class RobotsDisallowed(Exception):
+    """Raised when a host's robots.txt disallows `url` for our user agent."""
+
+    def __init__(self, url: str):
+        super().__init__(f"robots.txt disallows {url}")
+        self.url = url
+
+
+def robots_allowed(client: httpx.Client, url: str, *, user_agent: str) -> bool:
+    """True unless `url`'s host robots.txt explicitly disallows it for
+    `user_agent`. Fail-open: a missing, unreachable, or unparsable
+    robots.txt means "allowed" — robots.txt is an opt-out convention, and
+    most hosts we fetch from (think tanks, publishers) don't have one at
+    all. Fetched fresh per call, same as the rest of this module's
+    per-request clients (no cross-call caching)."""
+    parts = urlsplit(url)
+    robots_url = urlunsplit((parts.scheme, parts.netloc, "/robots.txt", "", ""))
+    try:
+        resp = client.get(robots_url, timeout=10.0)
+    except httpx.HTTPError:
+        return True
+    if resp.status_code >= 400:
+        return True
+    parser = urllib.robotparser.RobotFileParser()
+    parser.parse(resp.text.splitlines())
+    return parser.can_fetch(user_agent, url)
