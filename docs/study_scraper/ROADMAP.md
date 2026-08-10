@@ -237,8 +237,13 @@ for our verification layers). All items below have shipped:
   `storage/postgres.py`).
 - **Politeness & backoff** **[done, #32]** — `study_scraper/http.py`'s
   shared `request_with_retry` gives every fetcher jittered exponential
-  backoff and honours `Retry-After` on 429/503; `config.
-  respect_robots_txt` is the robots.txt floor.
+  backoff and honours `Retry-After` on 429/503. `config.
+  respect_robots_txt` is now actually enforced (self-propose,
+  2026-08-10, DECISIONS.md A39) — was declared but never checked
+  before; `fulltext.py`'s `fetch_url` now raises `RobotsDisallowed`
+  when a host's robots.txt disallows the URL, scoped to that fetch
+  loop only (see A39 for why the discovery source clients don't need
+  it).
 - **Two-layer bookkeeping** **[done]** — falls out of the two items
   above (etag/last-fetch/checksum metadata alongside the "already
   scheduled" keys).

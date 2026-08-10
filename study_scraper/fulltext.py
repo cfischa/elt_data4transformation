@@ -39,7 +39,12 @@ import httpx
 
 from study_scraper.claims import extract_claims_from_text
 from study_scraper.config import get_settings
-from study_scraper.http import get_with_retry, polite_sleep
+from study_scraper.http import (
+    RobotsDisallowed,
+    get_with_retry,
+    polite_sleep,
+    robots_allowed,
+)
 from study_scraper.pdf_resolver import is_pdf_url, resolve_pdf_url
 from study_scraper.storage import PostgresStorage
 
@@ -193,6 +198,7 @@ def fetch_url(
     timeout: float = 60.0,
     headers: Optional[Dict[str, str]] = None,
     transport: Optional[httpx.BaseTransport] = None,
+    respect_robots_txt: Optional[bool] = None,
 ) -> Tuple[Optional[bytes], Optional[str], httpx.Response]:
     """GET one URL; returns (content, content_type, response).
 
@@ -202,14 +208,29 @@ def fetch_url(
     "unchanged, skip processing" rather than an error. Raises on other
     HTTP error statuses via `raise_for_status()`. `transport` lets tests
     inject an `httpx.MockTransport` instead of hitting the network.
+
+    Raises `RobotsDisallowed` when the host's robots.txt disallows `url`
+    for our user agent and `respect_robots_txt` (default: `settings.
+    respect_robots_txt`) is true — this is the actual general-purpose
+    web crawl in this codebase (arbitrary publisher hosts), unlike the
+    source clients that call documented APIs.
     """
     settings = get_settings()
+    check_robots = (
+        settings.respect_robots_txt
+        if respect_robots_txt is None
+        else respect_robots_txt
+    )
     with httpx.Client(
         timeout=timeout,
         headers={"User-Agent": settings.http_user_agent},
         follow_redirects=True,
         transport=transport,
     ) as client:
+        if check_robots and not robots_allowed(
+            client, url, user_agent=settings.http_user_agent
+        ):
+            raise RobotsDisallowed(url)
         resp = get_with_retry(client, url, headers=headers)
         if resp.status_code == 304:
             return None, None, resp
@@ -346,6 +367,13 @@ def run_fulltext(
                     etag=resp.headers.get("etag"),
                     last_modified=resp.headers.get("last-modified"),
                 )
+        except RobotsDisallowed:
+            # A per-host policy, possibly temporary — retried next run
+            # (like fetch_error) rather than marked unfetchable forever.
+            summary = {
+                "study_id": sid, "status": "robots_disallowed", "claims": 0,
+            }
+            LOGGER.info("fulltext %s: robots_disallowed (%s)", sid[:12], url)
         except Exception as exc:
             summary = {
                 "study_id": sid, "status": f"fetch_error: {exc}",
