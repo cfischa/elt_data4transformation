@@ -269,8 +269,10 @@ for our verification layers). All items below have shipped:
 - `bundestag_dip` silent-401 visibility fix (#48 half 2 of 2) — now
   correctly shows `errors>0`; the source itself is still broken (key).
 - Attribution queue reorders registry-topic studies first (A26, #59
-  item 1) — landed 2026-07-19; items 2 (console Questions page) and 3
-  (lake→answers mapping proposal) still open.
+  item 1) — landed 2026-07-19; item 2 (console Questions page, PR
+  #60/#73) shipped by 2026-07-26 too. Only item 3 (lake→answers
+  mapping proposal, design-first/Product-Direction-gated) remains
+  open on #59.
 - Retry-After cap (#53, PR #67), no-signal studies stop re-clogging the
   attribution queue (#68, PR #68, migration 0011), GovData.de source
   built (#64, PR #69 — but see #74, not wired into the crawl),
