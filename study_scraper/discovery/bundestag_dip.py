@@ -17,14 +17,23 @@ Herunterladen" links on https://www.bundestag.de/services/opendata.
 Confirmed live (2026-08-03): identical response schema (`numFound`,
 `documents`, `cursor`, `fundstelle`, `urheber`, ...), same `f.titel`
 filter and cursor pagination, no `apikey` needed, not disallowed by
-bundestag.de's robots.txt. This module now defaults to that mirror.
+bundestag.de's robots.txt. This module defaulted to that mirror from
+2026-08-03.
 
-Auth: an API key sent as the `apikey` query parameter — no longer
-required against the bundestag.de mirror (harmless to send; ignored).
-Kept only so `DEFAULT_BASE_URL` can still be overridden back to the
-official host with a personal key if the mirror ever goes away.
-Resolution order: explicit `api_key=` arg → `DIP_API_KEY` env var → the
-published public key below.
+UPDATE (2026-08-13, issue #106): the mirror above has itself started
+401ing on every request, with or without an `apikey` param — verified
+live, the response body is identical to the canonical host's
+"An API key is required to access this service" error. The no-key hedge
+was NOT durable; this converges back to #48's original blocker. Getting
+`bundestag_dip` producing candidates again requires a maintainer-obtained
+personal key (email infoline.id3@bundestag.de per the DIP help page) set
+as `DIP_API_KEY`. See DECISIONS.md A40.
+
+Auth: an API key sent as the `apikey` query parameter. Currently required
+by both the canonical host and this mirror (as of 2026-08-13). Resolution
+order: explicit `api_key=` arg → `DIP_API_KEY` env var → the published
+public key below (known stale/expired, kept only as the last-resort
+default).
 
 Two modes share one parser (house pattern):
   1. Live — GET /drucksache with `f.titel` per topic keyword,
