@@ -1076,6 +1076,37 @@ project URL + service-role key (placed in `.env`, not committed), or
   rather than permanently flagged like `no_fetchable_url` — a host's
   robots.txt can change).
 
+### A40. A35's no-key `bundestag.de/dip-api` mirror expired — `bundestag_dip` is 401ing again (#106)
+
+- **Date:** 2026-08-13
+- **Problem:** #106 reported all 8/8 `bundestag_dip` topic runs failing
+  again with `401 Unauthorized` in the 2026-08-13 `scheduled-scrape` run,
+  against the no-key mirror A35 switched to on 2026-08-03. The mirror had
+  worked for at least two scheduled runs (2026-08-06, 2026-08-10,
+  `errors=0` across all 8 topics each day) before regressing.
+- **Finding:** verified live (2026-08-13) with three requests: the mirror
+  with no `apikey` param, the mirror with the stale `PUBLIC_API_KEY`
+  query param still hardcoded from A35, and the canonical
+  `search.dip.bundestag.de` host. All three now return the identical
+  401 body — `{"code":401,"message":"An API key is required to access
+  this service. ..."}`. This rules out A35's own #106-anticipated
+  "stray apikey param" theory: the mirror itself has started enforcing
+  auth exactly like the canonical host, independent of any particular
+  query param. Not something `bundestag_dip.py` can route around by
+  itself — this converges back to #48's original blocker.
+- **Decision:** no code fix (there's no client-side bug to fix — see
+  Finding). Documenting per #106's acceptance criteria: the mirror is
+  **not** a durable no-key hedge, and restoring `bundestag_dip` needs a
+  maintainer-obtained personal `DIP_API_KEY` (email
+  infoline.id3@bundestag.de per the DIP help page), set as a repo/
+  workflow secret. Updated the module docstring in
+  `study_scraper/discovery/bundestag_dip.py` to match. Left
+  `DEFAULT_BASE_URL` pointed at the mirror (harmless either way now that
+  both hosts require a key, and the mirror is still the one A35 verified
+  has working `f.titel` filtering and cursor pagination) — whoever adds
+  a real `DIP_API_KEY` should re-verify whether the mirror accepts it
+  before assuming the canonical host is needed instead.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
