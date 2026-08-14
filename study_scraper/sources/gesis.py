@@ -38,15 +38,30 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
+from urllib.error import HTTPError, URLError
 
 try:
     from SPARQLWrapper import JSON as SPARQL_JSON
     from SPARQLWrapper import SPARQLWrapper
+    from SPARQLWrapper.SPARQLExceptions import EndPointInternalError
 except ImportError:  # pragma: no cover - dependency gate
     SPARQL_JSON = None  # type: ignore[assignment]
     SPARQLWrapper = None  # type: ignore[assignment]
+    EndPointInternalError = None  # type: ignore[assignment,misc]
 
+from study_scraper.http import call_with_retry
 from study_scraper.models import SourceRecord
+
+# Retryable per RETRYABLE_STATUS (http.py): rate limiting, transient 5xx,
+# connection-level failures. SPARQLWrapper turns HTTP 400/401/404/414 into
+# distinct, non-retryable exception subclasses (QueryBadFormed/Unauthorized/
+# EndPointNotFound/URITooLong) that this tuple deliberately excludes -- those
+# are our fault or the endpoint's permanent answer, not worth retrying.
+_SPARQL_RETRY_EXCEPTIONS = (
+    (EndPointInternalError, HTTPError, URLError)
+    if EndPointInternalError is not None
+    else ()
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -213,7 +228,9 @@ class GESISSource:
     def _fetch_catalog_page(self, *, offset: int) -> List[str]:
         sw = self._new_wrapper()
         sw.setQuery(_CATALOG_QUERY % (self._page_size, offset))
-        results = sw.query().convert()
+        results = call_with_retry(
+            lambda: sw.query().convert(), retry_on=_SPARQL_RETRY_EXCEPTIONS
+        )
         return [
             b["d"]["value"]
             for b in (results.get("results") or {}).get("bindings") or []
@@ -226,7 +243,9 @@ class GESISSource:
         sw = self._new_wrapper()
         values = " ".join(f"<{u}>" for u in uris)
         sw.setQuery(_BATCH_DETAIL_QUERY % values)
-        results = sw.query().convert()
+        results = call_with_retry(
+            lambda: sw.query().convert(), retry_on=_SPARQL_RETRY_EXCEPTIONS
+        )
         out: Dict[str, List[Dict[str, Any]]] = {}
         for b in (results.get("results") or {}).get("bindings") or []:
             uri = (b.get("d") or {}).get("value")

@@ -13,6 +13,7 @@ import pytest
 
 from study_scraper.http import (
     RETRYABLE_STATUS,
+    call_with_retry,
     get_with_retry,
     polite_sleep,
     request_with_retry,
@@ -173,6 +174,53 @@ def test_retryable_status_set() -> None:
     assert 503 in RETRYABLE_STATUS
     assert 404 not in RETRYABLE_STATUS
     assert 200 not in RETRYABLE_STATUS
+
+
+class TestCallWithRetry:
+    def test_retries_on_configured_exception_then_succeeds(self) -> None:
+        calls = {"n": 0}
+
+        def fn() -> str:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ConnectionError("transient")
+            return "ok"
+
+        sleep, slept = _recording_sleeper()
+        result = call_with_retry(fn, retry_on=(ConnectionError,), sleep=sleep)
+
+        assert result == "ok"
+        assert calls["n"] == 2
+        assert len(slept) == 1
+
+    def test_does_not_retry_unconfigured_exception(self) -> None:
+        calls = {"n": 0}
+
+        def fn() -> str:
+            calls["n"] += 1
+            raise ValueError("client fault")
+
+        sleep, slept = _recording_sleeper()
+        with pytest.raises(ValueError):
+            call_with_retry(fn, retry_on=(ConnectionError,), sleep=sleep)
+
+        assert calls["n"] == 1
+        assert slept == []
+
+    def test_propagates_after_exhausting_retries(self) -> None:
+        calls = {"n": 0}
+
+        def fn() -> str:
+            calls["n"] += 1
+            raise ConnectionError("still down")
+
+        sleep, _ = _recording_sleeper()
+        with pytest.raises(ConnectionError):
+            call_with_retry(
+                fn, retry_on=(ConnectionError,), max_attempts=3, sleep=sleep
+            )
+
+        assert calls["n"] == 3
 
 
 class TestRobotsAllowed:

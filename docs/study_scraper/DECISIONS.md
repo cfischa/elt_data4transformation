@@ -1107,6 +1107,29 @@ project URL + service-role key (placed in `.env`, not committed), or
   a real `DIP_API_KEY` should re-verify whether the mirror accepts it
   before assuming the canonical host is needed instead.
 
+### A41. GESIS/Eurobarometer SPARQL sources now retry transient failures too (#108)
+
+- **Date:** 2026-08-14
+- **Problem:** every other source (`ssoar`, `openalex`, `bundestag_dip`,
+  `core_search`, `dawum`, `eurostat`, `govdata`) routes HTTP through
+  `http.py`'s `get_with_retry` (jittered exponential backoff, honours
+  `Retry-After` on 429/5xx, #32). `gesis.py` and `eurobarometer.py` called
+  `SPARQLWrapper.query().convert()` directly with no retry — a transient
+  hiccup on `data.gesis.org/gesiskg/sparql` would zero out the whole run
+  in one shot, the same failure mode #100 saw for SSOAR but with no
+  cushion at all.
+- **Decision:** added `http.call_with_retry`, a transport-agnostic sibling
+  of `request_with_retry` that takes a zero-arg callable and a tuple of
+  retryable exception types (no `Retry-After` support, since
+  SPARQLWrapper's exceptions don't carry response headers the way
+  `httpx`'s do). `gesis.py`/`eurobarometer.py` wrap
+  `sw.query().convert()` in it, retrying on `EndPointInternalError`
+  (SPARQLWrapper's name for HTTP 500), raw `HTTPError` (covers 429/502/
+  503/504 — SPARQLWrapper already turns 400/401/404/414 into distinct
+  non-retryable exception subclasses, so a bare `HTTPError` can't be one
+  of those), and `URLError` (connection-level failures). This mirrors
+  `RETRYABLE_STATUS`'s reasoning exactly without needing a new constant.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

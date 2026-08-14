@@ -186,6 +186,55 @@ class TestHelpers:
         assert _first_literal(triples, _TITLE_PROPS) == "Title"
 
 
+class _FakeSPARQLWrapper:
+    """Stands in for SPARQLWrapper's ``query().convert()`` chain, replaying
+    a scripted sequence of results/exceptions on each call."""
+
+    def __init__(self, results: list) -> None:
+        self._results = list(results)
+
+    def setQuery(self, query: str) -> None:
+        pass
+
+    def query(self) -> "_FakeSPARQLWrapper":
+        return self
+
+    def convert(self) -> dict:
+        item = self._results.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
+class TestLiveRetry:
+    """The live SPARQL path retries transient failures (agent:task #108),
+    matching the retry policy every other source already gets via
+    `http.get_with_retry`."""
+
+    _EMPTY_PAGE = {"results": {"bindings": []}}
+
+    def test_transient_error_is_retried_then_succeeds(self) -> None:
+        from urllib.error import HTTPError
+
+        fake = _FakeSPARQLWrapper(
+            [HTTPError("url", 503, "slow down", None, None), self._EMPTY_PAGE]
+        )
+        src = GESISSource()
+        src._new_wrapper = lambda: fake  # type: ignore[method-assign]
+
+        assert src._fetch_catalog_page(offset=0) == []
+
+    def test_client_fault_error_is_not_retried(self) -> None:
+        from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
+
+        fake = _FakeSPARQLWrapper([QueryBadFormed(b"bad query")])
+        src = GESISSource()
+        src._new_wrapper = lambda: fake  # type: ignore[method-assign]
+
+        with pytest.raises(QueryBadFormed):
+            src._fetch_catalog_page(offset=0)
+
+
 # --------------------------------------------------------------------------
 # Integration: lake ingest end-to-end
 # --------------------------------------------------------------------------

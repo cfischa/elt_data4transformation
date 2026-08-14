@@ -71,15 +71,19 @@ def _parse_retry_after(response: httpx.Response) -> Optional[float]:
     return max(0.0, seconds)
 
 
+def _backoff_delay(attempt: int, base_delay: float) -> float:
+    """Exponential backoff with full jitter, capped."""
+    ceiling = min(base_delay * (2 ** (max(1, attempt) - 1)), _MAX_BACKOFF)
+    return random.uniform(0.0, ceiling)
+
+
 def _wait_seconds(state: Any, base_delay: float) -> float:
     """Honour ``Retry-After`` when the upstream gave one, else exponential
     backoff with full jitter, capped."""
     exc = state.outcome.exception() if state.outcome else None
     if isinstance(exc, RetryableResponse) and exc.retry_after is not None:
         return min(exc.retry_after, _MAX_RETRY_AFTER)
-    attempt = max(1, state.attempt_number)
-    ceiling = min(base_delay * (2 ** (attempt - 1)), _MAX_BACKOFF)
-    return random.uniform(0.0, ceiling)  # full jitter
+    return _backoff_delay(state.attempt_number, base_delay)
 
 
 def request_with_retry(
@@ -127,6 +131,32 @@ def get_with_retry(
 ) -> httpx.Response:
     """Convenience wrapper for the common GET case."""
     return request_with_retry(client, "GET", url, **kwargs)
+
+
+def call_with_retry(
+    fn: Callable[[], Any],
+    *,
+    retry_on: tuple,
+    max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+    base_delay: float = _DEFAULT_BASE_DELAY,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Any:
+    """Transport-agnostic sibling of :func:`request_with_retry` for clients
+    that don't speak httpx (e.g. SPARQLWrapper, which raises urllib
+    exceptions instead of returning an inspectable response). Same jittered
+    exponential backoff; no ``Retry-After`` awareness since these
+    exceptions don't carry response headers the way ``RetryableResponse``
+    does. Callers pass the exception types worth retrying (transient
+    upstream trouble) so client-fault errors still propagate immediately.
+    """
+    retrying = Retrying(
+        stop=stop_after_attempt(max_attempts),
+        wait=lambda state: _backoff_delay(state.attempt_number, base_delay),
+        retry=retry_if_exception_type(retry_on),
+        sleep=sleep,
+        reraise=True,
+    )
+    return retrying(fn)
 
 
 def polite_sleep(
