@@ -12,49 +12,54 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Re-prioritized 2026-08-10: `bundestag_dip` came back to life (PR #91,
-A35/A36 — switched to a no-key `bundestag.de/dip-api` mirror, merged
-2026-08-03) and is now producing real data: **1,115 studies live**
-2026-08-10. Checked live DB per-topic-per-source breakdown today —
-**`GOAL.md`'s topic-coverage criterion (≥50 studies/topic from ≥3
-sources) is now MET for all 8 topics** (openalex+ssoar+bundestag_dip
-each contribute ≥40, most ≥130, per topic). #88 (BASE) and #89
-(bundestag.de XML dumps) closed as superseded — CORE (#94) and the DIP
-fix (#91) solved what they were chasing via different routes. The
-remaining gap on the *source-coverage* criterion (≥8 production
-sources) is now purely mechanical: only 6 distinct sources have ever
-produced a successful `crawl_runs` row (ssoar, openalex, bundestag_dip,
-dawum, gesis, eurostat); core/eurobarometer/govdata are built,
-fixture-tested, and simply never added to `scrape.yml` (#65,
-consolidated, needs-human, now priority:high — it's the single change
-standing between 6 and 9 sources).
+Updated 2026-08-17: `bundestag_dip` **regressed back to 401** (#106,
+DECISIONS.md A40) after only 2 working scheduled runs (08-06, 08-10) —
+the no-key mirror A35 switched to on 08-03 has started enforcing auth
+again, converging back to #48's original blocker (needs a real personal
+`DIP_API_KEY`; no code fix possible). Stuck at **1,115 studies** since
+08-10 while `openalex`/`ssoar` keep growing. **`GOAL.md`'s topic-coverage
+criterion stays MET** (all 8 topics ≥680 studies from ≥3 sources — a
+source going quiet doesn't un-ingest what it already contributed). The
+*source-coverage* criterion (≥8 production sources) is unchanged: still
+only 6 distinct sources have ever produced a successful `crawl_runs` row;
+core/eurobarometer/govdata remain built, fixture-tested, and simply never
+added to `scrape.yml` (#65). **New this week:** the attribution pipeline
+went fully dark for 6+ days (76 attributions since 08-11, zero net-new),
+including a 2026-08-14 run that reported success (17 turns, $0.87 cost)
+but wrote zero `attribution_attempts` rows — a distinct regression from
+the known cadence bottleneck. Filed #110 (priority:high, in-scope) so
+`status --json` surfaces this kind of silent stall automatically instead
+of needing manual Postgres-timestamp tracking in issue comments.
 
 1. **Wire core + eurobarometer + govdata into the scheduled crawl**
    (issue #65, priority:high, needs-human) — three ready-to-run
    sources, zero live records, one `scrape.yml` edit each (exact lines
-   in the issue). This is now the highest-leverage ask: it directly
+   in the issue). Still the highest-leverage ask: it directly
    clears `GOAL.md`'s ≥8-production-sources bar in one PR.
-2. **Attribution throughput** (issue #49) **[needs-human]** — `claims`
-   at 7,620 rows and still climbing every crawl; `attributions` stuck
-   at **75** since 2026-08-04 (6 days, one zero-yield `scheduled-attribute`
-   run in between). The #68 no-signal fix keeps the queue itself healthy
-   (383, draining even on zero-yield runs), so the only remaining lever
-   is `scheduled-attribute`'s cadence/`--limit` in
-   `.github/workflows/attribute.yml`, out of both agents' edit scope.
-   Still the single biggest lever on the *answering* half of the goal —
-   5 straight weekly updates with no movement.
+2. **Attribution throughput + dark-pipeline stall** (issue #49)
+   **[needs-human]** — `claims` at 9,202 rows and still climbing every
+   crawl; `attributions` stuck at **76** since 2026-08-11 (6+ days,
+   including a run that "succeeded" but wrote zero rows — see #49's
+   08-14/08-17 comments). The cadence half
+   (`scheduled-attribute`'s twice-weekly/`--limit 40` in
+   `.github/workflows/attribute.yml`) is still out of both agents' edit
+   scope; #110 (new, in-scope) adds a staleness signal so this doesn't
+   require manual tracking again. Still the single biggest lever on the
+   *answering* half of the goal.
 3. **Topic-content gap** (issue #50, priority:high, open since
-   2026-06-26 — 6+ weeks) **[needs-human]** — maintainer's ask
+   2026-06-26 — 7+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
    topic) needs `config/topics/topics.csv` + `questions.yml`, both
    outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
-   neither agent can build it as scoped.
-4. **`bundestag_dip`** (issue #48) **[done 2026-08-03]** — PR #91
-   switched to the no-key `bundestag.de/dip-api/api/v1` mirror
-   (DECISIONS.md A35/A36) instead of waiting on a `DIP_API_KEY`. Live
-   2026-08-10: **1,115 studies**, feeding all 8 topics. Closes the
-   "only 2 sources feed `studies`" gap that blocked `GOAL.md`'s
-   topic-coverage bar — see the P1 intro above.
+   neither agent can build it as scoped. Scouted 2026-08-17 for an API
+   alternative to hand-editing keywords (a structured Russia/Ukraine
+   opinion-data source) — found none free/no-auth; stays a config edit.
+4. **`bundestag_dip`** (issue #48, reopened in spirit as #106/A40) —
+   **regressed 2026-08-13**, still 401ing 2026-08-17. PR #91's no-key
+   mirror (A35/A36) worked for exactly 2 scheduled runs before the
+   mirror itself started requiring auth. No further code fix available;
+   converges back to needing a real `DIP_API_KEY`
+   (`infoline.id3@bundestag.de`).
 5. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
@@ -114,18 +119,19 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-08-03 live DB): **catalog** OpenAlex (5,266) +
-SSOAR (576), and **Bundestag DIP (1,115, live since 2026-08-03 fix)** —
-academic + government, three sources now feeding the `studies` table
-(GOAL.md's topic-coverage bar is met, see P1 intro); **lake** DAWUM
-(vote intention, 3,893 rows), GESIS KG (survey catalog, 500), Eurostat
-(official stats, 3 — thin by design). **CORE, Eurobarometer, GovData.de
-are all built and fixture-tested but have 0 live records** — none was
-ever added to `scrape.yml`'s crawl step (issue #65, consolidated,
-priority:high). The remaining representativeness gap is *source-count*
-(6 of 8 sources ever actually run; #65 closes it in one PR) — topic and
-government-category coverage are no longer the binding constraint now
-that `bundestag_dip` works. Ranked by yield per effort:
+Current coverage (2026-08-17 live DB): **catalog** OpenAlex (5,321) +
+SSOAR (625), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
+again, #106/A40)** — academic + government, three sources have fed the
+`studies` table (GOAL.md's topic-coverage bar is met and stays met, see
+P1 intro); **lake** DAWUM (vote intention, ~3,900 rows), GESIS KG
+(survey catalog, 500), Eurostat (official stats, 3 — thin by design).
+**CORE, Eurobarometer, GovData.de are all built and fixture-tested but
+have 0 live records** — none was ever added to `scrape.yml`'s crawl step
+(issue #65, consolidated, priority:high). The remaining representativeness
+gap is *source-count* (6 of 8 sources ever actually run; #65 closes it in
+one PR) — topic coverage is no longer the binding constraint, and
+government-category coverage now depends on a fresh `DIP_API_KEY` rather
+than code. Ranked by yield per effort:
 
 5. **CORE** (issue #94, shipped 2026-08-07, A38) **[done, code — see
    #65]** — third `studies`-table catalog source (`api.core.ac.uk`,
@@ -148,24 +154,27 @@ that `bundestag_dip` works. Ranked by yield per effort:
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
 
-### Scouted this round (2026-08-10)
+### Scouted this round (2026-08-17)
 
-- **Wohnen/Mieten structured survey data** — searched for a housing-
-  opinion equivalent of DAWUM; found only Destatis Microcensus housing
-  supplement (official stats, not opinion, already reachable via
-  Destatis GENESIS, item 11) and city-specific Mietspiegel surveys
-  (methodology reports, not open microdata, one city at a time). No
-  new source.
-- **Civey** (re-checked; already cited as a study source via SSOAR/
-  OpenAlex secondary reporting, e.g. the "Kernkraft nutzen" longitudinal
-  series) — confirmed it has no free/public API; access is behind a
-  paid corporate account (`civey.com/loesungen/kommunikation`). Not
-  buildable as a structured source; the existing catalog sources
-  already pick up Civey numbers when a study/article cites them.
-- Net: no new source module to propose this week — same as the last
-  two scouting rounds (07-20, 07-27). The frontier candidates remain
-  the needs-human ones already tracked (items 11-13 below) plus the
-  tier-3 `SitemapSource` play (item 10).
+- **Russia/Ukraine opinion data (API)** — searched specifically as an
+  alternative path to #50's `russland_ukraine` topic ask (which is
+  blocked on a `config/**` edit no agent can make). Found plenty of
+  *reporting* (Statista — paywalled; bpb.de Ukraine-/Russland-Analysen,
+  ARD-DeutschlandTrend via infratest dimap — HTML only, no API) but
+  nothing structured/free. Confirms bpb.de stays a tier-3
+  `SitemapSource` candidate (item 15), not a standalone win.
+- **Destatis GENESIS re-verified** — an earlier stray search result
+  implied "no registration needed"; checked the actual webservice docs
+  and confirmed the REST/JSON API still requires a personal
+  username+password or token (registration is free, but it's still a
+  credential, not a truly keyless API). No change to its `needs-human`
+  classification (item 11).
+- Net: no new source module to propose — 4th consecutive scouting round
+  (08-03, 08-10, 08-17 count as the same "nothing new" streak once you
+  include the 07-20/07-27 pair before it) with no buildable find. The
+  free/no-auth source frontier for this project looks exhausted for now;
+  remaining candidates are all needs-human (credentials, items 11-13) or
+  the tier-3 `SitemapSource` play (item 10).
 
 ### Scouted and rejected 2026-07-27/08-03
 
@@ -287,8 +296,15 @@ for our verification layers). All items below have shipped:
   Eurostat config-driven default codes (#84, A33) and JSON-stat typed
   projection (#86, A34, PR #87) — all landed 2026-07-29 through 08-02.
 - `bundestag_dip` no-key mirror fix (#91, A35/A36) — landed 2026-08-03,
-  **confirmed live 2026-08-10**: 1,115 studies, all 8 topics, closing the
-  3-week-old 401 outage (#48). CORE catalog source (#94, A38) — landed
-  2026-08-07. Both close `GOAL.md`'s topic-coverage bar; #65 (consolidated
-  core+eurobarometer+govdata wiring) is the one remaining gap on the
-  source-coverage bar.
+  confirmed live 2026-08-10 (1,115 studies, all 8 topics), then
+  **regressed to 401 again 2026-08-13** (#106, A40 — the mirror itself
+  started requiring auth; converges back to #48's original
+  `DIP_API_KEY` ask, no further code fix available). CORE catalog
+  source (#94, A38) — landed 2026-08-07. Both closed `GOAL.md`'s
+  topic-coverage bar and it stays closed regardless of the regression;
+  #65 (consolidated core+eurobarometer+govdata wiring) is the one
+  remaining gap on the source-coverage bar.
+- GESIS/Eurobarometer SPARQL retry/backoff (#108, A41) — landed
+  2026-08-14. `status.py` attribution-staleness signal (#110, new,
+  priority:high) — filed 2026-08-17 after the attribution pipeline went
+  dark for 6+ days with no automatic signal (see #49).
