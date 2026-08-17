@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -65,6 +66,64 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.keep_rate is None
     assert report.duplicate_rate is None
     assert report.duplicates_total == 0
+    assert report.attribution_days_since_last_attempt is None
+
+
+def _seed_study(storage: PostgresStorage, *, title: str):
+    from study_scraper.models import Provenance, Study
+
+    study = Study.build(
+        canonical_url=f"https://example.org/{abs(hash(title))}",
+        title=title,
+        abstract="50% support the policy.",
+        publication_date=None,
+        fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        source_id="openalex",
+        provenance=Provenance(discovery_source="openalex"),
+        topic_ids=["klima"],
+        topic_scores={"klima": 0.5},
+    )
+    storage.upsert_study(study)
+    return study
+
+
+def test_status_attribution_staleness_recent(storage: PostgresStorage) -> None:
+    """#110: a fresh attribution_attempts row reads as ~0 days stale."""
+    from study_scraper.attribute import apply_responses
+
+    s = _seed_study(storage, title="Recent Attempt")
+    response = json.dumps({"attributions": [
+        {"question": "Q", "position": "support", "percentage": 50,
+         "population": None, "confidence": 0.7},
+    ]})
+    apply_responses(storage=storage, responses={s.id: response})
+
+    report = build_status(storage)
+    assert report.attribution_days_since_last_attempt is not None
+    assert 0.0 <= report.attribution_days_since_last_attempt < 1.0
+
+    text = format_text(report)
+    assert "attribution last attempt" in text
+
+
+def test_status_attribution_staleness_stale(storage: PostgresStorage) -> None:
+    """A stale (>3 day old) attribution_attempts row must surface as such,
+    e.g. the 2026-08-11..2026-08-17 dark-pipeline window from #110."""
+    s = _seed_study(storage, title="Stale Attempt")
+    stale_ts = datetime.now(timezone.utc) - timedelta(days=6)
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO study_scraper.attribution_attempts "
+                "(study_id, model, found, attempted_at) "
+                "VALUES (%s, %s, %s, %s)",
+                (s.id, "llm-v1", 0, stale_ts),
+            )
+        conn.commit()
+
+    report = build_status(storage)
+    assert report.attribution_days_since_last_attempt is not None
+    assert report.attribution_days_since_last_attempt >= 5.9
 
 
 def test_status_after_two_source_run(

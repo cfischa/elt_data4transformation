@@ -45,6 +45,11 @@ class StatusReport:
     # (DOI or title-similarity match, see storage.upsert_study) rather
     # than landing as a new row -- the "waste" of a re-fetch (issue #82).
     duplicates_total: int = 0
+    # How long since the attribution pass last actually wrote a row --
+    # None if attribution_attempts is empty (never run). A run that
+    # completes "successfully" in CI but writes zero attempts (#110)
+    # otherwise looks identical to a healthy pipeline in status output.
+    attribution_days_since_last_attempt: Optional[float] = None
 
     @property
     def pending_count(self) -> int:
@@ -221,8 +226,22 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
                 row["format"]: int(row["c"]) for row in cur.fetchall()
             }
 
+            # Attribution staleness -- #110.
+            cur.execute(
+                f"SELECT MAX(attempted_at) AS last_attempt "
+                f"FROM {SCHEMA}.attribution_attempts"
+            )
+            last_attribution_attempt = cur.fetchone()["last_attempt"]
+
+    generated_at = datetime.now(timezone.utc)
+    attribution_days_since_last_attempt = (
+        (generated_at - last_attribution_attempt).total_seconds() / 86400.0
+        if last_attribution_attempt is not None
+        else None
+    )
+
     return StatusReport(
-        generated_at=datetime.now(timezone.utc),
+        generated_at=generated_at,
         total_studies=total_studies,
         studies_with_quant=studies_with_quant,
         studies_per_status=studies_per_status,
@@ -240,6 +259,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         candidates_seen_total=int(run_row["seen"]),
         candidates_kept_total=int(run_row["kept"]),
         duplicates_total=int(run_row["duplicates"]),
+        attribution_days_since_last_attempt=attribution_days_since_last_attempt,
     )
 
 
@@ -262,6 +282,13 @@ def format_text(report: StatusReport) -> str:
     lines.append(f"  duplicates (already known) : {report.duplicates_total}"
                  + (f"  ({report.duplicate_rate:.1%} of seen)"
                     if report.duplicate_rate is not None else ""))
+    if report.attribution_days_since_last_attempt is None:
+        lines.append("  attribution last attempt   : never")
+    else:
+        lines.append(
+            "  attribution last attempt   : "
+            f"{report.attribution_days_since_last_attempt:.1f} days ago"
+        )
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:
