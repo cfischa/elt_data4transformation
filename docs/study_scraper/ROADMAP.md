@@ -69,12 +69,12 @@ of needing manual Postgres-timestamp tracking in issue comments.
    (issue #71) **[done 2026-07-30]** — topic-crawl order now rotates by
    `GITHUB_RUN_NUMBER` (A32). Confirmed working live 2026-08-03: both
    topics' openalex counts roughly doubled/tripled week over week.
-7. **SSOAR outage, 8/8 topics failed 2026-08-10** (issue #100, new,
-   filed by the monitor agent) — first fully-failed SSOAR day since
-   late June (503/connection-refused on every topic). Likely a
-   transient upstream outage; watch the next `scheduled-scrape` run
-   (2026-08-13) to confirm it self-resolves before treating as a code
-   issue.
+7. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
+   #100]** — confirmed transient upstream outage: `ssoar` ran clean on
+   both the 2026-08-13 and 2026-08-17 scheduled runs (`errors=0` across
+   all 8 topics each time; live `status` on 2026-08-18 shows 625 total
+   SSOAR studies still growing). No repeat since 08-10 — no retry/backoff
+   hardening needed per the issue's own acceptance criteria.
 
 ## Answer-layer statistics — correctness upgrades (audited 2026-07-04; B+C = issue #39)
 
@@ -308,3 +308,6 @@ for our verification layers). All items below have shipped:
   2026-08-14. `status.py` attribution-staleness signal (#110, new,
   priority:high) — filed 2026-08-17 after the attribution pipeline went
   dark for 6+ days with no automatic signal (see #49).
+- SSOAR 8/8-topic outage (#100) — confirmed transient upstream, no
+  repeat on the 2026-08-13 or 2026-08-17 scheduled runs; closed
+  2026-08-18.
