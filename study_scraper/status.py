@@ -50,6 +50,14 @@ class StatusReport:
     # completes "successfully" in CI but writes zero attempts (#110)
     # otherwise looks identical to a healthy pipeline in status output.
     attribution_days_since_last_attempt: Optional[float] = None
+    # How long since each source's last *clean* crawl run (errors = 0,
+    # not aborted) -- None if the source has never had one. Generalizes
+    # #110's attribution signal to crawl sources so a silent regression
+    # (e.g. bundestag_dip's recurring 401s, #106) shows up here instead
+    # of needing a human to diff `crawl_runs` timestamps by hand.
+    source_days_since_last_success: Dict[str, Optional[float]] = field(
+        default_factory=dict
+    )
 
     @property
     def pending_count(self) -> int:
@@ -179,6 +187,24 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             )
             runs_per_source = {row["source_id"]: int(row["c"]) for row in cur.fetchall()}
 
+            # Per-source staleness (#115, generalizing #110): the most
+            # recent *clean* run per source, same "clean" definition as
+            # the successful/failed split above (errors = 0 and not
+            # aborted).
+            cur.execute(
+                f"""
+                SELECT source_id, MAX(started_at) AS last_success
+                FROM   {SCHEMA}.crawl_runs
+                WHERE  errors = 0
+                  AND  NOT (finished_at IS NULL
+                            AND COALESCE(notes, '') LIKE 'aborted:%')
+                GROUP  BY source_id
+                """
+            )
+            last_success_per_source = {
+                row["source_id"]: row["last_success"] for row in cur.fetchall()
+            }
+
             cur.execute(
                 f"""
                 SELECT id, source_id, topic_id, started_at, finished_at,
@@ -239,6 +265,15 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         if last_attribution_attempt is not None
         else None
     )
+    source_days_since_last_success = {
+        source_id: (
+            (generated_at - last_success_per_source[source_id]).total_seconds()
+            / 86400.0
+            if last_success_per_source.get(source_id) is not None
+            else None
+        )
+        for source_id in runs_per_source
+    }
 
     return StatusReport(
         generated_at=generated_at,
@@ -260,6 +295,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         candidates_kept_total=int(run_row["kept"]),
         duplicates_total=int(run_row["duplicates"]),
         attribution_days_since_last_attempt=attribution_days_since_last_attempt,
+        source_days_since_last_success=source_days_since_last_success,
     )
 
 
@@ -301,6 +337,17 @@ def format_text(report: StatusReport) -> str:
     if report.studies_per_source:
         for source_id, n in report.studies_per_source.items():
             lines.append(f"    {source_id:<28} {n}")
+    else:
+        lines.append("    (none)")
+    lines.append("")
+    lines.append("  crawl staleness per source (days since last clean run):")
+    if report.source_days_since_last_success:
+        for source_id, days in sorted(
+            report.source_days_since_last_success.items(),
+            key=lambda kv: (kv[1] is None, -(kv[1] or 0)),
+        ):
+            shown = "never" if days is None else f"{days:.1f}"
+            lines.append(f"    {source_id:<28} {shown}")
     else:
         lines.append("    (none)")
     lines.append("")
