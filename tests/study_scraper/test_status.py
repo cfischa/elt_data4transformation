@@ -242,6 +242,87 @@ def test_status_does_not_flag_in_progress_lake_run_as_failed(
     assert "ERR" not in text
 
 
+def test_status_source_staleness_no_runs(storage: PostgresStorage) -> None:
+    """A source that has never run doesn't appear in the staleness map."""
+    report = build_status(storage)
+    assert report.source_days_since_last_success == {}
+
+
+def test_status_source_staleness_recent_clean_run(storage: PostgresStorage) -> None:
+    """#115: a source's most recent clean run reads as ~0 days stale."""
+    run = CrawlRun(
+        id=str(uuid.uuid4()),
+        source_id="ssoar",
+        topic_id="klima",
+        started_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc),
+        errors=0,
+    )
+    storage.record_crawl_run(run)
+
+    report = build_status(storage)
+    days = report.source_days_since_last_success["ssoar"]
+    assert days is not None
+    assert 0.0 <= days < 1.0
+
+    text = format_text(report)
+    assert "crawl staleness per source" in text
+    assert "ssoar" in text
+
+
+def test_status_source_staleness_ignores_errored_runs(
+    storage: PostgresStorage,
+) -> None:
+    """A source whose only runs errored/aborted (e.g. bundestag_dip's
+    recurring 401s, #106) must read as never-clean, not as fresh just
+    because it kept attempting."""
+    run = CrawlRun(
+        id=str(uuid.uuid4()),
+        source_id="bundestag_dip",
+        topic_id="klima",
+        started_at=datetime.now(timezone.utc),
+        finished_at=None,
+        errors=0,
+        notes="aborted: 401 Unauthorized",
+    )
+    storage.record_crawl_run(run)
+
+    report = build_status(storage)
+    assert report.source_days_since_last_success["bundestag_dip"] is None
+
+
+def test_status_source_staleness_uses_last_clean_run_when_stale(
+    storage: PostgresStorage,
+) -> None:
+    """A stale (>3 day old) last-clean-run must surface as such even if
+    more recent runs for the same source errored."""
+    stale_ts = datetime.now(timezone.utc) - timedelta(days=6)
+    clean = CrawlRun(
+        id=str(uuid.uuid4()),
+        source_id="bundestag_dip",
+        topic_id="klima",
+        started_at=stale_ts,
+        finished_at=stale_ts,
+        errors=0,
+    )
+    storage.record_crawl_run(clean)
+    recent_failure = CrawlRun(
+        id=str(uuid.uuid4()),
+        source_id="bundestag_dip",
+        topic_id="klima",
+        started_at=datetime.now(timezone.utc),
+        finished_at=None,
+        errors=0,
+        notes="aborted: 401 Unauthorized",
+    )
+    storage.record_crawl_run(recent_failure)
+
+    report = build_status(storage)
+    days = report.source_days_since_last_success["bundestag_dip"]
+    assert days is not None
+    assert days >= 5.9
+
+
 def test_status_counts_lake_records(
     storage: PostgresStorage, topics_list
 ) -> None:
