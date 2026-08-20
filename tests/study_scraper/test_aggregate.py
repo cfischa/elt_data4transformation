@@ -140,7 +140,7 @@ class TestPopulationCells:
              "percentage": 30.0, "population": "Ostdeutsche",
              "publication_date": dt.date(2025, 1, 1)},
         ]
-        answers = aggregate_findings(rows)
+        answers = aggregate_findings(rows, today=TODAY)
         assert len(answers) == 1
         cells = answers[0].positions
         assert len(cells) == 2  # one per population, NOT one pooled mean
