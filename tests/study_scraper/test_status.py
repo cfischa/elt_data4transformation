@@ -126,6 +126,48 @@ def test_status_attribution_staleness_stale(storage: PostgresStorage) -> None:
     assert report.attribution_days_since_last_attempt >= 5.9
 
 
+def test_status_attribution_yield_no_attempts(storage: PostgresStorage) -> None:
+    report = build_status(storage)
+    assert report.attribution_last_run_attempts == 0
+    assert report.attribution_last_run_found == 0
+    assert report.attribution_last_run_yield_rate is None
+
+
+def test_status_attribution_yield_last_run(storage: PostgresStorage) -> None:
+    """#119: yield of the most recent run, distinct from staleness --
+    an on-cadence run that mostly finds nothing must still be visible."""
+    a = _seed_study(storage, title="Yield A")
+    b = _seed_study(storage, title="Yield B")
+    c = _seed_study(storage, title="Yield C")
+    # An older run (different day) must not be counted in "last run".
+    old_ts = datetime.now(timezone.utc) - timedelta(days=3)
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO study_scraper.attribution_attempts "
+                "(study_id, model, found, attempted_at) VALUES (%s, %s, %s, %s)",
+                (a.id, "llm-v1", 5, old_ts),
+            )
+        conn.commit()
+
+    response = json.dumps({"attributions": [
+        {"question": "Q", "position": "support", "percentage": 50,
+         "population": None, "confidence": 0.7},
+    ]})
+    from study_scraper.attribute import apply_responses
+
+    # b: found > 0 via a real attribution; c: found = 0 (no triples).
+    apply_responses(storage=storage, responses={b.id: response, c.id: "{}"})
+
+    report = build_status(storage)
+    assert report.attribution_last_run_attempts == 2
+    assert report.attribution_last_run_found == 1
+    assert report.attribution_last_run_yield_rate == pytest.approx(0.5)
+
+    text = format_text(report)
+    assert "attribution last run yield" in text
+
+
 def test_status_after_two_source_run(
     storage: PostgresStorage, topics_list
 ) -> None:

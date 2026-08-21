@@ -58,6 +58,19 @@ class StatusReport:
     source_days_since_last_success: Dict[str, Optional[float]] = field(
         default_factory=dict
     )
+    # Yield of the most recent attribution run (the latest calendar day
+    # present in attribution_attempts) -- #49's monitor updates repeatedly
+    # hand-computed "N attempts, M found" from Postgres to track a
+    # declining-yield concern distinct from the staleness signal above
+    # (a run can be fresh/on-cadence and still find almost nothing).
+    attribution_last_run_attempts: int = 0
+    attribution_last_run_found: int = 0
+
+    @property
+    def attribution_last_run_yield_rate(self) -> Optional[float]:
+        if self.attribution_last_run_attempts == 0:
+            return None
+        return self.attribution_last_run_found / self.attribution_last_run_attempts
 
     @property
     def pending_count(self) -> int:
@@ -259,6 +272,24 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             )
             last_attribution_attempt = cur.fetchone()["last_attempt"]
 
+            # Attribution yield of the most recent run -- #119. Attempts
+            # are written in one batch per invocation, so the latest
+            # calendar day present is "the last run" even though there's
+            # no explicit run id column on attribution_attempts.
+            cur.execute(
+                f"""
+                SELECT COUNT(*) AS attempts,
+                       COUNT(*) FILTER (WHERE found > 0) AS found
+                FROM   {SCHEMA}.attribution_attempts
+                WHERE  attempted_at::date = (
+                    SELECT MAX(attempted_at::date) FROM {SCHEMA}.attribution_attempts
+                )
+                """
+            )
+            yield_row = cur.fetchone()
+            attribution_last_run_attempts = int(yield_row["attempts"] or 0)
+            attribution_last_run_found = int(yield_row["found"] or 0)
+
     generated_at = datetime.now(timezone.utc)
     attribution_days_since_last_attempt = (
         (generated_at - last_attribution_attempt).total_seconds() / 86400.0
@@ -296,6 +327,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         duplicates_total=int(run_row["duplicates"]),
         attribution_days_since_last_attempt=attribution_days_since_last_attempt,
         source_days_since_last_success=source_days_since_last_success,
+        attribution_last_run_attempts=attribution_last_run_attempts,
+        attribution_last_run_found=attribution_last_run_found,
     )
 
 
@@ -324,6 +357,12 @@ def format_text(report: StatusReport) -> str:
         lines.append(
             "  attribution last attempt   : "
             f"{report.attribution_days_since_last_attempt:.1f} days ago"
+        )
+    if report.attribution_last_run_attempts:
+        lines.append(
+            "  attribution last run yield : "
+            f"{report.attribution_last_run_found}/{report.attribution_last_run_attempts}"
+            f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
     lines.append("")
     lines.append("  studies per topic:")
