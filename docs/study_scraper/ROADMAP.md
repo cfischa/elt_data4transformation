@@ -311,3 +311,9 @@ for our verification layers). All items below have shipped:
 - SSOAR 8/8-topic outage (#100) — confirmed transient upstream, no
   repeat on the 2026-08-13 or 2026-08-17 scheduled runs; closed
   2026-08-18.
+- `status.py` per-source crawl staleness (#115) — landed 2026-08-20.
+  Attribution run yield rate (#119, self-proposed) — `status` now
+  surfaces the most recent run's found/attempts alongside the existing
+  staleness signal, so the low/volatile "found" rate #49's monitor
+  updates kept hand-computing from Postgres (e.g. 08-18: 0/40, 08-21:
+  13/40) is visible without a manual query.
