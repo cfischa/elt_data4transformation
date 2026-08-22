@@ -139,6 +139,7 @@ def test_status_attribution_yield_last_run(storage: PostgresStorage) -> None:
     a = _seed_study(storage, title="Yield A")
     b = _seed_study(storage, title="Yield B")
     c = _seed_study(storage, title="Yield C")
+    d = _seed_study(storage, title="Yield D")
     # An older run (different day) must not be counted in "last run".
     old_ts = datetime.now(timezone.utc) - timedelta(days=3)
     with storage.connection() as conn:
@@ -154,15 +155,28 @@ def test_status_attribution_yield_last_run(storage: PostgresStorage) -> None:
         {"question": "Q", "position": "support", "percentage": 50,
          "population": None, "confidence": 0.7},
     ]})
+    # d yields two triples, so SUM(found) and COUNT(*) FILTER (WHERE
+    # found > 0) diverge (2 vs 1) -- proves the metric is a true sum,
+    # not a "did this attempt find anything" flag (#121).
+    multi_response = json.dumps({"attributions": [
+        {"question": "Q1", "position": "support", "percentage": 50,
+         "population": None, "confidence": 0.7},
+        {"question": "Q2", "position": "oppose", "percentage": 30,
+         "population": None, "confidence": 0.6},
+    ]})
     from study_scraper.attribute import apply_responses
 
-    # b: found > 0 via a real attribution; c: found = 0 (no triples).
-    apply_responses(storage=storage, responses={b.id: response, c.id: "{}"})
+    # b: found = 1 via a real attribution; c: found = 0 (no triples);
+    # d: found = 2 via two real attributions.
+    apply_responses(
+        storage=storage,
+        responses={b.id: response, c.id: "{}", d.id: multi_response},
+    )
 
     report = build_status(storage)
-    assert report.attribution_last_run_attempts == 2
-    assert report.attribution_last_run_found == 1
-    assert report.attribution_last_run_yield_rate == pytest.approx(0.5)
+    assert report.attribution_last_run_attempts == 3
+    assert report.attribution_last_run_found == 3
+    assert report.attribution_last_run_yield_rate == pytest.approx(1.0)
 
     text = format_text(report)
     assert "attribution last run yield" in text

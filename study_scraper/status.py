@@ -279,7 +279,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             cur.execute(
                 f"""
                 SELECT COUNT(*) AS attempts,
-                       COUNT(*) FILTER (WHERE found > 0) AS found
+                       COALESCE(SUM(found), 0) AS found
                 FROM   {SCHEMA}.attribution_attempts
                 WHERE  attempted_at::date = (
                     SELECT MAX(attempted_at::date) FROM {SCHEMA}.attribution_attempts
