@@ -1,9 +1,11 @@
 """Sources — per-source coverage & health (Phase 5d dock surface).
 
-One row per source (catalog: ssoar/openalex → `studies`; lake:
-dawum/gesis/eurostat → `source_records`) with record count, run count,
-errors, and last successful run. Plus the recent-run table. Reuses
-`build_status()`; one small inline query for per-source last-success.
+One row per source (catalog: ssoar/openalex/bundestag_dip/core →
+`studies`; lake: dawum/gesis/eurostat/govdata/eurobarometer →
+`source_records`, see `_sources.source_kind`) with record count, run
+count, errors, and last successful run. Plus the recent-run table.
+Reuses `build_status()`; one small inline query for per-source
+last-success.
 
 Read-only.
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 import streamlit as st
 
 from study_scraper.console._shared import storage_or_error
+from study_scraper.console._sources import source_kind
 from study_scraper.status import build_status
 
 
@@ -50,12 +53,6 @@ with storage.connection() as conn:
         )
         run_stats = {r["source_id"]: r for r in cur.fetchall()}
 
-# Known source kinds (catalog vs lake). Unknown sources still show, kind '?'.
-KIND = {
-    "ssoar": "catalog", "openalex": "catalog",
-    "dawum": "lake", "gesis": "lake", "eurostat": "lake",
-}
-
 all_sources = sorted(
     set(report.studies_per_source)
     | set(report.source_records_per_source)
@@ -73,7 +70,7 @@ for sid in all_sources:
     )
     rows.append({
         "source": sid,
-        "kind": KIND.get(sid, "?"),
+        "kind": source_kind(sid),
         "records": records,
         "runs": report.runs_per_source.get(sid, 0),
         "errors": int(stats.get("total_errors") or 0),
