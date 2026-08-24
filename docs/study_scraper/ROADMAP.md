@@ -12,24 +12,27 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Updated 2026-08-17: `bundestag_dip` **regressed back to 401** (#106,
-DECISIONS.md A40) after only 2 working scheduled runs (08-06, 08-10) —
-the no-key mirror A35 switched to on 08-03 has started enforcing auth
-again, converging back to #48's original blocker (needs a real personal
-`DIP_API_KEY`; no code fix possible). Stuck at **1,115 studies** since
-08-10 while `openalex`/`ssoar` keep growing. **`GOAL.md`'s topic-coverage
-criterion stays MET** (all 8 topics ≥680 studies from ≥3 sources — a
-source going quiet doesn't un-ingest what it already contributed). The
-*source-coverage* criterion (≥8 production sources) is unchanged: still
-only 6 distinct sources have ever produced a successful `crawl_runs` row;
-core/eurobarometer/govdata remain built, fixture-tested, and simply never
-added to `scrape.yml` (#65). **New this week:** the attribution pipeline
-went fully dark for 6+ days (76 attributions since 08-11, zero net-new),
-including a 2026-08-14 run that reported success (17 turns, $0.87 cost)
-but wrote zero `attribution_attempts` rows — a distinct regression from
-the known cadence bottleneck. Filed #110 (priority:high, in-scope) so
-`status --json` surfaces this kind of silent stall automatically instead
-of needing manual Postgres-timestamp tracking in issue comments.
+Updated 2026-08-24: `bundestag_dip` is now **14 days stale, 32/32 crawl
+runs errored** since the mirror re-broke on 08-13 (#113, duplicates
+#106/A40) — 1,115 studies, no growth since 08-10, still needs a fresh
+personal `DIP_API_KEY`. Given the mirror already proved itself fragile
+(worked 08-06/08-10, then re-401'd), **#65 (wiring the 3 already-built,
+zero-dependency sources — core/eurobarometer/govdata — into `scrape.yml`)
+is now the higher-leverage, more durable ask**: it clears `GOAL.md`'s
+≥8-production-sources bar without depending on any external credential
+staying alive. Studies: **7,184** (+123 since 08-17, +1.7% — growth has
+nearly stalled with `bundestag_dip` flat and `openalex`/`ssoar` the only
+sources still growing). The 08-14 "dark run" (success status, zero DB
+writes) flagged last week **did not recur** — 08-18 and 08-21 both wrote
+attempts normally (08-21: 40 attempts, 13 found, the best single run
+since the queue existed) — so that looks like a one-off, not a persistent
+regression. The underlying cadence bottleneck is unchanged and now
+starker: **claims 10,644 vs. attributions 89 (0.8% ever attributed)**,
+queue at 326. Five small in-scope fixes shipped since 08-17 (#115 per-
+source crawl staleness, #117 flaky-test fix, #119/#121 attribution-yield
+metric + its COUNT-vs-SUM bug fix, #123 console source-kind
+classification) — real progress on tooling, none of it touches the three
+needs-human blockers below.
 
 1. **Wire core + eurobarometer + govdata into the scheduled crawl**
    (issue #65, priority:high, needs-human) — three ready-to-run
@@ -119,11 +122,11 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-08-17 live DB): **catalog** OpenAlex (5,321) +
-SSOAR (625), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
-again, #106/A40)** — academic + government, three sources have fed the
+Current coverage (2026-08-24 live DB): **catalog** OpenAlex (5,340) +
+SSOAR (729), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
+again, #113/A40)** — academic + government, three sources have fed the
 `studies` table (GOAL.md's topic-coverage bar is met and stays met, see
-P1 intro); **lake** DAWUM (vote intention, ~3,900 rows), GESIS KG
+P1 intro); **lake** DAWUM (vote intention, ~3,911 rows), GESIS KG
 (survey catalog, 500), Eurostat (official stats, 3 — thin by design).
 **CORE, Eurobarometer, GovData.de are all built and fixture-tested but
 have 0 live records** — none was ever added to `scrape.yml`'s crawl step
@@ -154,7 +157,28 @@ than code. Ranked by yield per effort:
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
 
-### Scouted this round (2026-08-17)
+### Scouted this round (2026-08-24)
+
+- **Bildung (education) opinion/structured data** — searched for a
+  German open-data API on public education attitudes/outcomes.
+  Found only the Destatis-GENESIS-based "Kommunale Bildungsdatenbank"
+  (municipal education statistics) — same `needs-human` registration
+  gate as GENESIS generally (item 11), and indicators, not opinion
+  data. No new candidate.
+- **Wohnen (housing) opinion/structured data** — searched for a German
+  open API on housing-market sentiment/rent opinion. Found only
+  Destatis Mikrozensus housing tables (official stats, not opinion)
+  and paywalled Statista/Ipsos summaries. No new candidate.
+- Net: **5th consecutive scouting round with no new buildable source**
+  (08-03, 08-10, 08-17, 08-24, plus the 07-20/07-27 pair). The free/
+  no-auth frontier for this project's topic list looks genuinely
+  exhausted — remaining candidates are all `needs-human` (GENESIS
+  registration, GESIS microdata licences) or the tier-3 `SitemapSource`
+  play (item 10). Future scouting rounds should consider widening
+  beyond the 8 existing topics' exact keywords rather than re-querying
+  the same ground.
+
+### Scouted 2026-08-17
 
 - **Russia/Ukraine opinion data (API)** — searched specifically as an
   alternative path to #50's `russland_ukraine` topic ask (which is
@@ -317,3 +341,10 @@ for our verification layers). All items below have shipped:
   staleness signal, so the low/volatile "found" rate #49's monitor
   updates kept hand-computing from Postgres (e.g. 08-18: 0/40, 08-21:
   13/40) is visible without a manual query.
+- Flaky date-unpinned test fix (#117) — landed 2026-08-20. Attribution
+  yield metric COUNT-vs-SUM bug (#121, caught the day after #119
+  shipped) — fixed 2026-08-23, `status` now reports `sum(found)`
+  correctly (was undercounting, e.g. 5/40 instead of the true 13/40 for
+  08-21). Console Sources page kind-column misclassification for
+  bundestag_dip/core/govdata/eurobarometer (#123) — fixed 2026-08-23,
+  all 9 sources now classify correctly.
