@@ -59,6 +59,46 @@ col5.metric(
     ),
 )
 
+# ---- pipeline health --------------------------------------------------------
+# Mirrors the CLI's `status` text block (#110/#119) so a dock-only
+# operator sees the same staleness/yield signals a terminal user gets.
+
+st.subheader("Pipeline health")
+hcol1, hcol2 = st.columns(2)
+if report.attribution_days_since_last_attempt is None:
+    hcol1.metric("Attribution last attempt", "never")
+else:
+    hcol1.metric(
+        "Attribution last attempt",
+        f"{report.attribution_days_since_last_attempt:.1f}d ago",
+    )
+if report.attribution_last_run_attempts == 0:
+    hcol2.metric("Attribution last run yield", "—")
+else:
+    hcol2.metric(
+        "Attribution last run yield",
+        f"{report.attribution_last_run_found}/{report.attribution_last_run_attempts}"
+        f" ({report.attribution_last_run_yield_rate:.0%})",
+    )
+
+st.markdown("**crawl staleness per source (days since last clean run)**")
+if report.source_days_since_last_success:
+    staleness_rows = [
+        {
+            "source": source_id,
+            "days_since_last_success": (
+                "never" if days is None else round(days, 1)
+            ),
+        }
+        for source_id, days in sorted(
+            report.source_days_since_last_success.items(),
+            key=lambda kv: (kv[1] is None, -(kv[1] or 0)),
+        )
+    ]
+    st.dataframe(pd.DataFrame(staleness_rows), hide_index=True, use_container_width=True)
+else:
+    st.info("No crawl runs recorded yet.")
+
 # ---- per-topic / per-source breakdown -------------------------------------
 
 st.subheader("Coverage")
