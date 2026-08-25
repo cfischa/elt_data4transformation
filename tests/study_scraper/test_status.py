@@ -182,6 +182,52 @@ def test_status_attribution_yield_last_run(storage: PostgresStorage) -> None:
     assert "attribution last run yield" in text
 
 
+def test_status_attribution_queue_size_empty(storage: PostgresStorage) -> None:
+    report = build_status(storage)
+    assert report.attribution_queue_size == 0
+
+    text = format_text(report)
+    assert "attribution queue backlog" in text
+
+
+def test_status_attribution_queue_size_counts_and_excludes(
+    storage: PostgresStorage,
+) -> None:
+    """#128: attribution_queue_size mirrors the attribution_queue view --
+    a study with claims and no attribution is queued; a study already
+    attributed, or attempted with no signal (migration 0011), is not."""
+    from study_scraper.attribute import apply_responses
+    from study_scraper.claims import extract_claims
+
+    def _seed_claims(study):
+        claims = extract_claims(
+            study_id=study.id, title=study.title, abstract=study.abstract
+        )
+        storage.upsert_claims(study.id, claims)
+
+    waiting = _seed_study(storage, title="Waiting Study")
+    _seed_claims(waiting)
+
+    attributed = _seed_study(storage, title="Attributed Study")
+    _seed_claims(attributed)
+    response = json.dumps({"attributions": [
+        {"question": "Q", "position": "support", "percentage": 50,
+         "population": None, "confidence": 0.7},
+    ]})
+    apply_responses(storage=storage, responses={attributed.id: response})
+
+    no_signal = _seed_study(storage, title="No Signal Study")
+    _seed_claims(no_signal)
+    apply_responses(storage=storage, responses={no_signal.id: "{}"})
+
+    report = build_status(storage)
+    assert report.attribution_queue_size == 1
+
+    text = format_text(report)
+    assert "attribution queue backlog" in text
+    assert "1 studies" in text
+
+
 def test_status_after_two_source_run(
     storage: PostgresStorage, topics_list
 ) -> None:

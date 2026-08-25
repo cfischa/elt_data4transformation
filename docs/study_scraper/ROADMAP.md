@@ -348,3 +348,7 @@ for our verification layers). All items below have shipped:
   08-21). Console Sources page kind-column misclassification for
   bundestag_dip/core/govdata/eurobarometer (#123) — fixed 2026-08-23,
   all 9 sources now classify correctly.
+- Console Home dashboard surfaces attribution + crawl staleness (#127) —
+  landed 2026-08-25. Attribution queue backlog size (#128, self-proposed)
+  — `status`/dock now show `attribution_queue`'s row count directly, so
+  #49's monitor updates no longer need to hand-query Postgres for it.

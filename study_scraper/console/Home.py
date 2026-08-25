@@ -64,7 +64,7 @@ col5.metric(
 # operator sees the same staleness/yield signals a terminal user gets.
 
 st.subheader("Pipeline health")
-hcol1, hcol2 = st.columns(2)
+hcol1, hcol2, hcol3 = st.columns(3)
 if report.attribution_days_since_last_attempt is None:
     hcol1.metric("Attribution last attempt", "never")
 else:
@@ -80,6 +80,7 @@ else:
         f"{report.attribution_last_run_found}/{report.attribution_last_run_attempts}"
         f" ({report.attribution_last_run_yield_rate:.0%})",
     )
+hcol3.metric("Attribution queue backlog", f"{report.attribution_queue_size} studies")
 
 st.markdown("**crawl staleness per source (days since last clean run)**")
 if report.source_days_since_last_success:
