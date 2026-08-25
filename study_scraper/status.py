@@ -65,6 +65,10 @@ class StatusReport:
     # (a run can be fresh/on-cadence and still find almost nothing).
     attribution_last_run_attempts: int = 0
     attribution_last_run_found: int = 0
+    # Backlog size of the attribution_queue view (kept studies with claims,
+    # not yet attributed, excluding no-signal attempts per migration 0011)
+    # -- #49's monitor updates repeatedly hand-computed this from Postgres.
+    attribution_queue_size: int = 0
 
     @property
     def attribution_last_run_yield_rate(self) -> Optional[float]:
@@ -290,6 +294,9 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             attribution_last_run_attempts = int(yield_row["attempts"] or 0)
             attribution_last_run_found = int(yield_row["found"] or 0)
 
+            cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attribution_queue")
+            attribution_queue_size = int(cur.fetchone()["c"])
+
     generated_at = datetime.now(timezone.utc)
     attribution_days_since_last_attempt = (
         (generated_at - last_attribution_attempt).total_seconds() / 86400.0
@@ -329,6 +336,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         source_days_since_last_success=source_days_since_last_success,
         attribution_last_run_attempts=attribution_last_run_attempts,
         attribution_last_run_found=attribution_last_run_found,
+        attribution_queue_size=attribution_queue_size,
     )
 
 
@@ -364,6 +372,7 @@ def format_text(report: StatusReport) -> str:
             f"{report.attribution_last_run_found}/{report.attribution_last_run_attempts}"
             f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
+    lines.append(f"  attribution queue backlog  : {report.attribution_queue_size} studies")
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:
