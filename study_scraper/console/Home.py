@@ -81,6 +81,12 @@ else:
         f" ({report.attribution_last_run_yield_rate:.0%})",
     )
 hcol3.metric("Attribution queue backlog", f"{report.attribution_queue_size} studies")
+if report.attribution_consecutive_zero_yield_runs >= 2:
+    st.warning(
+        f"Last {report.attribution_consecutive_zero_yield_runs} attribution runs "
+        "in a row found zero attributions — possible extraction regression, "
+        "not just low-signal studies."
+    )
 
 st.markdown("**crawl staleness per source (days since last clean run)**")
 if report.source_days_since_last_success:

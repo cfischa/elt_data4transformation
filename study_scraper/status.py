@@ -69,6 +69,14 @@ class StatusReport:
     # not yet attributed, excluding no-signal attempts per migration 0011)
     # -- #49's monitor updates repeatedly hand-computed this from Postgres.
     attribution_queue_size: int = 0
+    # How many of the most recent attribution runs (by calendar day,
+    # newest first) found zero attributions in a row -- a single
+    # zero-yield run (e.g. 2026-08-25, per #49) can be a normal
+    # low-signal batch, but a *streak* of them alongside a non-shrinking
+    # queue points at a grounding/extraction regression rather than
+    # genuinely low-signal studies (#49's monitor flagged this as worth
+    # tracking without a mechanism to see it at a glance).
+    attribution_consecutive_zero_yield_runs: int = 0
 
     @property
     def attribution_last_run_yield_rate(self) -> Optional[float]:
@@ -297,6 +305,16 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attribution_queue")
             attribution_queue_size = int(cur.fetchone()["c"])
 
+            cur.execute(
+                f"""
+                SELECT attempted_at::date AS day, COALESCE(SUM(found), 0) AS found
+                FROM   {SCHEMA}.attribution_attempts
+                GROUP  BY day
+                ORDER  BY day DESC
+                """
+            )
+            run_days = cur.fetchall()
+
     generated_at = datetime.now(timezone.utc)
     attribution_days_since_last_attempt = (
         (generated_at - last_attribution_attempt).total_seconds() / 86400.0
@@ -312,6 +330,12 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         )
         for source_id in runs_per_source
     }
+
+    attribution_consecutive_zero_yield_runs = 0
+    for row in run_days:
+        if int(row["found"]) != 0:
+            break
+        attribution_consecutive_zero_yield_runs += 1
 
     return StatusReport(
         generated_at=generated_at,
@@ -337,6 +361,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         attribution_last_run_attempts=attribution_last_run_attempts,
         attribution_last_run_found=attribution_last_run_found,
         attribution_queue_size=attribution_queue_size,
+        attribution_consecutive_zero_yield_runs=attribution_consecutive_zero_yield_runs,
     )
 
 
@@ -373,6 +398,11 @@ def format_text(report: StatusReport) -> str:
             f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
     lines.append(f"  attribution queue backlog  : {report.attribution_queue_size} studies")
+    if report.attribution_consecutive_zero_yield_runs >= 2:
+        lines.append(
+            "  attribution zero-yield streak: "
+            f"{report.attribution_consecutive_zero_yield_runs} runs in a row found nothing"
+        )
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:
