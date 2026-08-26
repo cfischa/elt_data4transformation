@@ -228,6 +228,74 @@ def test_status_attribution_queue_size_counts_and_excludes(
     assert "1 studies" in text
 
 
+def test_status_zero_yield_streak_none_when_no_attempts(
+    storage: PostgresStorage,
+) -> None:
+    report = build_status(storage)
+    assert report.attribution_consecutive_zero_yield_runs == 0
+
+
+def test_status_zero_yield_streak_resets_on_a_found_run(
+    storage: PostgresStorage,
+) -> None:
+    """#49: a streak of zero-yield runs is only worth flagging while it's
+    unbroken -- a single successful day resets it, even if older runs
+    also found nothing."""
+    a = _seed_study(storage, title="Streak A")
+    b = _seed_study(storage, title="Streak B")
+    c = _seed_study(storage, title="Streak C")
+    now = datetime.now(timezone.utc)
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            # Oldest -> newest: zero, found, zero, zero (streak = 2, not 4,
+            # since the "found" run breaks it).
+            cur.execute(
+                "INSERT INTO study_scraper.attribution_attempts "
+                "(study_id, model, found, attempted_at) VALUES (%s, %s, %s, %s)",
+                (a.id, "llm-v1", 0, now - timedelta(days=3)),
+            )
+            cur.execute(
+                "INSERT INTO study_scraper.attribution_attempts "
+                "(study_id, model, found, attempted_at) VALUES (%s, %s, %s, %s)",
+                (b.id, "llm-v1", 4, now - timedelta(days=2)),
+            )
+            cur.execute(
+                "INSERT INTO study_scraper.attribution_attempts "
+                "(study_id, model, found, attempted_at) VALUES (%s, %s, %s, %s)",
+                (c.id, "llm-v1", 0, now - timedelta(days=1)),
+            )
+        conn.commit()
+
+    from study_scraper.attribute import apply_responses
+
+    d = _seed_study(storage, title="Streak D")
+    apply_responses(storage=storage, responses={d.id: "{}"})  # today, found=0
+
+    report = build_status(storage)
+    assert report.attribution_consecutive_zero_yield_runs == 2
+
+    text = format_text(report)
+    assert "attribution zero-yield streak: 2 runs in a row found nothing" in text
+
+
+def test_status_zero_yield_streak_below_threshold_not_shown(
+    storage: PostgresStorage,
+) -> None:
+    """A single zero-yield run is normal noise, not a streak worth a
+    banner (see #49's monitor update distinguishing one bad batch from a
+    persistent regression)."""
+    s = _seed_study(storage, title="Single Zero")
+    from study_scraper.attribute import apply_responses
+
+    apply_responses(storage=storage, responses={s.id: "{}"})
+
+    report = build_status(storage)
+    assert report.attribution_consecutive_zero_yield_runs == 1
+
+    text = format_text(report)
+    assert "zero-yield streak" not in text
+
+
 def test_status_after_two_source_run(
     storage: PostgresStorage, topics_list
 ) -> None:
