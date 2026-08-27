@@ -67,6 +67,9 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.duplicate_rate is None
     assert report.duplicates_total == 0
     assert report.attribution_days_since_last_attempt is None
+    assert report.total_claims == 0
+    assert report.total_attributions == 0
+    assert report.attribution_coverage_rate is None
 
 
 def _seed_study(storage: PostgresStorage, *, title: str):
@@ -226,6 +229,43 @@ def test_status_attribution_queue_size_counts_and_excludes(
     text = format_text(report)
     assert "attribution queue backlog" in text
     assert "1 studies" in text
+
+
+def test_status_claims_and_attributions_coverage(
+    storage: PostgresStorage,
+) -> None:
+    """#132: the ROADMAP has repeatedly hand-computed a "claims vs.
+    attributions, N% ever attributed" figure from Postgres -- `status`
+    should surface the same raw counts and ratio."""
+    from study_scraper.attribute import apply_responses
+    from study_scraper.claims import extract_claims
+
+    attributed = _seed_study(storage, title="Coverage Attributed")
+    claims = extract_claims(
+        study_id=attributed.id, title=attributed.title, abstract=attributed.abstract
+    )
+    storage.upsert_claims(attributed.id, claims)
+    response = json.dumps({"attributions": [
+        {"question": "Q", "position": "support", "percentage": 50,
+         "population": None, "confidence": 0.7},
+    ]})
+    apply_responses(storage=storage, responses={attributed.id: response})
+
+    waiting = _seed_study(storage, title="Coverage Waiting")
+    claims = extract_claims(
+        study_id=waiting.id, title=waiting.title, abstract=waiting.abstract
+    )
+    storage.upsert_claims(waiting.id, claims)
+
+    report = build_status(storage)
+    assert report.total_claims == 2
+    assert report.total_attributions == 1
+    assert report.attribution_coverage_rate == pytest.approx(0.5)
+
+    text = format_text(report)
+    assert "claims / attributions" in text
+    assert "2 / 1" in text
+    assert "50.0% ever attributed" in text
 
 
 def test_status_zero_yield_streak_none_when_no_attempts(

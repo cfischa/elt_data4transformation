@@ -77,6 +77,21 @@ class StatusReport:
     # genuinely low-signal studies (#49's monitor flagged this as worth
     # tracking without a mechanism to see it at a glance).
     attribution_consecutive_zero_yield_runs: int = 0
+    # Raw row counts backing the ratio the ROADMAP has repeatedly
+    # hand-computed from Postgres (e.g. "claims 10,644 vs. attributions
+    # 89, 0.8% ever attributed") to gauge how much of the collection
+    # pipeline's output ever reaches the LLM attribution stage.
+    total_claims: int = 0
+    total_attributions: int = 0
+
+    @property
+    def attribution_coverage_rate(self) -> Optional[float]:
+        """Share of `claims` rows matched by an `attributions` row --
+        a coarse, table-level ratio (not a per-claim join), same
+        granularity as the ROADMAP's hand-computed figure."""
+        if self.total_claims == 0:
+            return None
+        return self.total_attributions / self.total_claims
 
     @property
     def attribution_last_run_yield_rate(self) -> Optional[float]:
@@ -305,6 +320,12 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attribution_queue")
             attribution_queue_size = int(cur.fetchone()["c"])
 
+            cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.claims")
+            total_claims = int(cur.fetchone()["c"])
+
+            cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attributions")
+            total_attributions = int(cur.fetchone()["c"])
+
             cur.execute(
                 f"""
                 SELECT attempted_at::date AS day, COALESCE(SUM(found), 0) AS found
@@ -362,6 +383,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         attribution_last_run_found=attribution_last_run_found,
         attribution_queue_size=attribution_queue_size,
         attribution_consecutive_zero_yield_runs=attribution_consecutive_zero_yield_runs,
+        total_claims=total_claims,
+        total_attributions=total_attributions,
     )
 
 
@@ -398,6 +421,15 @@ def format_text(report: StatusReport) -> str:
             f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
     lines.append(f"  attribution queue backlog  : {report.attribution_queue_size} studies")
+    lines.append(
+        "  claims / attributions      : "
+        f"{report.total_claims} / {report.total_attributions}"
+        + (
+            f"  ({report.attribution_coverage_rate:.1%} ever attributed)"
+            if report.attribution_coverage_rate is not None
+            else ""
+        )
+    )
     if report.attribution_consecutive_zero_yield_runs >= 2:
         lines.append(
             "  attribution zero-yield streak: "
