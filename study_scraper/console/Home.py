@@ -81,6 +81,18 @@ else:
         f" ({report.attribution_last_run_yield_rate:.0%})",
     )
 hcol3.metric("Attribution queue backlog", f"{report.attribution_queue_size} studies")
+coverage = (
+    "—" if report.attribution_coverage_rate is None
+    else f"{report.attribution_coverage_rate:.1%}"
+)
+st.metric(
+    "Claims ever attributed",
+    coverage,
+    help=(
+        f"{report.total_attributions} attributions of {report.total_claims} "
+        f"claims — coarse table-level ratio, not a per-claim join"
+    ),
+)
 if report.attribution_consecutive_zero_yield_runs >= 2:
     st.warning(
         f"Last {report.attribution_consecutive_zero_yield_runs} attribution runs "
