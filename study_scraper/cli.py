@@ -204,15 +204,14 @@ def status(
     ),
 ) -> None:
     """Print a coverage / health overview to stdout (cron-friendly)."""
-    import dataclasses
     import json as _json
 
-    from study_scraper.status import build_status, format_text
+    from study_scraper.status import build_status, format_text, report_to_dict
 
     storage = _storage_from_settings()
     report = build_status(storage)
     if as_json:
-        payload = dataclasses.asdict(report)
+        payload = report_to_dict(report)
         typer.echo(_json.dumps(payload, default=str, ensure_ascii=False))
     else:
         typer.echo(format_text(report))
