@@ -127,6 +127,33 @@ class StatusReport:
         return self.duplicates_total / self.candidates_seen_total
 
 
+# Computed (@property) fields aren't plain dataclass attributes, so
+# `dataclasses.asdict(report)` silently drops them -- `status --json`
+# consumers (cron / CI / other agents) would miss every derived rate
+# (keep_rate, attribution_coverage_rate, ...) that the text/console
+# output already shows. Build the JSON payload through this helper
+# instead of `asdict` directly so the two representations stay in sync.
+_COMPUTED_PROPERTIES = (
+    "pending_count",
+    "rejected_count",
+    "kept_count",
+    "keep_rate",
+    "duplicate_rate",
+    "attribution_coverage_rate",
+    "attribution_last_run_yield_rate",
+)
+
+
+def report_to_dict(report: StatusReport) -> Dict[str, Any]:
+    """`StatusReport` as a plain dict, including derived `@property` rates."""
+    import dataclasses
+
+    payload = dataclasses.asdict(report)
+    for name in _COMPUTED_PROPERTIES:
+        payload[name] = getattr(report, name)
+    return payload
+
+
 def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusReport:
     with storage.connection() as conn:
         with conn.cursor() as cur:
