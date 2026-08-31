@@ -12,34 +12,36 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Updated 2026-08-24: `bundestag_dip` is now **14 days stale, 32/32 crawl
-runs errored** since the mirror re-broke on 08-13 (#113, duplicates
-#106/A40) — 1,115 studies, no growth since 08-10, still needs a fresh
-personal `DIP_API_KEY`. Given the mirror already proved itself fragile
-(worked 08-06/08-10, then re-401'd), **#65 (wiring the 3 already-built,
-zero-dependency sources — core/eurobarometer/govdata — into `scrape.yml`)
-is now the higher-leverage, more durable ask**: it clears `GOAL.md`'s
-≥8-production-sources bar without depending on any external credential
-staying alive. Studies: **7,184** (+123 since 08-17, +1.7% — growth has
-nearly stalled with `bundestag_dip` flat and `openalex`/`ssoar` the only
-sources still growing). The 08-14 "dark run" (success status, zero DB
-writes) flagged last week **did not recur** — 08-18 and 08-21 both wrote
-attempts normally (08-21: 40 attempts, 13 found, the best single run
-since the queue existed) — so that looks like a one-off, not a persistent
-regression. The underlying cadence bottleneck is unchanged and now
-starker: **claims 10,644 vs. attributions 89 (0.8% ever attributed)**,
-queue at 326. Five small in-scope fixes shipped since 08-17 (#115 per-
-source crawl staleness, #117 flaky-test fix, #119/#121 attribution-yield
-metric + its COUNT-vs-SUM bug fix, #123 console source-kind
-classification) — real progress on tooling, none of it touches the three
-needs-human blockers below.
+Updated 2026-08-31: Studies: **7,261** (+77 since 08-24, +1.1% — growth
+essentially flat). `bundestag_dip` is now 21.4 days stale, still 401ing
+(#113); `openalex` (5,349) + `ssoar` (797) are the only sources still
+growing, and both are increasingly rate-limit-constrained on the pure
+search-query path. **Attribution is still the starkest gap: claims
+11,453 vs. attributions 93 (0.8% ever attributed)**, queue at 273 (down
+from 326, but from more zero-signal studies draining out, not a cadence
+change). The five issues closed since 08-24 (#110/#119/#121/#126/#128/
+#130) were all attribution-visibility tooling (staleness days, yield %,
+zero-yield streaks, backlog size) — that surface is now comprehensive;
+the underlying `.github/workflows/attribute.yml` cadence it reports on
+is unchanged and out of agent scope. Rather than open another visibility
+ticket, filed a genuine new coverage lever instead: **#136,
+reference-follower step 2** (Phase 5d) — citation-following over
+`referenced_works`/`related_works` IDs already captured in `provenance`
+(A18, step 1, shipped 2026-05-31) but never turned into new candidates.
+No external credential or `.github/**` edit needed, and it's a real lever
+now that the two growing catalog sources are rate-limit-bound. Also
+scouted a new low-priority lake source, BMAS pension statistics (#137,
+free/no-auth CSV-XLSX downloads, indicator data not opinion — see
+"Scouted this round" below).
 
-1. **Wire core + eurobarometer + govdata into the scheduled crawl**
+1. **Developer: build #136 (reference-follower step 2)** — highest-
+   leverage in-scope item this cycle; see issue for acceptance criteria.
+2. **Wire core + eurobarometer + govdata into the scheduled crawl**
    (issue #65, priority:high, needs-human) — three ready-to-run
    sources, zero live records, one `scrape.yml` edit each (exact lines
-   in the issue). Still the highest-leverage ask: it directly
-   clears `GOAL.md`'s ≥8-production-sources bar in one PR.
-2. **Attribution throughput + dark-pipeline stall** (issue #49)
+   in the issue). Still the cheapest, most durable fix on the board for
+   `GOAL.md`'s ≥8-production-sources bar.
+3. **Attribution throughput + dark-pipeline stall** (issue #49)
    **[needs-human]** — `claims` at 9,202 rows and still climbing every
    crawl; `attributions` stuck at **76** since 2026-08-11 (6+ days,
    including a run that "succeeded" but wrote zero rows — see #49's
@@ -49,7 +51,7 @@ needs-human blockers below.
    scope; #110 (new, in-scope) adds a staleness signal so this doesn't
    require manual tracking again. Still the single biggest lever on the
    *answering* half of the goal.
-3. **Topic-content gap** (issue #50, priority:high, open since
+4. **Topic-content gap** (issue #50, priority:high, open since
    2026-06-26 — 7+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
    topic) needs `config/topics/topics.csv` + `questions.yml`, both
@@ -57,22 +59,22 @@ needs-human blockers below.
    neither agent can build it as scoped. Scouted 2026-08-17 for an API
    alternative to hand-editing keywords (a structured Russia/Ukraine
    opinion-data source) — found none free/no-auth; stays a config edit.
-4. **`bundestag_dip`** (issue #48, reopened in spirit as #106/A40) —
+5. **`bundestag_dip`** (issue #48, reopened in spirit as #106/A40) —
    **regressed 2026-08-13**, still 401ing 2026-08-17. PR #91's no-key
    mirror (A35/A36) worked for exactly 2 scheduled runs before the
    mirror itself started requiring auth. No further code fix available;
    converges back to needing a real `DIP_API_KEY`
    (`infoline.id3@bundestag.de`).
-5. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
+6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
    labels + value); `eurostat-table --code <code>` is the queryable
    surface. Python, not a SQL view — see DECISIONS.md A34 for why.
-6. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
+7. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
    (issue #71) **[done 2026-07-30]** — topic-crawl order now rotates by
    `GITHUB_RUN_NUMBER` (A32). Confirmed working live 2026-08-03: both
    topics' openalex counts roughly doubled/tripled week over week.
-7. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
+8. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
    #100]** — confirmed transient upstream outage: `ssoar` ran clean on
    both the 2026-08-13 and 2026-08-17 scheduled runs (`errors=0` across
    all 8 topics each time; live `status` on 2026-08-18 shows 625 total
@@ -157,7 +159,27 @@ than code. Ranked by yield per effort:
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
 
-### Scouted this round (2026-08-24)
+### Scouted this round (2026-08-31)
+
+- **BMAS pension statistics (Rentenbestandsstatistik)** — new candidate,
+  filed as issue #137 (`priority:low`). Free, no-auth CSV/XLSX downloads
+  at bmas.de, yearly since 2014, per-reporting-date CSVs since the
+  2021-07-01 revision. Official indicator data (recipient counts/amounts),
+  not opinion data, and no explicit license stated on the page — flagged
+  as caveats in the issue. Useful mainly for `rente` topic-coverage depth,
+  not for the answering/attribution layer.
+- **European Social Survey (ESS)** — re-confirmed registration-gated (same
+  shape as GESIS microdata/Q19); no change to its needs-human status.
+- **OParl** (German municipal council open-data standard) — real and
+  free, but wrong shape: per-municipality session/document/resolution
+  data, not opinion or study content, and fragmented across hundreds of
+  independent endpoints. Not a fit for this project's source model.
+- First scouting round in 6 with a new buildable candidate (BMAS), though
+  a low-priority one — the free/no-auth *opinion-data* frontier still
+  looks exhausted; remaining upside is in adjacent indicator/statistics
+  sources like this one, or the needs-human tiers already tracked.
+
+### Scouted 2026-08-24
 
 - **Bildung (education) opinion/structured data** — searched for a
   German open-data API on public education attitudes/outcomes.
@@ -246,6 +268,14 @@ than code. Ranked by yield per effort:
     scouted 2026-07-13) — same tier-3 bucket as #15; blog/PDF
     publication, no API found. Lower priority than #15 — Bertelsmann is
     already on the think-tank list and the data feed feels less durable.
+17. **BMAS Rentenbestandsstatistik / social-policy statistics** (scouted
+    2026-08-31, issue #137) **[now, low priority]** — free, no-auth
+    CSV/XLSX downloads on `bmas.de` (yearly since 2014, per-date CSVs
+    since 2021-07-01). Official pension-statistics indicators, not
+    opinion data; license unstated on the page (capture per-record,
+    same pattern as A29's GovData.de). Buildable now as a lake source
+    (A14 shape); low priority since `rente`'s source-coverage bar is
+    already met and this doesn't feed the answering layer.
 
 ## Production craft — patterns from mature scrapers (investigated 2026-07-04)
 
@@ -352,3 +382,13 @@ for our verification layers). All items below have shipped:
   landed 2026-08-25. Attribution queue backlog size (#128, self-proposed)
   — `status`/dock now show `attribution_queue`'s row count directly, so
   #49's monitor updates no longer need to hand-query Postgres for it.
+- Zero-yield run streak surfaced in status/dock (#130) — landed
+  2026-08-2x, closing out the attribution-visibility line of work
+  (staleness/yield/backlog/streak are all now surfaced). #49's actual
+  cadence fix still needs a `.github/workflows/attribute.yml` edit —
+  see P1 item 3.
+- Filed #136 (reference-follower step 2, Phase 5d) as the next coverage
+  lever now that `openalex`/`ssoar` growth is slowing under rate limits
+  and the three needs-human blockers (#65/#113/#49) haven't moved since
+  07-04. Scouted and filed #137 (BMAS pension statistics, low priority)
+  — 2026-08-31.
