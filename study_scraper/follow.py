@@ -93,6 +93,7 @@ def fetch_references(
     Each batch becomes one crawl run. Network required — runs on the
     maintainer's machine, not the sandbox.
     """
+    from study_scraper.config import get_settings
     from study_scraper.discovery.openalex import OpenAlexSource
     from study_scraper.pipeline import run_one
 
@@ -101,10 +102,14 @@ def fetch_references(
         LOGGER.info("reference follower: nothing pending")
         return []
 
+    settings = get_settings()
     runs: List[CrawlRun] = []
     for start in range(0, len(ids), FETCH_BATCH):
         batch = ids[start:start + FETCH_BATCH]
-        with OpenAlexSource(work_ids=batch) as src:
+        with OpenAlexSource(
+            work_ids=batch,
+            politeness_delay=settings.http_politeness_delay_seconds,
+        ) as src:
             run = run_one(
                 source=src, topic=topic, storage=storage,
                 min_score=min_score,

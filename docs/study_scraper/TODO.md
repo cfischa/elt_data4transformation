@@ -279,11 +279,19 @@ Three mechanisms, ranked by yield / effort:
       OpenAlex into `Candidate.raw` and `Study.provenance` (A18,
       shipped 2026-05-31). Cap at 200 IDs per side. Queryable via
       `provenance->'referenced_works'`.
-- [ ] **Step 2: follower** — periodic job that walks every OpenAlex
-      study, takes its referenced_works one hop, checks which IDs we
-      don't have yet, and queues them as candidates for the
-      OpenAlex source's next run. Cheap recall booster, no new
-      ingestion code; uses the existing OpenAlex source.
+- [x] **Step 2: follower** (shipped 2026-08-31, issue #136) — `study_scraper
+      follow --fetch --topic <id>` walks stored studies'
+      `referenced_works` / `related_works`, diffs against known studies
+      (`pending_references`), batches the rest into `ids.openalex:`
+      filter queries (`fetch_references`, `FETCH_BATCH=50`), and runs
+      each batch through the normal topic-filter/upsert pipeline —
+      recording a `crawl_runs` row per batch. Candidates are tagged
+      `provenance.discovery_method = "reference_follower"` to
+      distinguish them from direct search hits; the OpenAlex client
+      reuses the shared politeness delay (A31), no second client.
+      **Not yet scheduled** — wiring `follow --fetch` into
+      `.github/workflows/scrape.yml` is a `.github/**` edit and needs a
+      maintainer (`needs-human`); run it manually until then.
 - [ ] **Domain audit** — periodic WebSearch (or, on the maintainer's
       machine, real web search) for `<topic include keyword> studie
       Deutschland`, capture result URLs, group by domain. Domains we

@@ -277,6 +277,11 @@ class OpenAlexSource:
                 # bloat the row when a paper cites a long bibliography.
                 "referenced_works": referenced_works[:200],
                 "related_works": related_works[:200],
+                **(
+                    {"discovery_method": "reference_follower"}
+                    if self._work_ids
+                    else {}
+                ),
             },
         )
 

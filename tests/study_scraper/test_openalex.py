@@ -126,6 +126,24 @@ class TestOpenAlexFromFile:
             cands = list(src.iter_candidates(klima, limit=2))
         assert len(cands) == 2
 
+    def test_work_ids_mode_tags_reference_follower_discovery_method(
+        self, klima
+    ) -> None:
+        """Phase 5d step 2: candidates fetched in `work_ids` mode (the
+        reference follower) are distinguishable from direct search hits."""
+        with OpenAlexSource(from_file=FIXTURE, work_ids=["W123"]) as src:
+            cands = list(src.iter_candidates(klima))
+        assert cands
+        assert all(
+            c.raw.get("discovery_method") == "reference_follower" for c in cands
+        )
+
+    def test_search_mode_does_not_tag_discovery_method(self, klima) -> None:
+        with OpenAlexSource(from_file=FIXTURE) as src:
+            cands = list(src.iter_candidates(klima))
+        assert cands
+        assert all("discovery_method" not in c.raw for c in cands)
+
 
 def _recording_sleeper() -> "tuple[Callable[[float], None], List[float]]":
     slept: List[float] = []
