@@ -1130,6 +1130,36 @@ project URL + service-role key (placed in `.env`, not committed), or
   of those), and `URLError` (connection-level failures). This mirrors
   `RETRYABLE_STATUS`'s reasoning exactly without needing a new constant.
 
+### A42. Reference-follower step 2 tags candidates `discovery_method = "reference_follower"` in `provenance`, not a new `Candidate` field (#136)
+
+- **Date:** 2026-08-31
+- **Context:** `study_scraper follow --fetch --topic <id>` (A20) already
+  diffed known-vs-pending OpenAlex work IDs and fetched them through
+  `OpenAlexSource(work_ids=...)` + the normal `run_one` pipeline —
+  step 2's core mechanics existed, but nothing distinguished a
+  citation-follow hit from a direct keyword-search hit once it landed
+  in `studies`, and there were no tests for the diffing/batching/
+  pipeline-conformance behavior #136 asked for.
+- **Decision:** rather than adding a `discovery_method` field to
+  `Candidate` (a schema change every source would need to populate),
+  `OpenAlexSource._work_to_candidate` stamps
+  `raw["discovery_method"] = "reference_follower"` only when
+  `self._work_ids` is set (i.e. never in normal search mode), and
+  `pipeline._candidate_to_study` propagates it into
+  `Provenance` the same way it already does for `openalex_id` /
+  `referenced_works` / `pdf_url` etc. — no new column, queryable via
+  `provenance->>'discovery_method'`. Also had `fetch_references` pass
+  `settings.http_politeness_delay_seconds` into its `OpenAlexSource`
+  (it previously used the class default of `0.0`), so follower batches
+  observe the same per-page pacing A31 established for topic search
+  runs instead of bursting the shared OpenAlex rate-limit budget.
+  Added `tests/study_scraper/test_follow.py` (ID diffing, `FETCH_BATCH`
+  batching via a stubbed source/pipeline, and an end-to-end fixture run
+  asserting the tag + idempotent re-run) and two `work_ids`-mode cases
+  in `test_openalex.py`. Scheduling `follow --fetch` into
+  `.github/workflows/scrape.yml` is out of scope (`.github/**` edit) —
+  flagged `needs-human` in the PR for the maintainer to wire up.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

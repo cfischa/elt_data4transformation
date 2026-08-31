@@ -83,7 +83,8 @@ def _candidate_to_study(
         # metadata the opinion–policy gap view renders.
         for key in ("openalex_id", "referenced_works", "related_works",
                     "landing_page_url", "pdf_url",
-                    "drucksachetyp", "dokumentnummer", "vorgangsbezug"):
+                    "drucksachetyp", "dokumentnummer", "vorgangsbezug",
+                    "discovery_method"):
             value = cand.raw.get(key)
             if value:
                 provenance_extras[key] = value
