@@ -16,7 +16,7 @@ from __future__ import annotations
 # tests/study_scraper/test_console.py::test_source_kind_covers_all_sources,
 # which walks both packages and fails if a new source_id isn't listed here.
 CATALOG_SOURCES = {"ssoar", "openalex", "bundestag_dip", "core"}
-LAKE_SOURCES = {"dawum", "gesis", "eurostat", "govdata", "eurobarometer"}
+LAKE_SOURCES = {"dawum", "gesis", "eurostat", "govdata", "eurobarometer", "bmas"}
 
 
 def source_kind(source_id: str) -> str:
