@@ -16,6 +16,7 @@ from study_scraper.config import get_settings
 from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.ingest import run_lake_ingest
+from study_scraper.sources.bmas import BMASSource
 from study_scraper.sources.dawum import DAWUMSource
 from study_scraper.sources.eurobarometer import EurobarometerSource
 from study_scraper.sources.eurostat import EurostatSource
@@ -632,6 +633,12 @@ def ingest(
              "fetch all countries — WARNING: some tables are >60 MB "
              "unfiltered and will be skipped by the size guard.",
     ),
+    year: List[str] = typer.Option(
+        [], "--year",
+        help="BMAS-only: reporting year(s) whose CSV index page to crawl "
+             "(repeatable). Defaults to the most recent year confirmed to "
+             "have individual CSV downloads.",
+    ),
 ) -> None:
     """Ingest a structured-data source into the lake (`source_records`).
 
@@ -666,10 +673,12 @@ def ingest(
                 raise typer.BadParameter(f"unknown topic id {topic!r}")
             queries = topic_query_terms(matched)
         src = GovDataSource(from_file=from_file, queries=queries)
+    elif source == "bmas":
+        src = BMASSource(years=year or None, from_file=from_file)
     else:
         raise typer.BadParameter(
             f"unknown lake source {source!r}; "
-            f"supported: dawum, gesis, eurobarometer, eurostat, govdata"
+            f"supported: dawum, gesis, eurobarometer, eurostat, govdata, bmas"
         )
     storage = _storage_from_settings()
     topic_ids = [topic] if topic else None

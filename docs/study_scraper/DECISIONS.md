@@ -1160,6 +1160,36 @@ project URL + service-role key (placed in `.env`, not committed), or
   `.github/workflows/scrape.yml` is out of scope (`.github/**` edit) —
   flagged `needs-human` in the PR for the maintainer to wire up.
 
+### A43. BMAS Rentenbestandsstatistik lake source: CSV-only, no `openpyxl` (#137)
+
+- **Date:** 2026-09-01
+- **Context:** #137 scouted BMAS's pension-recipient statistics
+  (Rentenbestandsstatistik) as a new free, no-auth lake source. Each
+  reporting year ships one combined Excel file plus (for 2021-2024,
+  confirmed live) 24 individual CSV tables. Building the Excel path would
+  need `openpyxl`, which isn't in `pyproject.toml`; adding it means
+  editing the root `pyproject.toml`, outside the developer agent's scope
+  fence (`study_scraper/**`/`tests/**`/`docs/study_scraper/**` only).
+- **Decision:** `study_scraper/sources/bmas.py` (`source_id="bmas"`)
+  ingests only the per-year CSV tables, using stdlib `csv` plus the
+  already-vendored `beautifulsoup4` (used elsewhere for `pdf_resolver.py`/
+  `fulltext.py`) to discover download links on each year's index page.
+  Two findings from testing live against the real site (2026-09-01):
+  (1) the response's `content-type` header claims `charset=UTF-8` but the
+  body is actually ISO-8859-1 (German umlauts fail UTF-8 decoding,
+  succeed as Latin-1); (2) BMAS's download links aren't plain `<a href>`
+  but a custom `<pp-link href="...">` web component, so link discovery
+  scans every tag with an `href` attribute rather than filtering to `<a>`.
+  Payload is the raw parsed CSV grid (list of rows) preserved as-is (the
+  files open with several title/source rows before the real header row,
+  so there's no single well-defined header to project out at ingest
+  time -- a later SQL view's job, per A14). License is recorded as `None`:
+  the page states no license anywhere (checked live), so a blanket
+  license would be a guess. `--year` is repeatable on `ingest --source
+  bmas`, defaulting to 2024 (the most recent year with CSVs; 2025 only
+  has the combined Excel so far). Live mode verified in the PR against
+  the real site.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

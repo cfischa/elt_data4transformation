@@ -1,0 +1,18 @@
+{
+  "files": [
+    {
+      "year": "2024",
+      "filename": "rentenbestandsstatistik-07-2024-01-csv.csv",
+      "url": "https://www.bmas.de/SharedDocs/Downloads/DE/Rente/rentenbestandsstatistik-07-2024-01-csv.csv?__blob=publicationFile&v=2",
+      "index_url": "https://www.bmas.de/DE/Service/Statistiken-Open-Data/Rentenbestandsstatistik/rentenbestandsstatistik-2024.html",
+      "csv_text": "Rentenfallkonzept;;;;;;;;;;;;;;;;\r\nRentenbestand am 1. Juli 2024 Deutschland (ohne Renten nach Artikel 2 RÜG);;;;;;;;;;;;;;;;\r\nGesamtüberblick über die Ergebnisse der Rentenbestandsaufnahme (Versichertenrenten);;;;;;;;;;;;;;;;\r\nQuelle: Rentenbestandsaufnahme des BMAS aus dem Datensatz des Renten Service der Deutschen Post AG;;;;;;;;;;;;;;;;\r\n;;;;;;;;;;;;;;;;\r\nVersicherungszweig;Geschlecht;Einheiten;Auswertung;Versichertenrenten insgesamt;Renten wegen verminderter Erwerbsfähigkeit insgesamt;Renten wegen teilweiser Erwerbsminderung;Renten wegen voller Erwerbsminderung;Renten für Bergleute;Renten wegen Alters insgesamt;Regelaltersrenten;Altersrenten für besonders langjährig Versicherte;Altersrenten für langjährig Versicherte ;Altersrenten für schwerbehinderte Menschen;Altersrenten wegen Arbeitslosigkeit/ Altersteilzeitarbeit;Altersrenten für Frauen;Altersrenten für langjährig unter Tage Beschäftigten\r\nAllgemeine Rentenversicherung;Männer;Anzahl;Gesamtbestand ;8620833;742571;25167;717404;;7878262;3074500;1352869;1330654;917315;1202924;;\r\nAllgemeine Rentenversicherung;Männer;Anzahl;Gesamtbestand ohne nicht angepasste Renten und Vorschusszahlungen;8599530;739640;24788;714852;;7859890;3065593;1350843;1328024;914426;1201004;;\r\nAllgemeine Rentenversicherung;Männer;Durchschnittlicher Rentenzahlbetrag (in Euro/Monat);Gesamtbestand ;1355,86;1005,90;645,90;1018,53;;1388,84;989,84;1806,03;1525,66;1561,64;1656,33;;\r\n"
+    },
+    {
+      "year": "2024",
+      "filename": "rentenbestandsstatistik-07-2024-02-csv.csv",
+      "url": "https://www.bmas.de/SharedDocs/Downloads/DE/Rente/rentenbestandsstatistik-07-2024-02-csv.csv?__blob=publicationFile&v=2",
+      "index_url": "https://www.bmas.de/DE/Service/Statistiken-Open-Data/Rentenbestandsstatistik/rentenbestandsstatistik-2024.html",
+      "csv_text": "Rentenfallkonzept;;;;;;;;;;;;;;;\r\nRentenbestand am 1. Juli 2024 Deutschland (ohne Renten nach Artikel 2 RÜG);;;;;;;;;;;;;;;\r\nGesamtüberblick über die Ergebnisse der Rentenbestandsaufnahme (Renten wegen Todes);;;;;;;;;;;;;;;\r\nQuelle: Rentenbestandsaufnahme des BMAS aus dem Datensatz des Renten Service der Deutschen Post AG;;;;;;;;;;;;;;;\r\n;;;;;;;;;;;;;;;\r\nVersicherungszweig;Geschlecht;Einheiten;Auswertung;Renten wegen Todes insgesamt;Witwen-/Witwerrenten insgesamt;Witwenrenten insgesamt;kleine Witwenrente;große Witwenrente;Witwerrenten insgesamt;kleine Witwerrente;große Witwerrente;Waisenrenten insgesamt;Halbwaisen;Vollwaisen;Erziehungsrenten\r\nAllgemeine Rentenversicherung;Männer und Frauen;Anzahl;Gesamtbestand ;4992426;4742449;4027049;900;4026149;715400;128;715272;243484;239124;4360;6493\r\nAllgemeine Rentenversicherung;Männer und Frauen;Anzahl;Gesamtbestand ohne nicht angepasste Renten und Vorschusszahlungen;4786836;4539813;3864733;661;3864072;675080;83;674997;242962;238627;4335;4061\r\n"
+    }
+  ]
+}
