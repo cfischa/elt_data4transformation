@@ -123,6 +123,24 @@ def test_source_kind_covers_all_sources() -> None:
         assert source_kind(source_id) == "lake", source_id
 
 
+def test_pending_reference_rows_shapes_ids_for_display() -> None:
+    from study_scraper.console._candidates import pending_reference_rows
+
+    rows = pending_reference_rows(
+        ["https://openalex.org/W123", "https://openalex.org/W456"]
+    )
+    assert rows == [
+        {"openalex_id": "W123", "url": "https://openalex.org/W123"},
+        {"openalex_id": "W456", "url": "https://openalex.org/W456"},
+    ]
+
+
+def test_pending_reference_rows_handles_empty() -> None:
+    from study_scraper.console._candidates import pending_reference_rows
+
+    assert pending_reference_rows([]) == []
+
+
 def test_topic_csv_writer_handles_empty_keyword_lists(tmp_path: Path) -> None:
     from study_scraper.console._csv import write_csv
 
