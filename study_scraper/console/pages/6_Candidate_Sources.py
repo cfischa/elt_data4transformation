@@ -1,10 +1,15 @@
-"""Candidate sources — unknown domains from kept studies (Phase 5d dock
-surface, issue #38 / #77).
+"""Candidate sources & candidate studies (Phase 5d dock surface, issues
+#38 / #77 / #141).
 
-Reuses `domain_audit.audit_domains` verbatim: groups every kept study's
-URL by registrable domain and lists the domains not already covered by
-a dedicated source, ranked by frequency — candidates for the next
-scraper to build.
+Two independent queues:
+
+  - candidate **sources**: unknown domains from kept studies' URLs, via
+    `domain_audit.audit_domains` — candidates for the next scraper to
+    build.
+  - candidate **studies**: OpenAlex work IDs referenced/related by
+    studies we've already ingested but not yet ingested themselves, via
+    `follow.pending_references` — candidates the reference-follower
+    (#136) would fetch on its next `follow --fetch` run.
 
 Read-only.
 """
@@ -13,8 +18,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+from study_scraper.console._candidates import pending_reference_rows
 from study_scraper.console._shared import storage_or_error
 from study_scraper.domain_audit import audit_domains
+from study_scraper.follow import pending_references
 
 
 st.set_page_config(page_title="Study scraper — candidate sources", layout="wide")
@@ -39,3 +46,25 @@ else:
         for s in stats
     ]
     st.dataframe(rows, use_container_width=True, hide_index=True)
+
+st.divider()
+st.title("Candidate studies — reference follower")
+st.caption(
+    "OpenAlex work IDs referenced or related by studies we've already "
+    "ingested, but not yet ingested themselves. Informational only — "
+    "fetching them is a manual step, `study_scraper follow --fetch "
+    "--topic <id>` (not scheduled; see issue #136)."
+)
+
+studies_limit = st.slider(
+    "Max candidate studies to show", min_value=5, max_value=200, value=50,
+)
+pending_ids = pending_references(storage, limit=studies_limit)
+
+if not pending_ids:
+    st.info("No pending referenced works — nothing new since the last ingest.")
+else:
+    st.metric("pending candidate studies", len(pending_ids))
+    st.dataframe(
+        pending_reference_rows(pending_ids), use_container_width=True, hide_index=True,
+    )
