@@ -1190,6 +1190,39 @@ project URL + service-role key (placed in `.env`, not committed), or
   has the combined Excel so far). Live mode verified in the PR against
   the real site.
 
+### A44. Reference follower scopes `pending_references` to the citing study's own topic
+
+- **Date:** 2026-09-03
+- **Context:** `follow --fetch --topic <id>` (A42/#136) calls
+  `pending_references()` with no topic filter, so it returned every
+  unfetched OpenAlex work ID cited by *any* ingested study, across all
+  8 topics, then ran the whole batch through a single topic's filter.
+  A run for `--topic rente` would spend most of its `FETCH_BATCH`-sized
+  fetch budget on works cited by `klima`/`wohnen`/etc. studies that had
+  no realistic chance of matching `rente`'s keywords — diluting the
+  follower's effectiveness for every topic, worst for topics whose
+  citation graph is small relative to the others'.
+- **Decision:** added an optional `topic_id` parameter to
+  `pending_references()` that restricts the *citing* studies (not the
+  candidate work itself, which we don't have metadata for yet) to
+  `topic_id = ANY(topic_ids)`, and `fetch_references()` now always
+  passes `topic_id=topic.id`. The dry-run CLI listing (`follow`
+  without `--fetch`) and the console's "Candidate studies" page keep
+  calling `pending_references()` with no topic — they're informational
+  views over the whole graph, not a fetch about to spend a specific
+  topic's budget. Caught by adding
+  `tests/study_scraper/test_follow.py::TestPendingReferences::test_topic_id_scopes_to_citing_studies_own_topic`
+  and running the DB-gated `test_follow.py` suite against a real
+  Postgres (not just the default no-DSN skip path) — which also
+  surfaced a latent, unrelated bug in the same file's `_seed_study`
+  test helper: every seeded study shared the literal title `"Seed
+  study"`, which migration 0006's title-near-duplicate dedup (exact
+  match, permissive on NULL `publication_year`) silently collapsed
+  into one row, so `test_diffs_known_vs_unknown_ids` had never
+  actually verified what it claimed to when run for real. Fixed by
+  deriving the fixture title from `canonical_url` so each seeded study
+  is genuinely distinct.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

@@ -61,14 +61,23 @@ def klima_topic():
     return next(t for t in topics if t.id == "klima")
 
 
-def _seed_study(canonical_url: str, **provenance_extra: object) -> Study:
+def _seed_study(
+    canonical_url: str,
+    *,
+    topic_ids: tuple = ("klima",),
+    **provenance_extra: object,
+) -> Study:
     return Study.build(
         canonical_url=canonical_url,
-        title="Seed study",
+        # Distinct per URL: a literal shared title (e.g. "Seed study")
+        # trips migration 0006's pg_trgm near-duplicate dedup (exact
+        # match, permissive NULL publication_year) and silently merges
+        # what the test expects to be separate rows.
+        title=f"Seed study {canonical_url}",
         fetched_at=datetime(2026, 5, 5, 12, 0, tzinfo=timezone.utc),
         source_id="openalex",
         provenance=Provenance(discovery_source="openalex", **provenance_extra),
-        topic_ids=["klima"],
+        topic_ids=list(topic_ids),
     )
 
 
@@ -103,6 +112,38 @@ class TestPendingReferences:
         storage.upsert_study(cited, status="kept")
 
         assert len(pending_references(storage, limit=3)) == 3
+
+    def test_topic_id_scopes_to_citing_studies_own_topic(
+        self, storage: PostgresStorage
+    ) -> None:
+        # W1 is only cited by a klima study, W2 only by a rente study --
+        # `topic_id="rente"` should surface W2 but not W1, and vice versa,
+        # even though both are pending overall (#59-adjacent gap: a
+        # follower run for one topic shouldn't spend its fetch budget on
+        # another topic's bibliography, see A44).
+        klima_citer = _seed_study(
+            "https://doi.org/10.1/klima-seed",
+            topic_ids=("klima",),
+            referenced_works=["https://openalex.org/W1"],
+        )
+        rente_citer = _seed_study(
+            "https://doi.org/10.1/rente-seed",
+            topic_ids=("rente",),
+            referenced_works=["https://openalex.org/W2"],
+        )
+        storage.upsert_study(klima_citer, status="kept")
+        storage.upsert_study(rente_citer, status="kept")
+
+        assert set(pending_references(storage, topic_id="klima")) == {
+            "https://openalex.org/W1",
+        }
+        assert set(pending_references(storage, topic_id="rente")) == {
+            "https://openalex.org/W2",
+        }
+        assert set(pending_references(storage)) == {
+            "https://openalex.org/W1",
+            "https://openalex.org/W2",
+        }
 
 
 class TestFetchReferencesBatching:

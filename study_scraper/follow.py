@@ -32,30 +32,41 @@ FETCH_BATCH = 50
 
 
 def pending_references(
-    storage: PostgresStorage, *, limit: int = 200
+    storage: PostgresStorage, *, limit: int = 200, topic_id: Optional[str] = None
 ) -> List[str]:
     """OpenAlex work IDs referenced by our studies but not yet ingested.
 
     "Not yet ingested" = the ID is neither any study's canonical_url
     nor any study's provenance openalex_id. Rejected studies still
     count as ingested (a human said no; don't re-suggest).
+
+    `topic_id`, when given, restricts the *citing* studies to that
+    topic — a bibliography is about the citing study's subject, so
+    scoping here (rather than relying on the fetch-side topic filter
+    alone) keeps `--topic X`'s fetch budget spent on candidates that
+    actually have a shot at matching X, instead of being diluted by
+    every other topic's citation graph.
     """
+    topic_clause = "AND %s = ANY(topic_ids)" if topic_id is not None else ""
+    topic_params = [topic_id] if topic_id is not None else []
     with storage.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 WITH cited AS (
                     SELECT DISTINCT jsonb_array_elements_text(
                                provenance->'referenced_works'
                            ) AS work_id
                     FROM   study_scraper.studies
                     WHERE  provenance ? 'referenced_works'
+                    {topic_clause}
                     UNION
                     SELECT DISTINCT jsonb_array_elements_text(
                                provenance->'related_works'
                            ) AS work_id
                     FROM   study_scraper.studies
                     WHERE  provenance ? 'related_works'
+                    {topic_clause}
                 ),
                 known AS (
                     SELECT canonical_url AS work_id
@@ -75,7 +86,7 @@ def pending_references(
                 ORDER  BY c.work_id
                 LIMIT  %s
                 """,
-                (limit,),
+                (*topic_params, *topic_params, limit),
             )
             return [row["work_id"] for row in cur.fetchall()]
 
@@ -97,7 +108,7 @@ def fetch_references(
     from study_scraper.discovery.openalex import OpenAlexSource
     from study_scraper.pipeline import run_one
 
-    ids = pending_references(storage, limit=limit)
+    ids = pending_references(storage, limit=limit, topic_id=topic.id)
     if not ids:
         LOGGER.info("reference follower: nothing pending")
         return []
