@@ -30,6 +30,8 @@ KNOWN_DOMAINS = {
     "europa.eu",
     "govdata.de",
     "doi.org",
+    "core.ac.uk",
+    "bmas.de",
 }
 
 
