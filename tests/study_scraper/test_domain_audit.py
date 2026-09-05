@@ -48,7 +48,7 @@ def test_normalize_domain(url, expected) -> None:
 
 def test_known_domains_cover_existing_sources() -> None:
     for domain in ("openalex.org", "ssoar.info", "dawum.de", "gesis.org",
-                    "govdata.de", "doi.org"):
+                    "govdata.de", "doi.org", "core.ac.uk", "bmas.de"):
         assert domain in KNOWN_DOMAINS
 
 
