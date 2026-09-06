@@ -83,6 +83,14 @@ class StatusReport:
     # pipeline's output ever reaches the LLM attribution stage.
     total_claims: int = 0
     total_attributions: int = 0
+    # How many studies were discovered by the reference follower
+    # (`follow --fetch`, #136) rather than a normal source crawl --
+    # tagged via `provenance->>'discovery_method' = 'reference_follower'`
+    # (discovery/openalex.py). The follower is deliberately unscheduled
+    # (a `.github/**` edit, needs-human), so without this there was no
+    # signal at all for whether it had ever actually been run, only for
+    # what it still had pending (#141/#142's candidate-studies queue).
+    reference_follower_studies_total: int = 0
 
     @property
     def attribution_coverage_rate(self) -> Optional[float]:
@@ -354,6 +362,12 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             total_attributions = int(cur.fetchone()["c"])
 
             cur.execute(
+                f"SELECT COUNT(*) AS c FROM {SCHEMA}.studies "
+                f"WHERE provenance->>'discovery_method' = 'reference_follower'"
+            )
+            reference_follower_studies_total = int(cur.fetchone()["c"])
+
+            cur.execute(
                 f"""
                 SELECT attempted_at::date AS day, COALESCE(SUM(found), 0) AS found
                 FROM   {SCHEMA}.attribution_attempts
@@ -412,6 +426,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         attribution_consecutive_zero_yield_runs=attribution_consecutive_zero_yield_runs,
         total_claims=total_claims,
         total_attributions=total_attributions,
+        reference_follower_studies_total=reference_follower_studies_total,
     )
 
 
@@ -462,6 +477,10 @@ def format_text(report: StatusReport) -> str:
             "  attribution zero-yield streak: "
             f"{report.attribution_consecutive_zero_yield_runs} runs in a row found nothing"
         )
+    lines.append(
+        "  reference-follower studies : "
+        f"{report.reference_follower_studies_total}"
+    )
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:

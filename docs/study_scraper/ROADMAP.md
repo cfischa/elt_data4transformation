@@ -392,3 +392,11 @@ for our verification layers). All items below have shipped:
   and the three needs-human blockers (#65/#113/#49) haven't moved since
   07-04. Scouted and filed #137 (BMAS pension statistics, low priority)
   — 2026-08-31.
+- #136 shipped (2026-08-31) plus its follow-ups: candidate-studies queue
+  in the dock (#141/#142), citation-graph topic-scoping fix (#143/#144,
+  A44), BMAS lake source (#137/#140), and `KNOWN_DOMAINS` coverage for
+  `core.ac.uk`/`bmas.de` (#146/#147). Self-proposed #148 next (2026-09-06):
+  `status`/dock had a queue for the follower's *pending* candidates but
+  no signal for whether it had ever actually been run — added
+  `reference_follower_studies_total`, same "surface X" pattern as
+  #110/#115/#119/#128/#130/#132.
