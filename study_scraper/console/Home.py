@@ -64,7 +64,7 @@ col5.metric(
 # operator sees the same staleness/yield signals a terminal user gets.
 
 st.subheader("Pipeline health")
-hcol1, hcol2, hcol3 = st.columns(3)
+hcol1, hcol2, hcol3, hcol4 = st.columns(4)
 if report.attribution_days_since_last_attempt is None:
     hcol1.metric("Attribution last attempt", "never")
 else:
@@ -81,6 +81,16 @@ else:
         f" ({report.attribution_last_run_yield_rate:.0%})",
     )
 hcol3.metric("Attribution queue backlog", f"{report.attribution_queue_size} studies")
+hcol4.metric(
+    "Reference-follower studies",
+    f"{report.reference_follower_studies_total}",
+    help=(
+        "Studies discovered by `follow --fetch` (#136) rather than a "
+        "normal source crawl. The follower is manual-only (not "
+        "scheduled), so this is the only signal for whether it has "
+        "ever actually been run."
+    ),
+)
 coverage = (
     "—" if report.attribution_coverage_rate is None
     else f"{report.attribution_coverage_rate:.1%}"

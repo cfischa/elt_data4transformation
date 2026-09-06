@@ -70,10 +70,15 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.total_claims == 0
     assert report.total_attributions == 0
     assert report.attribution_coverage_rate is None
+    assert report.reference_follower_studies_total == 0
 
 
-def _seed_study(storage: PostgresStorage, *, title: str):
+def _seed_study(storage: PostgresStorage, *, title: str, discovery_method: str | None = None):
     from study_scraper.models import Provenance, Study
+
+    provenance_kwargs = {"discovery_source": "openalex"}
+    if discovery_method is not None:
+        provenance_kwargs["discovery_method"] = discovery_method
 
     study = Study.build(
         canonical_url=f"https://example.org/{abs(hash(title))}",
@@ -82,7 +87,7 @@ def _seed_study(storage: PostgresStorage, *, title: str):
         publication_date=None,
         fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
         source_id="openalex",
-        provenance=Provenance(discovery_source="openalex"),
+        provenance=Provenance(**provenance_kwargs),
         topic_ids=["klima"],
         topic_scores={"klima": 0.5},
     )
@@ -266,6 +271,35 @@ def test_status_claims_and_attributions_coverage(
     assert "claims / attributions" in text
     assert "2 / 1" in text
     assert "50.0% ever attributed" in text
+
+
+def test_status_reference_follower_studies_zero_by_default(
+    storage: PostgresStorage,
+) -> None:
+    """#148: a normal (non-follower) study must not be counted."""
+    _seed_study(storage, title="Normal Discovery")
+
+    report = build_status(storage)
+    assert report.reference_follower_studies_total == 0
+
+    text = format_text(report)
+    assert "reference-follower studies : 0" in text
+
+
+def test_status_reference_follower_studies_counts_tagged_studies(
+    storage: PostgresStorage,
+) -> None:
+    """#148: studies tagged `discovery_method=reference_follower`
+    (set by OpenAlexSource(work_ids=...), #136) are counted; plain
+    studies are not."""
+    _seed_study(storage, title="Follower Candidate", discovery_method="reference_follower")
+    _seed_study(storage, title="Normal Discovery Two")
+
+    report = build_status(storage)
+    assert report.reference_follower_studies_total == 1
+
+    text = format_text(report)
+    assert "reference-follower studies : 1" in text
 
 
 def test_status_zero_yield_streak_none_when_no_attempts(
