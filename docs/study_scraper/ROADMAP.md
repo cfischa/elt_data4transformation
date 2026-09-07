@@ -12,69 +12,70 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Updated 2026-08-31: Studies: **7,261** (+77 since 08-24, +1.1% — growth
-essentially flat). `bundestag_dip` is now 21.4 days stale, still 401ing
-(#113); `openalex` (5,349) + `ssoar` (797) are the only sources still
-growing, and both are increasingly rate-limit-constrained on the pure
-search-query path. **Attribution is still the starkest gap: claims
-11,453 vs. attributions 93 (0.8% ever attributed)**, queue at 273 (down
-from 326, but from more zero-signal studies draining out, not a cadence
-change). The five issues closed since 08-24 (#110/#119/#121/#126/#128/
-#130) were all attribution-visibility tooling (staleness days, yield %,
-zero-yield streaks, backlog size) — that surface is now comprehensive;
-the underlying `.github/workflows/attribute.yml` cadence it reports on
-is unchanged and out of agent scope. Rather than open another visibility
-ticket, filed a genuine new coverage lever instead: **#136,
-reference-follower step 2** (Phase 5d) — citation-following over
-`referenced_works`/`related_works` IDs already captured in `provenance`
-(A18, step 1, shipped 2026-05-31) but never turned into new candidates.
-No external credential or `.github/**` edit needed, and it's a real lever
-now that the two growing catalog sources are rate-limit-bound. Also
-scouted a new low-priority lake source, BMAS pension statistics (#137,
-free/no-auth CSV-XLSX downloads, indicator data not opinion — see
-"Scouted this round" below).
+Updated 2026-09-07: Studies: **7,304** (+43 since 08-31, +0.6% — growth
+has decelerated four weeks running: 08-17 +68, 08-24 +123, 08-31 +77, now
++43). `bundestag_dip` is now 28.3 days stale, still 401ing (#113);
+`openalex` (5,363) + `ssoar` (826) are the only sources still growing.
+**New and urgent: the attribution pipeline is hard-broken, not just
+slow** — filed #145 (2026-09-04, now priority:high): `attribute.yml`'s
+install step omits `beautifulsoup4`, so every `scheduled-attribute` run
+has failed at the first step since 09-04 (`cli.py` imports it
+unconditionally via `sources/bmas.py`). One-line fix, needs-human. This
+is why attributions only moved 93→**96** this week (+3, well under the
+recent ~+15/week pace) while claims kept climbing to **12,446**
+(0.8% ever attributed, unchanged headline). Also confirmed via the new
+`reference_follower_studies_total` metric (#148) that **#136's
+reference-follower has produced zero live studies** — built and shipped
+08-31, but never added to `scrape.yml`'s crawl step, same
+"shipped-but-idle" pattern as CORE/Eurobarometer/GovData before #65.
+Made the design call on #59 item 3 (lake→answers, was gated on Product
+Direction): build a Eurobarometer-only adapter (#150) — DAWUM/GESIS/
+Eurostat don't fit the `(question, position, %)` shape. Scouted a second
+new low-priority lake source, Bundesfinanzministerium Datenportal
+(#151, free/no-auth CSV, licensed) — see "Scouted this round" below.
 
-1. **Developer: build #136 (reference-follower step 2)** — highest-
-   leverage in-scope item this cycle; see issue for acceptance criteria.
-2. **Wire core + eurobarometer + govdata into the scheduled crawl**
+1. **You: merge #145 (one-line `attribute.yml` install fix)** — now the
+   single highest-leverage action available; every attribution number is
+   downstream of the pipeline actually running.
+2. **Developer: build #150 (Eurobarometer lake → attributions adapter)**
+   — testable against the existing fixture today, doesn't wait on #65,
+   a genuine new lever on the answering half of the goal.
+3. **Wire core + eurobarometer + govdata into the scheduled crawl**
    (issue #65, priority:high, needs-human) — three ready-to-run
    sources, zero live records, one `scrape.yml` edit each (exact lines
-   in the issue). Still the cheapest, most durable fix on the board for
-   `GOAL.md`'s ≥8-production-sources bar.
-3. **Attribution throughput + dark-pipeline stall** (issue #49)
-   **[needs-human]** — `claims` at 9,202 rows and still climbing every
-   crawl; `attributions` stuck at **76** since 2026-08-11 (6+ days,
-   including a run that "succeeded" but wrote zero rows — see #49's
-   08-14/08-17 comments). The cadence half
-   (`scheduled-attribute`'s twice-weekly/`--limit 40` in
-   `.github/workflows/attribute.yml`) is still out of both agents' edit
-   scope; #110 (new, in-scope) adds a staleness signal so this doesn't
-   require manual tracking again. Still the single biggest lever on the
-   *answering* half of the goal.
-4. **Topic-content gap** (issue #50, priority:high, open since
-   2026-06-26 — 7+ weeks) **[needs-human]** — maintainer's ask
+   in the issue). Also now blocks #150's live data. Still the cheapest,
+   most durable fix on the board for `GOAL.md`'s ≥8-production-sources
+   bar.
+4. **Attribution throughput + dark-pipeline stall** (issue #49)
+   **[needs-human]** — moot until #145 lands; once it does, the fixed
+   `--limit 40` cadence in `.github/workflows/attribute.yml` becomes the
+   binding constraint again. Still the single biggest lever on the
+   *answering* half of the goal, next in line after #145.
+5. **Topic-content gap** (issue #50, priority:high, open since
+   2026-06-26 — 10+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
    topic) needs `config/topics/topics.csv` + `questions.yml`, both
    outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
    neither agent can build it as scoped. Scouted 2026-08-17 for an API
    alternative to hand-editing keywords (a structured Russia/Ukraine
    opinion-data source) — found none free/no-auth; stays a config edit.
-5. **`bundestag_dip`** (issue #48, reopened in spirit as #106/A40) —
-   **regressed 2026-08-13**, still 401ing 2026-08-17. PR #91's no-key
-   mirror (A35/A36) worked for exactly 2 scheduled runs before the
-   mirror itself started requiring auth. No further code fix available;
-   converges back to needing a real `DIP_API_KEY`
-   (`infoline.id3@bundestag.de`).
-6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
+6. **`bundestag_dip`** (issue #48, reopened in spirit as #106/#113/A40)
+   — **regressed 2026-08-13**, still 401ing as of 2026-09-07 (28.3 days
+   stale). PR #91's no-key mirror (A35/A36) worked for exactly 2
+   scheduled runs before the mirror itself started requiring auth. No
+   further code fix available; converges back to needing a real
+   `DIP_API_KEY` (`infoline.id3@bundestag.de`). Deprioritized below #65
+   per maintainer's 08-24 silent-default.
+7. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
    labels + value); `eurostat-table --code <code>` is the queryable
    surface. Python, not a SQL view — see DECISIONS.md A34 for why.
-7. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
+8. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
    (issue #71) **[done 2026-07-30]** — topic-crawl order now rotates by
    `GITHUB_RUN_NUMBER` (A32). Confirmed working live 2026-08-03: both
    topics' openalex counts roughly doubled/tripled week over week.
-8. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
+9. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
    #100]** — confirmed transient upstream outage: `ssoar` ran clean on
    both the 2026-08-13 and 2026-08-17 scheduled runs (`errors=0` across
    all 8 topics each time; live `status` on 2026-08-18 shows 625 total
@@ -159,7 +160,25 @@ than code. Ranked by yield per effort:
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
 
-### Scouted this round (2026-08-31)
+### Scouted this round (2026-09-07)
+
+- **Bundesfinanzministerium Datenportal** — new candidate, filed as
+  issue #151 (`priority:low`). Free, no-auth CSV/XLSX tax/budget tables
+  (`bundesfinanzministerium.de/Datenportal`), explicitly licensed
+  `DL-DE-BY-2.0` (better documented than BMAS's unstated license).
+  Official indicator data (tax revenue, budget figures), not opinion —
+  same low-priority class as BMAS (#137), feeds `steuern` coverage
+  depth only.
+- Searched specifically on `steuern` and `migration_einwanderung` (both
+  under-scouted in recent rounds vs. rente/verteidigung/wohnen/bildung).
+  Migration search surfaced nothing new: Statista (paywalled), YouGov DE
+  and FES (HTML/PDF only, no API) — same dead ends as prior rounds.
+- Net: one new low-priority buildable candidate this round, same
+  indicator-not-opinion pattern as BMAS — the free/no-auth
+  *opinion-data* frontier is still exhausted; official-statistics
+  sources remain the only fresh ground.
+
+### Scouted 2026-08-31
 
 - **BMAS pension statistics (Rentenbestandsstatistik)** — new candidate,
   filed as issue #137 (`priority:low`). Free, no-auth CSV/XLSX downloads
@@ -400,3 +419,12 @@ for our verification layers). All items below have shipped:
   no signal for whether it had ever actually been run — added
   `reference_follower_studies_total`, same "surface X" pattern as
   #110/#115/#119/#128/#130/#132.
+- **2026-09-07 (Product Direction):** live `reference_follower_studies_total`
+  reads **0** — #136 has never actually run in production (not wired into
+  `scrape.yml`, needs-human, flagged for the first time this round). Bumped
+  #145 (`scheduled-attribute` hard-broken by a missing `beautifulsoup4` in
+  `attribute.yml`'s install step, filed by the monitor 2026-09-04) to
+  `priority:high` — it's the acute blocker this week, distinct from #49's
+  slow-cadence problem. Resolved #59 item 3's design gate (lake→answers):
+  Eurobarometer-only adapter, filed as #150. Closed #59. Scouted and filed
+  #151 (Bundesfinanzministerium Datenportal, low priority).
