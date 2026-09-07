@@ -1223,6 +1223,58 @@ project URL + service-role key (placed in `.env`, not committed), or
   deriving the fixture title from `canonical_url` so each seeded study
   is genuinely distinct.
 
+### A45. Eurostat oversized datasets record a `payload_uri` pointer instead of vanishing (#153)
+
+- **Date:** 2026-09-07
+- **Context:** self-propose pick this cycle — the two open `agent:task`
+  issues (#150 Eurobarometer lake→attributions, #151 Bundesfinanzministerium
+  Datenportal) both turned out non-buildable on investigation (see their
+  issue comments: #150's premise assumed percentage data the source
+  never carries; #151's target domain is behind Radware bot management
+  and the same catalog is already reachable via the existing `govdata`
+  source), so fell back to `ACCURACY.md`'s deferred backlog per the
+  developer-agent skill. Picked up F7's Eurostat half: `EurostatSource`'s
+  `max_bytes` size guard (A14.1, added for the `nrg_bal_s` MemoryError)
+  returned `None` with only a `LOGGER.warning` on an over-size response.
+  `iter_records` then `continue`d — the dataset code was never counted
+  in `candidates_seen`, never written to `source_records`, and left no
+  trace an operator could see post-hoc. `tests/study_scraper/
+  test_eurostat_fetch.py` had a test asserting exactly this silent-drop
+  behavior (`recs == []`), so it wasn't a regression, just untested-as-
+  a-loss original behavior.
+- **Decision:** migration 0005's `source_records.payload_uri` column
+  ("Storage URI for binary / oversized payloads") already exists for
+  exactly this case and `SourceRecord.build()` already requires exactly
+  one of `payload`/`payload_uri`. An over-size dataset now yields a
+  `SourceRecord` with `payload=None`, `payload_uri` set to the Eurostat
+  databrowser view URL for that code, and `provenance={"oversized":
+  True, "byte_size": ..., "max_bytes": ...}` — visible in the lake and
+  the dock's Lake page (`console/pages/3_Lake.py` already renders
+  `payload_uri` specially). `content_hash` is computed from the real
+  downloaded bytes (not fabricated), so a later re-fetch under a
+  narrower filter still registers as a genuine change. The normal
+  (under-limit) path's hash is unchanged — still the canonical
+  sorted-keys JSON re-hash, not the raw response bytes, so upstream
+  whitespace/key-order noise between fetches doesn't cause spurious
+  "changed" detections there.
+- **Also fixed while in the neighborhood:** `tests/study_scraper/
+  test_eurostat.py` and `test_gesis.py` both had a module-level
+  `pytestmark = pytest.mark.skipif(not TEST_DSN, ...)` that applies to
+  *every* test in the file, not just the integration ones below it —
+  silently skipping each file's ~10-30 pure fixture-parser unit tests
+  whenever `STUDY_SCRAPER_TEST_DSN` is unset (i.e. every normal CI run).
+  This was flagged as a known latent issue in `test_eurobarometer.py`'s
+  own history ("test_gesis.py and test_eurostat.py use the module-level
+  form and appear to have the same latent issue; out of scope to fix
+  here") but never picked up. Fixed both by scoping the marker to a
+  `TestLakeIngestIntegration` class, matching `test_bmas.py`/
+  `test_eurobarometer.py`'s existing pattern — confirmed via
+  `STUDY_SCRAPER_TEST_DSN= pytest tests/study_scraper/test_eurostat.py
+  tests/study_scraper/test_gesis.py` that all pure-parser tests now run
+  (33 passed vs. all-skipped before), and via a local docker-compose
+  Postgres that the integration classes (previously *never* exercised
+  in this sandbox either) pass for real.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
