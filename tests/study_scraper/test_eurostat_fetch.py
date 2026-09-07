@@ -5,12 +5,16 @@ transport — no network, no DB — so they always run. They cover the
 fixes for the `nrg_bal_s` MemoryError seen on 2026-06-24:
 
   - geo=DE is applied by default (shrinks payloads ~30x);
-  - an over-size response is skipped (warning) instead of crashing;
+  - an over-size response records a `payload_uri` pointer instead of
+    crashing *or* silently vanishing (#153 -- it used to just be
+    dropped, with nothing in `source_records` and no trace past a log
+    line, see the module docstring in `sources/eurostat.py`);
   - a 400 on the filtered request retries unfiltered.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import httpx
@@ -68,16 +72,62 @@ def test_custom_geo_filter() -> None:
     assert seen["geo"] == "FR"
 
 
-def test_oversize_payload_is_skipped_not_fatal() -> None:
+def test_oversize_payload_records_pointer_not_fatal() -> None:
     big = ("x" * 200).encode()  # bytes; we only need to exceed max_bytes
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=big)
 
-    # max_bytes below the response size => skipped, no MemoryError, no raise.
+    # max_bytes below the response size => no MemoryError, no raise, and
+    # (per #153) not silently dropped either -- a pointer record instead.
     recs = _records(EurostatSource(
         codes=["nrg_bal_s"], max_bytes=100, client=_client(handler)))
-    assert recs == []
+    assert len(recs) == 1
+    record = recs[0]
+    assert record.payload is None
+    assert record.payload_uri == (
+        "https://ec.europa.eu/eurostat/databrowser/view/nrg_bal_s"
+    )
+    assert record.provenance["oversized"] is True
+    assert record.provenance["byte_size"] == 200
+    assert record.provenance["max_bytes"] == 100
+    # Real bytes' hash, not fabricated -- a later re-fetch under a
+    # narrower filter that actually changes still registers as a change.
+    assert record.content_hash == hashlib.sha256(big).hexdigest()
+
+
+def test_under_limit_payload_is_unaffected_by_the_size_guard() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_MINIMAL_DATASET)
+
+    recs = _records(EurostatSource(
+        codes=["nrg_bal_s"], max_bytes=1_000_000, client=_client(handler)))
+    assert len(recs) == 1
+    assert recs[0].payload is not None
+    assert recs[0].payload_uri is None
+    assert recs[0].provenance.get("oversized") is not True
+
+
+def test_oversized_code_does_not_abort_other_codes_in_the_same_run() -> None:
+    small_body = json.dumps(_MINIMAL_DATASET).encode()
+    big_body = ("x" * (len(small_body) * 10)).encode()
+    bodies = {"big_code": big_body, "small_code": small_body}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        code = str(request.url).rsplit("/", 1)[-1].split("?", 1)[0]
+        return httpx.Response(200, content=bodies[code])
+
+    recs = _records(EurostatSource(
+        codes=["big_code", "small_code"],
+        max_bytes=len(small_body) + 1,
+        client=_client(handler),
+    ))
+    by_code = {r.source_record_id: r for r in recs}
+    assert set(by_code) == {"big_code", "small_code"}
+    assert by_code["big_code"].payload is None
+    assert by_code["big_code"].payload_uri is not None
+    assert by_code["small_code"].payload is not None
+    assert by_code["small_code"].payload_uri is None
 
 
 def test_400_on_filtered_request_retries_unfiltered() -> None:

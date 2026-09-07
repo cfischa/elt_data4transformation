@@ -237,68 +237,73 @@ class TestLiveRetry:
 
 # --------------------------------------------------------------------------
 # Integration: lake ingest end-to-end
+#
+# NOTE: `pytestmark` is scoped to this *class*, not module-level -- a
+# bare module-level `pytestmark` applies to every test in the file,
+# which silently skipped this file's pure parser tests above whenever
+# STUDY_SCRAPER_TEST_DSN was unset (i.e. in normal CI). Same fix as
+# test_eurobarometer.py's / test_bmas.py's `TestLakeIngestIntegration`
+# (#153; flagged as a known latent issue in test_eurobarometer.py's
+# history, never picked up until now).
 # --------------------------------------------------------------------------
 
 
-pytestmark = pytest.mark.skipif(
-    not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
-)
+class TestLakeIngestIntegration:
+    pytestmark = pytest.mark.skipif(
+        not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
+    )
 
+    @pytest.fixture()
+    def storage(self) -> PostgresStorage:
+        assert TEST_DSN is not None
+        store = PostgresStorage(TEST_DSN)
+        store.migrate()
+        return store
 
-@pytest.fixture(scope="module")
-def storage() -> PostgresStorage:
-    assert TEST_DSN is not None
-    store = PostgresStorage(TEST_DSN)
-    store.migrate()
-    return store
+    @pytest.fixture(autouse=True)
+    def _clean(self, storage: PostgresStorage) -> Iterator[None]:
+        with storage.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE study_scraper.claims CASCADE")
+                cur.execute("TRUNCATE study_scraper.source_records CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
+            conn.commit()
+        yield
 
+    def test_lake_ingest_populates_source_records(
+        self, storage: PostgresStorage
+    ) -> None:
+        with GESISSource(from_file=FIXTURE) as src:
+            run = run_lake_ingest(
+                source=src, storage=storage, topic_ids=["klima"]
+            )
+        assert run.candidates_seen == 4
+        assert run.candidates_kept == 4
+        assert storage.count_source_records(source_id="gesis") == 4
 
-@pytest.fixture(autouse=True)
-def _clean(storage: PostgresStorage) -> Iterator[None]:
-    with storage.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE study_scraper.claims CASCADE")
-            cur.execute("TRUNCATE study_scraper.source_records CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
-        conn.commit()
-    yield
+    def test_lake_ingest_is_idempotent(self, storage: PostgresStorage) -> None:
+        with GESISSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
+        with GESISSource(from_file=FIXTURE) as src:
+            run = run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
+        assert run.candidates_kept == 0  # unchanged content, no new rows
+        assert storage.count_source_records(source_id="gesis") == 4
 
+    def test_topic_tagging_persists(self, storage: PostgresStorage) -> None:
+        with GESISSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
+        rows = storage.list_source_records(source_id="gesis", topic_id="klima")
+        assert len(rows) == 4
 
-def test_lake_ingest_populates_source_records(storage: PostgresStorage) -> None:
-    with GESISSource(from_file=FIXTURE) as src:
-        run = run_lake_ingest(
-            source=src, storage=storage, topic_ids=["klima"]
-        )
-    assert run.candidates_seen == 4
-    assert run.candidates_kept == 4
-    assert storage.count_source_records(source_id="gesis") == 4
-
-
-def test_lake_ingest_is_idempotent(storage: PostgresStorage) -> None:
-    with GESISSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
-    with GESISSource(from_file=FIXTURE) as src:
-        run = run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
-    assert run.candidates_kept == 0  # unchanged content, no new rows
-    assert storage.count_source_records(source_id="gesis") == 4
-
-
-def test_topic_tagging_persists(storage: PostgresStorage) -> None:
-    with GESISSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage, topic_ids=["klima"])
-    rows = storage.list_source_records(source_id="gesis", topic_id="klima")
-    assert len(rows) == 4
-
-
-def test_doi_promoted_to_typed_column(storage: PostgresStorage) -> None:
-    with GESISSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage)
-    rows = storage.list_source_records(source_id="gesis")
-    dois = {row.get("source_record_id") for row in rows}
-    # Source record id is last URI segment (e.g. "1.14206"); DOIs match
-    # those when populated.
-    assert "1.14206" in dois     # Politbarometer
-    assert "1.14374" in dois     # Umweltbewusstsein 2022
-    assert "1.13298" in dois     # Umweltbewusstsein 2018
+    def test_doi_promoted_to_typed_column(self, storage: PostgresStorage) -> None:
+        with GESISSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage)
+        rows = storage.list_source_records(source_id="gesis")
+        dois = {row.get("source_record_id") for row in rows}
+        # Source record id is last URI segment (e.g. "1.14206"); DOIs match
+        # those when populated.
+        assert "1.14206" in dois     # Politbarometer
+        assert "1.14374" in dois     # Umweltbewusstsein 2022
+        assert "1.13298" in dois     # Umweltbewusstsein 2018

@@ -21,10 +21,13 @@ country × category × year. Unfiltered, a table like `nrg_bal_s`
 (Simplified energy balances) is ~69 MB / 1.6M data points and blows up
 `json.loads` into a MemoryError. Since this is a German scraper we
 filter to `geo=DE` by default, which both shrinks the payload by ~30x
-and makes it relevant. A `max_bytes` guard skips any response that is
-still pathologically large (logged, not fatal — coverage-first stays
-resilient). Datasets without a `geo` dimension return HTTP 400 to the
-filtered request; we transparently retry unfiltered (under the guard).
+and makes it relevant. A `max_bytes` guard catches any response that is
+still pathologically large: rather than storing the payload, we record
+a `source_records` row with `payload_uri` pointing at the dataset's
+databrowser page and `provenance.oversized=True` (not fatal — coverage-
+first stays resilient, and the dataset isn't silently lost either, #153).
+Datasets without a `geo` dimension return HTTP 400 to the filtered
+request; we transparently retry unfiltered (under the guard).
 
 License: Eurostat re-use policy (CC BY 4.0 with attribution). Captured
 on every emitted SourceRecord.
@@ -35,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
@@ -46,6 +50,18 @@ from study_scraper.models import SourceRecord
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class _FetchResult:
+    """Result of one live dataset fetch -- `payload` is None exactly
+    when `oversized` is True (the size guard tripped, see
+    `_fetch_payload`)."""
+
+    payload: Optional[Dict[str, Any]]
+    content_hash: str
+    oversized: bool
+    byte_size: int
 
 DEFAULT_BASE_URL = (
     "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
@@ -129,11 +145,19 @@ class EurostatSource:
         now = datetime.now(timezone.utc)
         yielded = 0
         for code in self._codes:
-            payload = self._fetch_payload(code)
-            if payload is None:
-                continue
+            fetched = self._fetch_payload(code)
             record = self._build_record(
-                code=code, payload=payload, now=now, run_id=run_id,
+                code=code,
+                payload=fetched.payload,
+                now=now,
+                run_id=run_id,
+                oversized=fetched.oversized,
+                # Only the oversized branch needs the raw-bytes hash (no
+                # parsed payload to canonically re-hash); the normal path
+                # keeps hashing the canonical JSON as before, unaffected
+                # by upstream whitespace/key-order noise between fetches.
+                content_hash=fetched.content_hash if fetched.oversized else None,
+                byte_size=fetched.byte_size,
             )
             if record is None:
                 continue
@@ -152,10 +176,12 @@ class EurostatSource:
             params.update(self._filters)
         return params
 
-    def _fetch_payload(self, code: str) -> Optional[Dict[str, Any]]:
+    def _fetch_payload(self, code: str) -> "_FetchResult":
         """GET one dataset as JSON-stat, applying the geo filter and the
-        size guard. Returns None (with a warning) rather than raising on
-        an over-size payload, so one bad table can't abort the run.
+        size guard. An over-size payload comes back with `oversized=True`
+        and `payload=None` rather than raising, so one bad table can't
+        abort the run -- the caller still records a pointer for it
+        instead of silently dropping it (see `_build_record`).
 
         Datasets without the filtered dimension answer 400; we retry once
         unfiltered (still under the size guard)."""
@@ -173,14 +199,26 @@ class EurostatSource:
             resp = self._get(code, with_filters=False)
         resp.raise_for_status()
         content = resp.content
+        content_hash = hashlib.sha256(content).hexdigest()
         if len(content) > self._max_bytes:
             LOGGER.warning(
                 "eurostat %s: payload %d bytes exceeds max_bytes %d; "
-                "skipping (narrow it with filters, e.g. geo=DE)",
+                "recording a pointer, not the payload (narrow it with "
+                "filters, e.g. geo=DE)",
                 code, len(content), self._max_bytes,
             )
-            return None
-        return json.loads(content)
+            return _FetchResult(
+                payload=None,
+                content_hash=content_hash,
+                oversized=True,
+                byte_size=len(content),
+            )
+        return _FetchResult(
+            payload=json.loads(content),
+            content_hash=content_hash,
+            oversized=False,
+            byte_size=len(content),
+        )
 
     def _get(self, code: str, *, with_filters: bool) -> httpx.Response:
         url = f"{self._base_url}/{code}"
@@ -248,22 +286,57 @@ class EurostatSource:
         self,
         *,
         code: str,
-        payload: Dict[str, Any],
+        payload: Optional[Dict[str, Any]],
         now: datetime,
         run_id: str,
+        oversized: bool = False,
+        content_hash: Optional[str] = None,
+        byte_size: Optional[int] = None,
     ) -> Optional[SourceRecord]:
+        canonical_url = VIEWER_URL.format(code=code)
+
+        if oversized:
+            # The size guard tripped (`_fetch_payload`) -- no payload to
+            # store, but record a pointer (per migration 0005's
+            # `payload_uri` column) rather than silently dropping the
+            # dataset. `content_hash` is the real downloaded bytes' hash
+            # (computed before we gave up on them), so a later re-fetch
+            # under a narrower filter still registers as a change.
+            assert content_hash is not None  # always set alongside oversized
+            return SourceRecord.build(
+                source_id=self.source_id,
+                source_record_id=code,
+                canonical_url=canonical_url,
+                format=RECORD_FORMAT,
+                content_type="application/json",
+                content_hash=content_hash,
+                fetched_at=now,
+                discovery_run_id=run_id,
+                payload_uri=canonical_url,
+                license=EUROSTAT_LICENSE,
+                provenance={
+                    "fetch_source": "eurostat_dissemination_v1",
+                    "base_url": self._base_url,
+                    "code": code,
+                    "oversized": True,
+                    "byte_size": byte_size,
+                    "max_bytes": self._max_bytes,
+                    "filters": dict(self._filters),
+                },
+            )
+
         if not payload:
             return None
-        canonical_url = VIEWER_URL.format(code=code)
         title_hint = payload.get("label") or code
         updated = payload.get("updated")
         size = payload.get("size") or []
-        # Hash the canonical sorted-keys payload so re-fetching the
-        # same data hashes the same way.
-        payload_bytes = json.dumps(
-            payload, ensure_ascii=False, sort_keys=True
-        ).encode("utf-8")
-        content_hash = hashlib.sha256(payload_bytes).hexdigest()
+        if content_hash is None:
+            # Fixture path: no raw bytes, hash the canonical sorted-keys
+            # payload so re-loading the same fixture hashes the same way.
+            payload_bytes = json.dumps(
+                payload, ensure_ascii=False, sort_keys=True
+            ).encode("utf-8")
+            content_hash = hashlib.sha256(payload_bytes).hexdigest()
 
         return SourceRecord.build(
             source_id=self.source_id,

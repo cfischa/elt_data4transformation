@@ -36,9 +36,13 @@ study was auto-kept/rejected).
   would reduce accuracy; surface DAWUM via its typed views instead. Parser
   `source_record_id` support already exists for a future policy-opinion
   lake source.
-- **F7 structured-lake metadata** (German `sample_size` parsing, Eurostat
-  oversized→pending, GESIS DOI validation) — small, do when a real fixture
-  exposes the loss.
+- **F7 structured-lake metadata** (German `sample_size` parsing, GESIS DOI
+  validation) — small, do when a real fixture exposes the loss. The
+  Eurostat half shipped 2026-09-07 (#153): an over-size dataset now
+  records a `source_records` row with `payload_uri` pointing at the
+  databrowser page instead of silently vanishing (it previously left
+  zero trace — not even counted in `candidates_seen` — see
+  DECISIONS.md A45).
 
 ## Needs the maintainer (can't be done in-sandbox)
 

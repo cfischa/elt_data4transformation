@@ -115,49 +115,54 @@ class TestEurostatParser:
 
 # --------------------------------------------------------------------------
 # Integration: lake ingest end-to-end
+#
+# NOTE: `pytestmark` is scoped to this *class*, not module-level -- a
+# bare module-level `pytestmark` applies to every test in the file,
+# which silently skipped this file's pure parser tests above whenever
+# STUDY_SCRAPER_TEST_DSN was unset (i.e. in normal CI). Same fix as
+# test_eurobarometer.py's `TestLakeIngestIntegration` / test_bmas.py's
+# `TestLakeIngestIntegration` (#153; flagged as a known latent issue in
+# test_eurobarometer.py's history, never picked up until now).
 # --------------------------------------------------------------------------
 
 
-pytestmark = pytest.mark.skipif(
-    not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
-)
+class TestLakeIngestIntegration:
+    pytestmark = pytest.mark.skipif(
+        not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
+    )
 
+    @pytest.fixture()
+    def storage(self) -> PostgresStorage:
+        assert TEST_DSN is not None
+        store = PostgresStorage(TEST_DSN)
+        store.migrate()
+        return store
 
-@pytest.fixture(scope="module")
-def storage() -> PostgresStorage:
-    assert TEST_DSN is not None
-    store = PostgresStorage(TEST_DSN)
-    store.migrate()
-    return store
+    @pytest.fixture(autouse=True)
+    def _clean(self, storage: PostgresStorage) -> Iterator[None]:
+        with storage.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE study_scraper.claims CASCADE")
+                cur.execute("TRUNCATE study_scraper.source_records CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
+            conn.commit()
+        yield
 
+    def test_eurostat_lake_ingest(self, storage: PostgresStorage) -> None:
+        with EurostatSource(from_file=FIXTURE) as src:
+            run = run_lake_ingest(
+                source=src, storage=storage, topic_ids=["klima"]
+            )
+        assert run.candidates_seen == 2
+        assert run.candidates_kept == 2
+        assert storage.count_source_records(source_id="eurostat") == 2
 
-@pytest.fixture(autouse=True)
-def _clean(storage: PostgresStorage) -> Iterator[None]:
-    with storage.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE study_scraper.claims CASCADE")
-            cur.execute("TRUNCATE study_scraper.source_records CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
-        conn.commit()
-    yield
-
-
-def test_eurostat_lake_ingest(storage: PostgresStorage) -> None:
-    with EurostatSource(from_file=FIXTURE) as src:
-        run = run_lake_ingest(
-            source=src, storage=storage, topic_ids=["klima"]
-        )
-    assert run.candidates_seen == 2
-    assert run.candidates_kept == 2
-    assert storage.count_source_records(source_id="eurostat") == 2
-
-
-def test_eurostat_ingest_is_idempotent(storage: PostgresStorage) -> None:
-    with EurostatSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage)
-    with EurostatSource(from_file=FIXTURE) as src:
-        second = run_lake_ingest(source=src, storage=storage)
-    assert second.candidates_kept == 0  # nothing new
-    assert storage.count_source_records(source_id="eurostat") == 2
+    def test_eurostat_ingest_is_idempotent(self, storage: PostgresStorage) -> None:
+        with EurostatSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage)
+        with EurostatSource(from_file=FIXTURE) as src:
+            second = run_lake_ingest(source=src, storage=storage)
+        assert second.candidates_kept == 0  # nothing new
+        assert storage.count_source_records(source_id="eurostat") == 2
