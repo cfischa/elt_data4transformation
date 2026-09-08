@@ -19,6 +19,23 @@ from study_scraper.storage import PostgresStorage
 
 SCHEMA = "study_scraper"
 
+# Canonical registry of every source_id the CLI knows how to run --
+# "catalog" sources (study_scraper/discovery/*.py) write to `studies`;
+# "lake" sources (study_scraper/sources/*.py) write to `source_records`.
+# Single source of truth for "which sources exist at all", independent of
+# whether any of them have ever actually been invoked -- see
+# `never_run_sources` below (issue #65: CORE/Eurobarometer/GovData shipped
+# and fixture-tested but never added to `scrape.yml`'s crawl step, so they
+# had 0 live records with no signal anywhere that they existed and simply
+# hadn't run, as opposed to not existing). `console/_sources.py`'s
+# `source_kind()` re-exports these two sets rather than hand-maintaining a
+# second copy.
+CATALOG_SOURCE_IDS = frozenset({"ssoar", "openalex", "bundestag_dip", "core"})
+LAKE_SOURCE_IDS = frozenset(
+    {"dawum", "gesis", "eurostat", "govdata", "eurobarometer", "bmas"}
+)
+KNOWN_SOURCE_IDS = CATALOG_SOURCE_IDS | LAKE_SOURCE_IDS
+
 
 @dataclass
 class StatusReport:
@@ -91,6 +108,14 @@ class StatusReport:
     # signal at all for whether it had ever actually been run, only for
     # what it still had pending (#141/#142's candidate-studies queue).
     reference_follower_studies_total: int = 0
+    # Known source_ids (KNOWN_SOURCE_IDS) with zero rows in `crawl_runs` --
+    # a source that's built and fixture-tested but was never wired into the
+    # scheduled crawl (or run manually) reads identically to "doesn't exist"
+    # in every other status field, since studies_per_source/
+    # source_records_per_source/runs_per_source are all derived from what's
+    # already in the DB (#65's "shipped-but-idle" pattern, repeated for
+    # CORE/Eurobarometer/GovData and the reference-follower before #148).
+    never_run_sources: List[str] = field(default_factory=list)
 
     @property
     def attribution_coverage_rate(self) -> Optional[float]:
@@ -393,6 +418,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         for source_id in runs_per_source
     }
 
+    never_run_sources = sorted(KNOWN_SOURCE_IDS - set(runs_per_source))
+
     attribution_consecutive_zero_yield_runs = 0
     for row in run_days:
         if int(row["found"]) != 0:
@@ -427,6 +454,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         total_claims=total_claims,
         total_attributions=total_attributions,
         reference_follower_studies_total=reference_follower_studies_total,
+        never_run_sources=never_run_sources,
     )
 
 
@@ -481,6 +509,11 @@ def format_text(report: StatusReport) -> str:
         "  reference-follower studies : "
         f"{report.reference_follower_studies_total}"
     )
+    if report.never_run_sources:
+        lines.append(
+            "  sources never run (built, no crawl yet): "
+            f"{', '.join(report.never_run_sources)}"
+        )
     lines.append("")
     lines.append("  studies per topic:")
     if report.studies_per_topic:
