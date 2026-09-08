@@ -58,6 +58,7 @@ all_sources = sorted(
     | set(report.source_records_per_source)
     | set(report.runs_per_source)
     | set(run_stats)
+    | set(report.never_run_sources)
 )
 
 rows = []

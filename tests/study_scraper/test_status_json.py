@@ -62,6 +62,7 @@ def test_report_to_dict_includes_computed_rates() -> None:
     # Plain dataclass fields still come through as before.
     assert payload["total_studies"] == 10
     assert payload["attribution_queue_size"] == 12
+    assert payload["never_run_sources"] == []
 
 
 def test_report_to_dict_handles_none_rates() -> None:

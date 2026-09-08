@@ -16,7 +16,7 @@ from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.models import CrawlRun
 from study_scraper.pipeline import run_one
-from study_scraper.status import build_status, format_text
+from study_scraper.status import KNOWN_SOURCE_IDS, build_status, format_text
 from study_scraper.storage import PostgresStorage
 from study_scraper.topics import load_topics
 
@@ -368,6 +368,38 @@ def test_status_zero_yield_streak_below_threshold_not_shown(
 
     text = format_text(report)
     assert "zero-yield streak" not in text
+
+
+def test_status_never_run_sources_lists_every_known_source_on_empty_db(
+    storage: PostgresStorage,
+) -> None:
+    """#65's "shipped-but-idle" pattern (CORE/Eurobarometer/GovData built
+    and fixture-tested but 0 live records): with no crawl_runs at all,
+    every known source_id must show up as never-run rather than being
+    invisible."""
+    report = build_status(storage)
+    assert set(report.never_run_sources) == set(KNOWN_SOURCE_IDS)
+
+    text = format_text(report)
+    assert "sources never run" in text
+    assert "ssoar" in text.split("sources never run")[1]
+
+
+def test_status_never_run_sources_excludes_a_source_with_any_run(
+    storage: PostgresStorage, topics_list
+) -> None:
+    """A source drops off `never_run_sources` as soon as it has one
+    crawl_runs row, clean or not -- this tracks "has it ever been
+    invoked", distinct from `source_days_since_last_success`'s "was its
+    most recent run clean"."""
+    klima = _klima(topics_list)
+    with SSOARSource(from_file=FIXTURES / "ssoar" / "klima_records.xml") as src:
+        run_one(source=src, topic=klima, storage=storage)
+
+    report = build_status(storage)
+    assert "ssoar" not in report.never_run_sources
+    assert "core" in report.never_run_sources
+    assert "eurobarometer" in report.never_run_sources
 
 
 def test_status_after_two_source_run(
