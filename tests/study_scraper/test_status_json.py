@@ -37,6 +37,7 @@ def _report(**overrides) -> StatusReport:
         attribution_last_run_attempts=40,
         attribution_last_run_found=4,
         attribution_queue_size=12,
+        attribution_queue_per_topic={"klima": 9, "steuern": 3},
         total_claims=100,
         total_attributions=10,
     )
@@ -62,6 +63,7 @@ def test_report_to_dict_includes_computed_rates() -> None:
     # Plain dataclass fields still come through as before.
     assert payload["total_studies"] == 10
     assert payload["attribution_queue_size"] == 12
+    assert payload["attribution_queue_per_topic"] == {"klima": 9, "steuern": 3}
     assert payload["never_run_sources"] == []
 
 

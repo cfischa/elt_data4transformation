@@ -116,6 +116,12 @@ class StatusReport:
     # already in the DB (#65's "shipped-but-idle" pattern, repeated for
     # CORE/Eurobarometer/GovData and the reference-follower before #148).
     never_run_sources: List[str] = field(default_factory=list)
+    # Per-topic breakdown of `attribution_queue` (#49's backlog, unnested
+    # the same way as `studies_per_topic`) -- the queue total alone
+    # doesn't tell an operator *which* topic to spend the fixed per-run
+    # attribution budget on; a topic sitting at the top of the backlog
+    # for weeks is invisible next to a single global count.
+    attribution_queue_per_topic: Dict[str, int] = field(default_factory=dict)
 
     @property
     def attribution_coverage_rate(self) -> Optional[float]:
@@ -380,6 +386,18 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.attribution_queue")
             attribution_queue_size = int(cur.fetchone()["c"])
 
+            cur.execute(
+                f"""
+                SELECT unnest(topic_ids) AS topic_id, COUNT(*) AS c
+                FROM   {SCHEMA}.attribution_queue
+                GROUP  BY topic_id
+                ORDER  BY c DESC
+                """
+            )
+            attribution_queue_per_topic = {
+                row["topic_id"]: int(row["c"]) for row in cur.fetchall()
+            }
+
             cur.execute(f"SELECT COUNT(*) AS c FROM {SCHEMA}.claims")
             total_claims = int(cur.fetchone()["c"])
 
@@ -450,6 +468,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         attribution_last_run_attempts=attribution_last_run_attempts,
         attribution_last_run_found=attribution_last_run_found,
         attribution_queue_size=attribution_queue_size,
+        attribution_queue_per_topic=attribution_queue_per_topic,
         attribution_consecutive_zero_yield_runs=attribution_consecutive_zero_yield_runs,
         total_claims=total_claims,
         total_attributions=total_attributions,
@@ -491,6 +510,12 @@ def format_text(report: StatusReport) -> str:
             f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
     lines.append(f"  attribution queue backlog  : {report.attribution_queue_size} studies")
+    if report.attribution_queue_per_topic:
+        per_topic = ", ".join(
+            f"{topic_id}={n}"
+            for topic_id, n in report.attribution_queue_per_topic.items()
+        )
+        lines.append(f"  attribution queue by topic : {per_topic}")
     lines.append(
         "  claims / attributions      : "
         f"{report.total_claims} / {report.total_attributions}"

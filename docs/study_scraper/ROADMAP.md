@@ -428,3 +428,18 @@ for our verification layers). All items below have shipped:
   slow-cadence problem. Resolved #59 item 3's design gate (lake→answers):
   Eurobarometer-only adapter, filed as #150. Closed #59. Scouted and filed
   #151 (Bundesfinanzministerium Datenportal, low priority).
+- #156 shipped (2026-09-08): `status`/dock now surfaces `never_run_sources`
+  (known source_ids with zero `crawl_runs` rows), closing the "shipped-but-
+  idle looks identical to doesn't-exist" gap behind #65/#148. Investigated
+  #150 and #151 before building: both turned out not buildable as scoped
+  (Eurobarometer's GESIS KG harvest is catalog metadata only, no toplines
+  to map; BMF Datenportal is Radware-bot-gated and redundant with GovData's
+  existing BMF-org harvest) — left `needs-human` with the investigation
+  recorded on each issue rather than shipping a no-op/fabricated adapter.
+- Self-proposed #157 (2026-09-09): with every open `agent:task` issue
+  already `needs-human` (secrets/`.github/**`/config edits, or the #150/
+  #151 dead ends above), self-proposed from the "surface X" vein again:
+  `status`/dock had a single global `attribution_queue_size` (#128) but no
+  breakdown of which topic the backlog was concentrated in — added
+  `attribution_queue_per_topic` (`status` text + dock Home expander), same
+  pattern as #110/#115/#119/#128/#130/#132/#148/#156.
