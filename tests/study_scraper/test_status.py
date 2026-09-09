@@ -73,7 +73,13 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.reference_follower_studies_total == 0
 
 
-def _seed_study(storage: PostgresStorage, *, title: str, discovery_method: str | None = None):
+def _seed_study(
+    storage: PostgresStorage,
+    *,
+    title: str,
+    discovery_method: str | None = None,
+    topic_id: str = "klima",
+):
     from study_scraper.models import Provenance, Study
 
     provenance_kwargs = {"discovery_source": "openalex"}
@@ -88,8 +94,8 @@ def _seed_study(storage: PostgresStorage, *, title: str, discovery_method: str |
         fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
         source_id="openalex",
         provenance=Provenance(**provenance_kwargs),
-        topic_ids=["klima"],
-        topic_scores={"klima": 0.5},
+        topic_ids=[topic_id],
+        topic_scores={topic_id: 0.5},
     )
     storage.upsert_study(study)
     return study
@@ -234,6 +240,41 @@ def test_status_attribution_queue_size_counts_and_excludes(
     text = format_text(report)
     assert "attribution queue backlog" in text
     assert "1 studies" in text
+
+
+def test_status_attribution_queue_per_topic(storage: PostgresStorage) -> None:
+    """The queue backlog broken out by topic (unnest, same shape as
+    studies_per_topic) -- lets an operator see *which* topic to spend the
+    fixed per-run attribution budget on instead of one global count."""
+    from study_scraper.claims import extract_claims
+
+    def _seed_claims(study):
+        claims = extract_claims(
+            study_id=study.id, title=study.title, abstract=study.abstract
+        )
+        storage.upsert_claims(study.id, claims)
+
+    klima_a = _seed_study(storage, title="Klima Waiting A", topic_id="klima")
+    _seed_claims(klima_a)
+    klima_b = _seed_study(storage, title="Klima Waiting B", topic_id="klima")
+    _seed_claims(klima_b)
+    steuern = _seed_study(storage, title="Steuern Waiting", topic_id="steuern")
+    _seed_claims(steuern)
+
+    report = build_status(storage)
+    assert report.attribution_queue_per_topic == {"klima": 2, "steuern": 1}
+
+    text = format_text(report)
+    assert "attribution queue by topic" in text
+    assert "klima=2" in text
+    assert "steuern=1" in text
+
+
+def test_status_attribution_queue_per_topic_empty(storage: PostgresStorage) -> None:
+    report = build_status(storage)
+    assert report.attribution_queue_per_topic == {}
+    text = format_text(report)
+    assert "attribution queue by topic" not in text
 
 
 def test_status_claims_and_attributions_coverage(

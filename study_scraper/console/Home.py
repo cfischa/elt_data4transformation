@@ -91,6 +91,13 @@ hcol4.metric(
         "ever actually been run."
     ),
 )
+if report.attribution_queue_per_topic:
+    with st.expander("Attribution queue backlog by topic"):
+        df = pd.DataFrame(
+            {"topic": list(report.attribution_queue_per_topic.keys()),
+             "queued studies": list(report.attribution_queue_per_topic.values())}
+        )
+        st.dataframe(df, hide_index=True, use_container_width=True)
 coverage = (
     "—" if report.attribution_coverage_rate is None
     else f"{report.attribution_coverage_rate:.1%}"
