@@ -17,7 +17,12 @@ from typing import Iterator, List
 import pytest
 
 from study_scraper.discovery.openalex import OpenAlexSource
-from study_scraper.follow import FETCH_BATCH, fetch_references, pending_references
+from study_scraper.follow import (
+    FETCH_BATCH,
+    count_pending_references,
+    fetch_references,
+    pending_references,
+)
 from study_scraper.models import CrawlRun, Provenance, Study
 from study_scraper.pipeline import run_one
 from study_scraper.storage import PostgresStorage
@@ -144,6 +149,57 @@ class TestPendingReferences:
             "https://openalex.org/W1",
             "https://openalex.org/W2",
         }
+
+
+class TestCountPendingReferences:
+    def test_matches_unpaginated_pending_references(
+        self, storage: PostgresStorage
+    ) -> None:
+        cited = _seed_study(
+            "https://doi.org/10.1/count-seed",
+            referenced_works=[
+                "https://openalex.org/W1",
+                "https://openalex.org/W2",
+            ],
+        )
+        storage.upsert_study(cited, status="kept")
+
+        assert count_pending_references(storage) == 2
+
+    def test_not_capped_by_pending_references_page_limit(
+        self, storage: PostgresStorage
+    ) -> None:
+        # The whole point of this function: `pending_references`' default
+        # page size (200) hides the true backlog size once it's exceeded
+        # (#141/#142's dock queue), so the count must not share that cap.
+        cited = _seed_study(
+            "https://doi.org/10.1/count-seed2",
+            referenced_works=[f"https://openalex.org/W{i}" for i in range(10)],
+        )
+        storage.upsert_study(cited, status="kept")
+
+        assert len(pending_references(storage, limit=3)) == 3
+        assert count_pending_references(storage) == 10
+
+    def test_topic_id_scopes_like_pending_references(
+        self, storage: PostgresStorage
+    ) -> None:
+        klima_citer = _seed_study(
+            "https://doi.org/10.1/count-klima-seed",
+            topic_ids=("klima",),
+            referenced_works=["https://openalex.org/W1"],
+        )
+        rente_citer = _seed_study(
+            "https://doi.org/10.1/count-rente-seed",
+            topic_ids=("rente",),
+            referenced_works=["https://openalex.org/W2"],
+        )
+        storage.upsert_study(klima_citer, status="kept")
+        storage.upsert_study(rente_citer, status="kept")
+
+        assert count_pending_references(storage, topic_id="klima") == 1
+        assert count_pending_references(storage, topic_id="rente") == 1
+        assert count_pending_references(storage) == 2
 
 
 class TestFetchReferencesBatching:

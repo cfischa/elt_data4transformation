@@ -65,6 +65,7 @@ def test_report_to_dict_includes_computed_rates() -> None:
     assert payload["attribution_queue_size"] == 12
     assert payload["attribution_queue_per_topic"] == {"klima": 9, "steuern": 3}
     assert payload["never_run_sources"] == []
+    assert payload["reference_follower_pending_total"] == 0
 
 
 def test_report_to_dict_handles_none_rates() -> None:
