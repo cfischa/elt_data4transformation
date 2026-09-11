@@ -88,7 +88,8 @@ hcol4.metric(
         "Studies discovered by `follow --fetch` (#136) rather than a "
         "normal source crawl. The follower is manual-only (not "
         "scheduled), so this is the only signal for whether it has "
-        "ever actually been run."
+        "ever actually been run. Pending (not yet fetched): "
+        f"{report.reference_follower_pending_total}."
     ),
 )
 if report.attribution_queue_per_topic:

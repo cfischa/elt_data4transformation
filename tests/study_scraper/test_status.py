@@ -71,6 +71,7 @@ def test_status_empty_db(storage: PostgresStorage) -> None:
     assert report.total_attributions == 0
     assert report.attribution_coverage_rate is None
     assert report.reference_follower_studies_total == 0
+    assert report.reference_follower_pending_total == 0
 
 
 def _seed_study(
@@ -341,6 +342,39 @@ def test_status_reference_follower_studies_counts_tagged_studies(
 
     text = format_text(report)
     assert "reference-follower studies : 1" in text
+
+
+def test_status_reference_follower_pending_reflects_true_backlog(
+    storage: PostgresStorage,
+) -> None:
+    """The pending count is the reference-follower's *input* queue --
+    unfetched `referenced_works` IDs -- distinct from
+    `reference_follower_studies_total` (its output). Must reflect the
+    true backlog, not any dock page size."""
+    from study_scraper.models import Provenance, Study
+
+    citer = Study.build(
+        canonical_url="https://doi.org/10.1/citer",
+        title="Citer Study",
+        fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        source_id="openalex",
+        provenance=Provenance(
+            discovery_source="openalex",
+            referenced_works=[
+                "https://openalex.org/W1",
+                "https://openalex.org/W2",
+            ],
+        ),
+        topic_ids=["klima"],
+    )
+    storage.upsert_study(citer, status="kept")
+
+    report = build_status(storage)
+    assert report.reference_follower_pending_total == 2
+    assert report.reference_follower_studies_total == 0
+
+    text = format_text(report)
+    assert "(pending: 2)" in text
 
 
 def test_status_zero_yield_streak_none_when_no_attempts(

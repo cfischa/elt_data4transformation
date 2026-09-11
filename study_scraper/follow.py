@@ -31,6 +31,44 @@ LOGGER = logging.getLogger(__name__)
 FETCH_BATCH = 50
 
 
+# Shared by `pending_references` (paginated, for actually fetching) and
+# `count_pending_references` (status/dock, needs the true backlog size,
+# not a page of it) -- kept as one CTE so the "not yet ingested" logic
+# can't drift between the two call sites.
+_PENDING_REFERENCES_CTE = """
+    WITH cited AS (
+        SELECT DISTINCT jsonb_array_elements_text(
+                   provenance->'referenced_works'
+               ) AS work_id
+        FROM   study_scraper.studies
+        WHERE  provenance ? 'referenced_works'
+        {topic_clause}
+        UNION
+        SELECT DISTINCT jsonb_array_elements_text(
+                   provenance->'related_works'
+               ) AS work_id
+        FROM   study_scraper.studies
+        WHERE  provenance ? 'related_works'
+        {topic_clause}
+    ),
+    known AS (
+        SELECT canonical_url AS work_id
+        FROM   study_scraper.studies
+        UNION
+        SELECT provenance->>'openalex_id'
+        FROM   study_scraper.studies
+        WHERE  provenance ? 'openalex_id'
+    )
+    SELECT c.work_id
+    FROM   cited c
+    WHERE  c.work_id LIKE 'https://openalex.org/%%'
+      AND  NOT EXISTS (
+               SELECT 1 FROM known k
+               WHERE  k.work_id = c.work_id
+           )
+"""
+
+
 def pending_references(
     storage: PostgresStorage, *, limit: int = 200, topic_id: Optional[str] = None
 ) -> List[str]:
@@ -52,43 +90,33 @@ def pending_references(
     with storage.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"""
-                WITH cited AS (
-                    SELECT DISTINCT jsonb_array_elements_text(
-                               provenance->'referenced_works'
-                           ) AS work_id
-                    FROM   study_scraper.studies
-                    WHERE  provenance ? 'referenced_works'
-                    {topic_clause}
-                    UNION
-                    SELECT DISTINCT jsonb_array_elements_text(
-                               provenance->'related_works'
-                           ) AS work_id
-                    FROM   study_scraper.studies
-                    WHERE  provenance ? 'related_works'
-                    {topic_clause}
-                ),
-                known AS (
-                    SELECT canonical_url AS work_id
-                    FROM   study_scraper.studies
-                    UNION
-                    SELECT provenance->>'openalex_id'
-                    FROM   study_scraper.studies
-                    WHERE  provenance ? 'openalex_id'
-                )
-                SELECT c.work_id
-                FROM   cited c
-                WHERE  c.work_id LIKE 'https://openalex.org/%%'
-                  AND  NOT EXISTS (
-                           SELECT 1 FROM known k
-                           WHERE  k.work_id = c.work_id
-                       )
-                ORDER  BY c.work_id
-                LIMIT  %s
-                """,
+                _PENDING_REFERENCES_CTE.format(topic_clause=topic_clause)
+                + "ORDER BY c.work_id LIMIT %s",
                 (*topic_params, *topic_params, limit),
             )
             return [row["work_id"] for row in cur.fetchall()]
+
+
+def count_pending_references(
+    storage: PostgresStorage, *, topic_id: Optional[str] = None
+) -> int:
+    """True size of the `pending_references` backlog (no page limit).
+
+    `pending_references` is capped (`limit`, default 200) since it feeds
+    an actual fetch/dock page; that cap silently hides how large the real
+    backlog is once it exceeds one page, the same "shipped but invisible"
+    gap #148/#156 fixed for the follower's *output* -- this covers its
+    *input* queue.
+    """
+    topic_clause = "AND %s = ANY(topic_ids)" if topic_id is not None else ""
+    topic_params = [topic_id] if topic_id is not None else []
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT COUNT(*) AS c FROM ({_PENDING_REFERENCES_CTE.format(topic_clause=topic_clause)}) AS pending",
+                (*topic_params, *topic_params),
+            )
+            return int(cur.fetchone()["c"])
 
 
 def fetch_references(

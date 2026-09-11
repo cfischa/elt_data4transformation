@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from study_scraper.follow import count_pending_references
 from study_scraper.storage import PostgresStorage
 
 
@@ -108,6 +109,14 @@ class StatusReport:
     # signal at all for whether it had ever actually been run, only for
     # what it still had pending (#141/#142's candidate-studies queue).
     reference_follower_studies_total: int = 0
+    # True size of the reference-follower's *input* queue (`follow.
+    # count_pending_references`, uncapped) -- distinct from the field
+    # above, which only says whether the follower has ever produced
+    # anything. A dock page already lists a capped page of these IDs
+    # (#141/#142), but that page silently hides the real backlog size
+    # once it exceeds the page limit, the same gap #148/#156 closed for
+    # the follower's output side.
+    reference_follower_pending_total: int = 0
     # Known source_ids (KNOWN_SOURCE_IDS) with zero rows in `crawl_runs` --
     # a source that's built and fixture-tested but was never wired into the
     # scheduled crawl (or run manually) reads identically to "doesn't exist"
@@ -410,6 +419,8 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             )
             reference_follower_studies_total = int(cur.fetchone()["c"])
 
+            reference_follower_pending_total = count_pending_references(storage)
+
             cur.execute(
                 f"""
                 SELECT attempted_at::date AS day, COALESCE(SUM(found), 0) AS found
@@ -473,6 +484,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         total_claims=total_claims,
         total_attributions=total_attributions,
         reference_follower_studies_total=reference_follower_studies_total,
+        reference_follower_pending_total=reference_follower_pending_total,
         never_run_sources=never_run_sources,
     )
 
@@ -533,6 +545,7 @@ def format_text(report: StatusReport) -> str:
     lines.append(
         "  reference-follower studies : "
         f"{report.reference_follower_studies_total}"
+        f" (pending: {report.reference_follower_pending_total})"
     )
     if report.never_run_sources:
         lines.append(
