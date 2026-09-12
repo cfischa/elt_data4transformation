@@ -28,7 +28,14 @@ report = build_status(storage, recent_n=20)
 # ---- top-line counters ----------------------------------------------------
 
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Studies", f"{report.total_studies}")
+col1.metric(
+    "Studies",
+    f"{report.total_studies}",
+    help=(
+        f"{report.kept_count} kept / {report.pending_count} pending review "
+        f"/ {report.rejected_count} rejected"
+    ),
+)
 col2.metric("With quantitative data", f"{report.studies_with_quant}")
 col3.metric(
     "Crawl runs",
@@ -58,6 +65,11 @@ col5.metric(
         f"candidates seen were already-known studies (re-fetch waste)"
     ),
 )
+if report.pending_count > 0:
+    st.info(
+        f"{report.pending_count} candidate(s) awaiting review on the "
+        "`Review` page (below the topic-filter threshold, per Q12)."
+    )
 
 # ---- pipeline health --------------------------------------------------------
 # Mirrors the CLI's `status` text block (#110/#119) so a dock-only

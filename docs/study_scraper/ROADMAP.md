@@ -443,3 +443,12 @@ for our verification layers). All items below have shipped:
   breakdown of which topic the backlog was concentrated in — added
   `attribution_queue_per_topic` (`status` text + dock Home expander), same
   pattern as #110/#115/#119/#128/#130/#132/#148/#156.
+- Self-proposed #161 (2026-09-12): same "surfaced in one place, invisible
+  in the other" gap, dock-side this time — the CLI's `status` text has
+  shown kept/pending/rejected study counts since Q12's review-queue work,
+  but the dock's Home page only ever showed the `total_studies` sum, so a
+  dock-only operator had no landing-page signal that a review-queue
+  backlog (`2_Review.py`) existed at all. Added the breakdown to the
+  `Studies` metric's tooltip plus a callout when `pending_count > 0`. No
+  new backend field — `pending_count`/`rejected_count`/`kept_count`
+  already existed and were tested.
