@@ -53,7 +53,6 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
-from bs4 import BeautifulSoup
 
 from study_scraper.http import get_with_retry
 from study_scraper.models import SourceRecord
@@ -267,6 +266,8 @@ def _extract_csv_links(html: str, *, base_url: str) -> List[Tuple[str, str]]:
     Returns `(filename, absolute_url)` pairs, deduped and in document
     order.
     """
+    from bs4 import BeautifulSoup  # lazy: optional at import time, see A43/#163
+
     soup = BeautifulSoup(html, "html.parser")
     links: List[Tuple[str, str]] = []
     seen: set = set()

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -59,6 +61,22 @@ def test_python_dash_m_entrypoint_resolves() -> None:
     import study_scraper.__main__  # noqa: F401
 
     assert Path(study_scraper.__main__.__file__).name == "__main__.py"
+
+
+def test_cli_importable_without_bs4() -> None:
+    # #163: cli.py used to eagerly import BMASSource, which imports bs4 at
+    # module scope -- meaning any command (status/attribute/ask/...) crashed
+    # if beautifulsoup4 wasn't installed, not just `ingest --source bmas`.
+    # Simulate bs4 being absent (regardless of whether it's actually
+    # installed here) via the standard sys.modules=None trick, in a
+    # subprocess so it can't pollute this test run's import cache.
+    script = "import sys; sys.modules['bs4'] = None; import study_scraper.cli"
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 class TestResolveEurostatCodes:

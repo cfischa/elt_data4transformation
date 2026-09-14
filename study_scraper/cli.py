@@ -16,7 +16,6 @@ from study_scraper.config import get_settings
 from study_scraper.discovery.openalex import OpenAlexSource
 from study_scraper.discovery.ssoar import SSOARSource
 from study_scraper.ingest import run_lake_ingest
-from study_scraper.sources.bmas import BMASSource
 from study_scraper.sources.dawum import DAWUMSource
 from study_scraper.sources.eurobarometer import EurobarometerSource
 from study_scraper.sources.eurostat import EurostatSource
@@ -674,6 +673,8 @@ def ingest(
             queries = topic_query_terms(matched)
         src = GovDataSource(from_file=from_file, queries=queries)
     elif source == "bmas":
+        from study_scraper.sources.bmas import BMASSource  # lazy: optional bs4 dep, see #163
+
         src = BMASSource(years=year or None, from_file=from_file)
     else:
         raise typer.BadParameter(
