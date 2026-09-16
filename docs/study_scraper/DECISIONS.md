@@ -1275,6 +1275,54 @@ project URL + service-role key (placed in `.env`, not committed), or
   Postgres that the integration classes (previously *never* exercised
   in this sandbox either) pass for real.
 
+### A46. Scoped the remaining module-level `pytestmark` DB-skip markers to their integration tests only (#166)
+
+- **Date:** 2026-09-16
+- **Context:** self-propose pick this cycle — every open `agent:task`
+  issue was already `needs-human` (secrets, `.github/**`, or
+  `config/**` edits no agent can make), and #163 (the top ROADMAP
+  item, lazy `bs4` import) had already shipped and merged. A45/#153
+  fixed this exact pytest gotcha (a bare module-level `pytestmark =
+  pytest.mark.skipif(not TEST_DSN, ...)` silently skips *every* test
+  in the file, not just the ones physically below it) in
+  `test_eurostat.py`/`test_gesis.py`, but explicitly didn't audit the
+  rest of the suite. Auditing the remaining files with the module-level
+  form found the same bug, unfixed, in `test_storage.py`
+  (`TestResolveDatabaseUrl`, 4 tests), `test_dedup.py`
+  (`TestNormalizeDoi`, 8 cases), `test_attributions.py` (`TestSchema`
+  / `TestBuildPrompt` / `TestParseResponse` / `TestAttributionId` plus
+  5 mocked-client tests), `test_fulltext.py` (`TestSniffKind` /
+  `TestTextExtraction` / `TestPersistArtifactsSetting` /
+  `TestFulltextClaims`, 12 tests — with a literal, false "Pure-Python
+  parts always run" comment directly above them), and `test_claims.py`
+  (`TestExtractor` / `TestValueParsing`, 15 tests — same false "always
+  run" comment). `.github/workflows/ci-study-scraper.yml` runs exactly
+  `python -m pytest tests/study_scraper -o addopts="" -q` with no
+  `STUDY_SCRAPER_TEST_DSN`, so these ~40 pure-unit tests were silently
+  skipped on every real CI run, not just in this sandbox.
+- **Decision:** for files where the DB tests were already grouped into
+  classes (`test_storage.py`), moved the marker to a
+  `pytestmark = _SKIP_NO_DB` class attribute on each DB-dependent
+  class, matching A45's `TestLakeIngestIntegration` pattern. For files
+  where the integration tests are bare top-level functions
+  (`test_dedup.py`, `test_attributions.py`, `test_fulltext.py`,
+  `test_claims.py`), applied `@_needs_db` as a per-function decorator
+  instead of restructuring them into a class (smaller diff, no
+  reindentation risk). In both cases the file's `_clean*` fixture also
+  lost its module-wide `autouse=True` (which — independent of the
+  `pytestmark` scope — would otherwise still instantiate a real
+  `PostgresStorage` for the newly-unskipped pure tests) and gained an
+  explicit `@pytest.mark.usefixtures(...)` alongside the skip marker on
+  each DB test instead.
+- **Verified:** `STUDY_SCRAPER_TEST_DSN` unset —
+  `python -m pytest tests/study_scraper -o addopts="" -q` went from
+  435 passed/201 skipped to **493 passed/143 skipped** (58 previously-
+  silent pure tests now actually execute). Against a local
+  docker-compose Postgres, `STUDY_SCRAPER_TEST_DSN` set — 636 passed,
+  0 errors (all the same integration tests that ran before still run
+  and pass; none went from "skipped" to "erroring for lack of a real
+  DB").
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

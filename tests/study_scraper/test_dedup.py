@@ -21,7 +21,10 @@ from study_scraper.topics import load_topics
 TEST_DSN = os.environ.get("STUDY_SCRAPER_TEST_DSN")
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
-pytestmark = pytest.mark.skipif(
+# NOTE: applied per-test below via `@_needs_db`, not as a bare module-level
+# `pytestmark` -- that would apply to every test in the file, including
+# `TestNormalizeDoi` (pure, no DB) below (#153/#166).
+_needs_db = pytest.mark.skipif(
     not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping dedup tests"
 )
 
@@ -34,7 +37,7 @@ def storage() -> PostgresStorage:
     return store
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def _clean(storage: PostgresStorage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
@@ -103,6 +106,8 @@ class TestNormalizeDoi:
 # --------------------------------------------------------------------------
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_first_doi_insert_is_a_new_row(storage: PostgresStorage) -> None:
     s = _study(
         canonical_url="https://doi.org/10.1515/pwp-2023-0031",
@@ -115,6 +120,8 @@ def test_first_doi_insert_is_a_new_row(storage: PostgresStorage) -> None:
     assert row["doi"] == "10.1515/pwp-2023-0031"
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_second_source_same_doi_merges_into_existing(
     storage: PostgresStorage,
 ) -> None:
@@ -156,6 +163,8 @@ def test_second_source_same_doi_merges_into_existing(
     assert "https://openalex.org/W4391234567" in row["source_urls"]
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_dedup_mutates_study_id_to_target(storage: PostgresStorage) -> None:
     """After dedup the in-memory Study has the target id so the caller
     (pipeline) attaches claims and crawl_run_studies to the right row."""
@@ -175,6 +184,8 @@ def test_dedup_mutates_study_id_to_target(storage: PostgresStorage) -> None:
     assert second.id == first.id  # mutated after dedup
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_dedup_merges_topic_ids_and_scores(storage: PostgresStorage) -> None:
     first = _study(
         canonical_url="https://example.org/a",
@@ -201,6 +212,8 @@ def test_dedup_merges_topic_ids_and_scores(storage: PostgresStorage) -> None:
     assert row["topic_scores"]["migration_einwanderung"] == 0.4
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_no_doi_no_title_match_no_dedup(storage: PostgresStorage) -> None:
     """Without a DOI AND with different titles, no dedup -- both rows kept."""
     a = _study(
@@ -224,6 +237,8 @@ def test_no_doi_no_title_match_no_dedup(storage: PostgresStorage) -> None:
 # --------------------------------------------------------------------------
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_identical_title_no_doi_merges(storage: PostgresStorage) -> None:
     """Without DOIs, identical titles + same publication_year merge."""
     a = _study(
@@ -243,6 +258,8 @@ def test_identical_title_no_doi_merges(storage: PostgresStorage) -> None:
             assert cur.fetchone()["c"] == 1
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_near_identical_title_merges_above_threshold(
     storage: PostgresStorage,
 ) -> None:
@@ -265,6 +282,8 @@ def test_near_identical_title_merges_above_threshold(
     assert "https://b.example/y" in row["source_urls"]
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_different_titles_do_not_merge(storage: PostgresStorage) -> None:
     """Two genuinely different titles do NOT merge even at same year."""
     a = _study(
@@ -284,6 +303,8 @@ def test_different_titles_do_not_merge(storage: PostgresStorage) -> None:
             assert cur.fetchone()["c"] == 2
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_doi_dedup_runs_before_title_dedup(storage: PostgresStorage) -> None:
     """DOI match short-circuits before title lookup -- DOI is the
     authoritative identifier when present."""
@@ -308,6 +329,8 @@ def test_doi_dedup_runs_before_title_dedup(storage: PostgresStorage) -> None:
     assert "https://b.example/y" in row["source_urls"]
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_title_dedup_promotes_doi_into_existing_row(
     storage: PostgresStorage,
 ) -> None:
@@ -329,6 +352,8 @@ def test_title_dedup_promotes_doi_into_existing_row(
     assert row["doi"] == "10.1007/s11578-021-0099-2"
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_title_dedup_skipped_when_different_publication_year(
     storage: PostgresStorage,
 ) -> None:
@@ -358,6 +383,8 @@ def test_title_dedup_skipped_when_different_publication_year(
 # --------------------------------------------------------------------------
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_real_fixtures_dedup_via_openalex_doi(
     storage: PostgresStorage, klima_topic
 ) -> None:
