@@ -264,7 +264,10 @@ def test_target_ids_scans_beyond_limit_to_surface_priority_studies(monkeypatch) 
 
 TEST_DSN = os.environ.get("STUDY_SCRAPER_TEST_DSN")
 
-pytestmark = pytest.mark.skipif(
+# NOTE: applied per-test below via `@_needs_db`, not as a bare module-level
+# `pytestmark` -- that would apply to every test in the file, including the
+# pure schema/prompt/parse/id and mocked-client tests above (#153/#166).
+_needs_db = pytest.mark.skipif(
     not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
 )
 
@@ -278,7 +281,7 @@ def storage():
     return store
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def _clean(storage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
@@ -313,6 +316,8 @@ def _seed_study_with_claim(storage, *, title: str, abstract: str,
     return study
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_attribution_queue_lists_studies_with_claims_no_attribution(storage) -> None:
     s = _seed_study_with_claim(
         storage, title="Klima", abstract="62% befürworten ein Klimaschutzgesetz.")
@@ -320,6 +325,8 @@ def test_attribution_queue_lists_studies_with_claims_no_attribution(storage) -> 
     assert s.id in {r["id"] for r in rows}
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_offline_apply_and_search(storage) -> None:
     from study_scraper.attribute import apply_responses
 
@@ -343,6 +350,8 @@ def test_offline_apply_and_search(storage) -> None:
     assert s.id not in {r["id"] for r in rows}
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_upsert_attributions_idempotent_per_model(storage) -> None:
     from study_scraper.attribute import apply_responses
     s = _seed_study_with_claim(storage, title="X", abstract="50% support Y.")
@@ -355,6 +364,8 @@ def test_upsert_attributions_idempotent_per_model(storage) -> None:
     assert storage.count_attributions() == 1  # not 2
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_no_signal_study_leaves_queue_after_attempt(storage) -> None:
     """A study the LLM pass finds zero triples for must not be
     re-selected on every subsequent run (#49): the queue should exclude
@@ -373,6 +384,8 @@ def test_no_signal_study_leaves_queue_after_attempt(storage) -> None:
     assert s.id not in {r["id"] for r in rows}
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_no_signal_attempt_is_idempotent_per_model(storage) -> None:
     from study_scraper.attribute import apply_responses
 
@@ -393,6 +406,8 @@ def test_no_signal_attempt_is_idempotent_per_model(storage) -> None:
             assert cur.fetchone()["c"] == 1
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_search_attributions_since_filters_old_and_undated(storage) -> None:
     from datetime import date
 
@@ -423,6 +438,8 @@ def test_search_attributions_since_filters_old_and_undated(storage) -> None:
     assert [float(r["percentage"]) for r in recent] == [62.0]
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_search_attributions_carries_sample_size(storage) -> None:
     from study_scraper.attribute import apply_responses
 
@@ -438,6 +455,8 @@ def test_search_attributions_carries_sample_size(storage) -> None:
     assert hits and int(hits[0]["sample_size"]) == 1009
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_search_attributions_sample_size_null_without_n_claim(storage) -> None:
     from study_scraper.attribute import apply_responses
 
@@ -452,6 +471,8 @@ def test_search_attributions_sample_size_null_without_n_claim(storage) -> None:
     assert hits and hits[0]["sample_size"] is None
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_dump_prompts_emits_queue(storage) -> None:
     from study_scraper.attribute import dump_prompts
     s = _seed_study_with_claim(

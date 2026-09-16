@@ -26,7 +26,10 @@ from study_scraper.storage import PostgresStorage, StorageError, resolve_databas
 
 TEST_DSN = os.environ.get("STUDY_SCRAPER_TEST_DSN")
 
-pytestmark = pytest.mark.skipif(
+# NOTE: `pytestmark` is scoped per-class below, not module-level -- a bare
+# module-level `pytestmark` applies to every test in the file, which would
+# silently skip `TestResolveDatabaseUrl` (pure, no DB) too (#153/#166).
+_SKIP_NO_DB = pytest.mark.skipif(
     not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping storage tests"
 )
 
@@ -39,7 +42,7 @@ def storage() -> PostgresStorage:
     return store
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def _clean_tables(storage: PostgresStorage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
@@ -73,6 +76,8 @@ def _study(url: str = "https://example.org/study/1", **overrides: object) -> Stu
 
 
 class TestMigrations:
+    pytestmark = [_SKIP_NO_DB, pytest.mark.usefixtures("_clean_tables")]
+
     def test_migrate_is_idempotent(self, storage: PostgresStorage) -> None:
         # The fixture already migrated; a second call must be a no-op.
         applied = storage.migrate()
@@ -89,6 +94,8 @@ class TestMigrations:
 
 
 class TestUpsertStudy:
+    pytestmark = [_SKIP_NO_DB, pytest.mark.usefixtures("_clean_tables")]
+
     def test_first_insert_returns_true(self, storage: PostgresStorage) -> None:
         is_new = storage.upsert_study(_study())
         assert is_new is True
@@ -118,6 +125,8 @@ class TestUpsertStudy:
 
 
 class TestListStudies:
+    pytestmark = [_SKIP_NO_DB, pytest.mark.usefixtures("_clean_tables")]
+
     def test_filter_by_topic(self, storage: PostgresStorage) -> None:
         # Distinct titles so the migration 0006 title-near-dup doesn't
         # collapse them into one row.
@@ -161,6 +170,8 @@ class TestListStudies:
 
 
 class TestCrawlRuns:
+    pytestmark = [_SKIP_NO_DB, pytest.mark.usefixtures("_clean_tables")]
+
     def test_record_and_attach(self, storage: PostgresStorage) -> None:
         study = _study()
         storage.upsert_study(study)

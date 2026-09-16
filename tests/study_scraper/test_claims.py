@@ -121,7 +121,10 @@ class TestValueParsing:
 # --------------------------------------------------------------------------
 
 
-pytestmark = pytest.mark.skipif(
+# NOTE: applied per-test below via `@_needs_db`, not as a bare module-level
+# `pytestmark` -- that would apply to every test in the file, including the
+# pure TestExtractor/TestValueParsing tests above (#153/#166).
+_needs_db = pytest.mark.skipif(
     not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping claims integration tests"
 )
 
@@ -134,7 +137,7 @@ def storage() -> PostgresStorage:
     return store
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def _clean_tables(storage: PostgresStorage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
@@ -155,12 +158,16 @@ def klima_topic():
     )
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean_tables")
 def test_pipeline_populates_claims_table(storage: PostgresStorage, klima_topic) -> None:
     with OpenAlexSource(from_file=FIXTURE) as src:
         run_one(source=src, topic=klima_topic, storage=storage)
     assert storage.count_claims() > 0
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean_tables")
 def test_search_finds_klimaschutzgesetz_claim(
     storage: PostgresStorage, klima_topic
 ) -> None:
@@ -175,6 +182,8 @@ def test_search_finds_klimaschutzgesetz_claim(
     assert 62.0 in values
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean_tables")
 def test_search_finds_nuclear_claim(storage: PostgresStorage, klima_topic) -> None:
     with OpenAlexSource(from_file=FIXTURE) as src:
         run_one(source=src, topic=klima_topic, storage=storage)
@@ -197,6 +206,8 @@ def runner(monkeypatch) -> CliRunner:
     return CliRunner()
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean_tables")
 def test_cli_search_climate_law(
     storage: PostgresStorage, klima_topic, runner: CliRunner, monkeypatch
 ) -> None:
@@ -208,6 +219,8 @@ def test_cli_search_climate_law(
     assert "62" in out.output  # the headline %
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean_tables")
 def test_cli_search_no_hits(runner: CliRunner, monkeypatch) -> None:
     monkeypatch.setenv("POSTGRES_URL", TEST_DSN)
     out = runner.invoke(app, ["search", "completely_made_up_term_xyz"])

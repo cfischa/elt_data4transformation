@@ -119,7 +119,10 @@ class TestFulltextClaims:
 # --------------------------------------------------------------------------
 
 
-pytestmark = pytest.mark.skipif(
+# NOTE: applied per-test below via `@_needs_db`, not as a bare module-level
+# `pytestmark` -- that would apply to every test in the file, including the
+# pure sniff/extraction/claims tests above (#153/#166).
+_needs_db = pytest.mark.skipif(
     not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping integration"
 )
 
@@ -132,7 +135,7 @@ def storage() -> PostgresStorage:
     return store
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def _clean(storage: PostgresStorage) -> Iterator[None]:
     with storage.connection() as conn:
         with conn.cursor() as cur:
@@ -158,6 +161,8 @@ def _mk_study(url: str, title: str, **extras) -> Study:
     )
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_process_document_pdf_end_to_end(
     storage: PostgresStorage, tmp_path: Path
 ) -> None:
@@ -192,6 +197,8 @@ def test_process_document_pdf_end_to_end(
     assert extractors == {"regex-v2"}
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_fulltext_claims_coexist_with_abstract_claims(
     storage: PostgresStorage, tmp_path: Path
 ) -> None:
@@ -230,6 +237,8 @@ def test_fulltext_claims_coexist_with_abstract_claims(
     assert counts.get("regex-v2", 0) >= 5
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_process_document_unusable_payload(
     storage: PostgresStorage, tmp_path: Path
 ) -> None:
@@ -243,6 +252,8 @@ def test_process_document_unusable_payload(
     assert storage.get_study(study.id)["raw_artifact_ref"] is None
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_reading_list_view_reasons(
     storage: PostgresStorage, tmp_path: Path
 ) -> None:
@@ -274,6 +285,8 @@ def test_reading_list_view_reasons(
     assert by_id[fresh.id]["reason"] == "no_artifact" # fetch pending
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_process_document_no_persist_leaves_marker_not_path(
     storage: PostgresStorage, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -301,6 +314,8 @@ def test_process_document_no_persist_leaves_marker_not_path(
     assert study.id not in {r["id"] for r in queue}  # still leaves the queue
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_list_studies_for_fulltext_queue(
     storage: PostgresStorage, tmp_path: Path
 ) -> None:
@@ -322,6 +337,8 @@ def test_list_studies_for_fulltext_queue(
     assert {r["id"] for r in queue} == {a.id, b.id}
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_set_fetch_conditional_merges_into_provenance(
     storage: PostgresStorage,
 ) -> None:
@@ -343,6 +360,8 @@ def test_set_fetch_conditional_merges_into_provenance(
     assert row["provenance"]["discovery_source"] == "ssoar"
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_set_fetch_conditional_noop_without_headers(
     storage: PostgresStorage,
 ) -> None:
@@ -355,6 +374,8 @@ def test_set_fetch_conditional_noop_without_headers(
     assert "fetch_etag" not in row["provenance"]
 
 
+@_needs_db
+@pytest.mark.usefixtures("_clean")
 def test_pending_references_queue(storage: PostgresStorage) -> None:
     """The follower lists cited works we don't have, skips ones we do."""
     from study_scraper.follow import pending_references
