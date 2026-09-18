@@ -134,94 +134,96 @@ class TestDAWUMParser:
 
 
 # --------------------------------------------------------------------------
-# End-to-end against real Postgres
+# Integration: lake ingest end-to-end
+#
+# NOTE: `pytestmark` is scoped to this *class*, not module-level -- a bare
+# module-level `pytestmark` applies to every test in the file, which
+# silently skipped this file's pure unit tests above (TestSourceRecordModel,
+# TestDAWUMParser) whenever STUDY_SCRAPER_TEST_DSN was unset (i.e. in normal
+# CI). Same fix as test_eurostat.py's / test_eurobarometer.py's /
+# test_bmas.py's `TestLakeIngestIntegration` (#153, #167) -- this file was
+# missed in both prior sweeps.
 # --------------------------------------------------------------------------
 
 
-pytestmark = pytest.mark.skipif(
-    not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping lake integration"
-)
+class TestLakeIngestIntegration:
+    pytestmark = pytest.mark.skipif(
+        not TEST_DSN, reason="STUDY_SCRAPER_TEST_DSN not set; skipping lake integration"
+    )
 
+    @pytest.fixture()
+    def storage(self) -> PostgresStorage:
+        assert TEST_DSN is not None
+        store = PostgresStorage(TEST_DSN)
+        store.migrate()
+        return store
 
-@pytest.fixture(scope="module")
-def storage() -> PostgresStorage:
-    assert TEST_DSN is not None
-    store = PostgresStorage(TEST_DSN)
-    store.migrate()
-    return store
+    @pytest.fixture(autouse=True)
+    def _clean(self, storage: PostgresStorage) -> Iterator[None]:
+        with storage.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("TRUNCATE study_scraper.claims CASCADE")
+                cur.execute("TRUNCATE study_scraper.source_records CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.studies CASCADE")
+                cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
+            conn.commit()
+        yield
 
+    def test_lake_ingest_populates_source_records(self, storage: PostgresStorage) -> None:
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run = run_lake_ingest(source=src, storage=storage)
+        assert run.candidates_seen == 5
+        assert run.candidates_kept == 5
+        assert run.errors == 0
+        assert storage.count_source_records(source_id="dawum") == 5
 
-@pytest.fixture(autouse=True)
-def _clean(storage: PostgresStorage) -> Iterator[None]:
-    with storage.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE study_scraper.claims CASCADE")
-            cur.execute("TRUNCATE study_scraper.source_records CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.studies CASCADE")
-            cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
-        conn.commit()
-    yield
+    def test_lake_ingest_is_idempotent(self, storage: PostgresStorage) -> None:
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage)
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run = run_lake_ingest(source=src, storage=storage)
+        # Same content -> no new rows on second run.
+        assert run.candidates_kept == 0
+        assert storage.count_source_records(source_id="dawum") == 5
 
+    def test_optional_topic_tagging(self, storage: PostgresStorage) -> None:
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run_lake_ingest(
+                source=src, storage=storage, topic_ids=["klima"]
+            )
+        rows = storage.list_source_records(source_id="dawum", topic_id="klima")
+        assert len(rows) == 5
 
-def test_lake_ingest_populates_source_records(storage: PostgresStorage) -> None:
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run = run_lake_ingest(source=src, storage=storage)
-    assert run.candidates_seen == 5
-    assert run.candidates_kept == 5
-    assert run.errors == 0
-    assert storage.count_source_records(source_id="dawum") == 5
+    def test_dawum_polls_view_returns_typed_columns(self, storage: PostgresStorage) -> None:
+        """The lake-then-view pattern: raw payload in source_records,
+        typed columns via SQL view -- no per-source table."""
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage)
+        rows = storage.query_view("dawum_polls", limit=10)
+        assert len(rows) == 5
+        # Typed projections
+        sample = rows[0]
+        assert "poll_date" in sample
+        assert "institute_name" in sample
+        assert "sample_size" in sample
+        # Postgres returns ::date as datetime.date in psycopg
+        from datetime import date as _date
+        assert isinstance(sample["poll_date"], _date)
+        assert isinstance(sample["sample_size"], int)
 
-
-def test_lake_ingest_is_idempotent(storage: PostgresStorage) -> None:
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage)
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run = run_lake_ingest(source=src, storage=storage)
-    # Same content -> no new rows on second run.
-    assert run.candidates_kept == 0
-    assert storage.count_source_records(source_id="dawum") == 5
-
-
-def test_optional_topic_tagging(storage: PostgresStorage) -> None:
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run_lake_ingest(
-            source=src, storage=storage, topic_ids=["klima"]
-        )
-    rows = storage.list_source_records(source_id="dawum", topic_id="klima")
-    assert len(rows) == 5
-
-
-def test_dawum_polls_view_returns_typed_columns(storage: PostgresStorage) -> None:
-    """The lake-then-view pattern: raw payload in source_records,
-    typed columns via SQL view -- no per-source table."""
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage)
-    rows = storage.query_view("dawum_polls", limit=10)
-    assert len(rows) == 5
-    # Typed projections
-    sample = rows[0]
-    assert "poll_date" in sample
-    assert "institute_name" in sample
-    assert "sample_size" in sample
-    # Postgres returns ::date as datetime.date in psycopg
-    from datetime import date as _date
-    assert isinstance(sample["poll_date"], _date)
-    assert isinstance(sample["sample_size"], int)
-
-
-def test_dawum_poll_results_view_explodes_parties(
-    storage: PostgresStorage,
-) -> None:
-    with DAWUMSource(from_file=FIXTURE) as src:
-        run_lake_ingest(source=src, storage=storage)
-    rows = storage.query_view("dawum_poll_results", limit=100)
-    # 5 polls × (7 or 8 parties each); >= 35 total rows expected.
-    assert len(rows) >= 35
-    # Each row carries a typed percentage.
-    for r in rows:
-        assert r["percentage"] is None or isinstance(r["percentage"], float) or hasattr(r["percentage"], "is_finite")
-    # Union (party_id=1) should be present.
-    unions = [r for r in rows if r["party_id"] == "1"]
-    assert unions
-    assert all(r["party_name"] == "CDU/CSU" for r in unions)
+    def test_dawum_poll_results_view_explodes_parties(
+        self, storage: PostgresStorage,
+    ) -> None:
+        with DAWUMSource(from_file=FIXTURE) as src:
+            run_lake_ingest(source=src, storage=storage)
+        rows = storage.query_view("dawum_poll_results", limit=100)
+        # 5 polls × (7 or 8 parties each); >= 35 total rows expected.
+        assert len(rows) >= 35
+        # Each row carries a typed percentage.
+        for r in rows:
+            assert r["percentage"] is None or isinstance(r["percentage"], float) or hasattr(r["percentage"], "is_finite")
+        # Union (party_id=1) should be present.
+        unions = [r for r in rows if r["party_id"] == "1"]
+        assert unions
+        assert all(r["party_name"] == "CDU/CSU" for r in unions)
