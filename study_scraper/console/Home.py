@@ -76,7 +76,7 @@ if report.pending_count > 0:
 # operator sees the same staleness/yield signals a terminal user gets.
 
 st.subheader("Pipeline health")
-hcol1, hcol2, hcol3, hcol4 = st.columns(4)
+hcol1, hcol2, hcol3, hcol4, hcol5 = st.columns(5)
 if report.attribution_days_since_last_attempt is None:
     hcol1.metric("Attribution last attempt", "never")
 else:
@@ -104,6 +104,19 @@ hcol4.metric(
         f"{report.reference_follower_pending_total}."
     ),
 )
+if report.digest_days_since_last_run is None:
+    hcol5.metric("Digest last run", "never")
+else:
+    hcol5.metric(
+        "Digest last run",
+        f"{report.digest_days_since_last_run:.1f}d ago",
+        help=(
+            "Most recent `watch_snapshots` row across all registered "
+            "watches -- `scrape.yml`'s scheduled `digest` step. A silent "
+            "stall here means the Questions page stops showing new "
+            "shifts even though nothing looks broken elsewhere."
+        ),
+    )
 if report.attribution_queue_per_topic:
     with st.expander("Attribution queue backlog by topic"):
         df = pd.DataFrame(
