@@ -131,6 +131,14 @@ class StatusReport:
     # attribution budget on; a topic sitting at the top of the backlog
     # for weeks is invisible next to a single global count.
     attribution_queue_per_topic: Dict[str, int] = field(default_factory=dict)
+    # How long since the digest (`watch_snapshots`, monitoring v1) last
+    # actually took a snapshot -- None if no watch has ever been
+    # digested. `scrape.yml` runs `digest` as its last step; if that step
+    # silently stops running (the same failure shape #110 caught for
+    # attribution and #115 generalized to crawl sources), an operator
+    # watching Questions-page shifts would otherwise have no signal that
+    # the feed had gone stale, only that nothing new happened to show.
+    digest_days_since_last_run: Optional[float] = None
 
     @property
     def attribution_coverage_rate(self) -> Optional[float]:
@@ -431,6 +439,9 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             )
             run_days = cur.fetchall()
 
+            cur.execute(f"SELECT MAX(taken_at) AS last FROM {SCHEMA}.watch_snapshots")
+            last_digest_run = cur.fetchone()["last"]
+
     generated_at = datetime.now(timezone.utc)
     attribution_days_since_last_attempt = (
         (generated_at - last_attribution_attempt).total_seconds() / 86400.0
@@ -446,6 +457,11 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         )
         for source_id in runs_per_source
     }
+    digest_days_since_last_run = (
+        (generated_at - last_digest_run).total_seconds() / 86400.0
+        if last_digest_run is not None
+        else None
+    )
 
     never_run_sources = sorted(KNOWN_SOURCE_IDS - set(runs_per_source))
 
@@ -486,6 +502,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         reference_follower_studies_total=reference_follower_studies_total,
         reference_follower_pending_total=reference_follower_pending_total,
         never_run_sources=never_run_sources,
+        digest_days_since_last_run=digest_days_since_last_run,
     )
 
 
@@ -547,6 +564,13 @@ def format_text(report: StatusReport) -> str:
         f"{report.reference_follower_studies_total}"
         f" (pending: {report.reference_follower_pending_total})"
     )
+    if report.digest_days_since_last_run is None:
+        lines.append("  digest last run            : never")
+    else:
+        lines.append(
+            "  digest last run            : "
+            f"{report.digest_days_since_last_run:.1f} days ago"
+        )
     if report.never_run_sources:
         lines.append(
             "  sources never run (built, no crawl yet): "

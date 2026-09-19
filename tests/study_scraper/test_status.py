@@ -44,6 +44,7 @@ def _clean_tables(storage: PostgresStorage) -> Iterator[None]:
             cur.execute("TRUNCATE study_scraper.crawl_run_studies CASCADE")
             cur.execute("TRUNCATE study_scraper.studies CASCADE")
             cur.execute("TRUNCATE study_scraper.crawl_runs CASCADE")
+            cur.execute("TRUNCATE study_scraper.watches CASCADE")
         conn.commit()
     yield
 
@@ -375,6 +376,51 @@ def test_status_reference_follower_pending_reflects_true_backlog(
 
     text = format_text(report)
     assert "(pending: 2)" in text
+
+
+def test_status_digest_staleness_never_run(storage: PostgresStorage) -> None:
+    """No watch has ever been digested -- must read as 'never', same
+    shape as attribution_days_since_last_attempt's empty case (#110)."""
+    report = build_status(storage)
+    assert report.digest_days_since_last_run is None
+
+    text = format_text(report)
+    assert "digest last run            : never" in text
+
+
+def test_status_digest_staleness_recent(storage: PostgresStorage) -> None:
+    """A fresh watch_snapshots row reads as ~0 days stale."""
+    watch_id = storage.add_watch(query="climate laws")
+    storage.save_watch_snapshot(watch_id, findings_count=1, payload=[])
+
+    report = build_status(storage)
+    assert report.digest_days_since_last_run is not None
+    assert 0.0 <= report.digest_days_since_last_run < 1.0
+
+    text = format_text(report)
+    assert "digest last run" in text
+
+
+def test_status_digest_staleness_stale(storage: PostgresStorage) -> None:
+    """A stale (>3 day old) most-recent snapshot across all watches must
+    surface as such -- a silently-stopped `digest` step (scrape.yml's
+    last scheduled step) would otherwise look identical to a healthy
+    pipeline everywhere else in `status`."""
+    watch_id = storage.add_watch(query="nuclear energy")
+    stale_ts = datetime.now(timezone.utc) - timedelta(days=6)
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO study_scraper.watch_snapshots "
+                "(watch_id, taken_at, findings_count, payload) "
+                "VALUES (%s, %s, %s, %s::jsonb)",
+                (watch_id, stale_ts, 0, "[]"),
+            )
+        conn.commit()
+
+    report = build_status(storage)
+    assert report.digest_days_since_last_run is not None
+    assert report.digest_days_since_last_run >= 5.9
 
 
 def test_status_zero_yield_streak_none_when_no_attempts(
