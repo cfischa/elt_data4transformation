@@ -7,6 +7,9 @@ same pattern).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from typing import Optional
+
 from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS
 
 # Known source kinds: "catalog" sources (study_scraper/discovery/*.py) write
@@ -32,3 +35,21 @@ def source_kind(source_id: str) -> str:
     if source_id in LAKE_SOURCES:
         return "lake"
     return "?"
+
+
+def days_since(timestamp: Optional[datetime], *, now: Optional[datetime] = None) -> Optional[float]:
+    """Days elapsed since `timestamp`, or None if `timestamp` is None.
+
+    Same "days since last clean run" computation `status.py::build_status`
+    does for the Home page's staleness table -- the Sources page's per-
+    source table (`5_Sources.py`) previously only showed the raw "last
+    successful run" timestamp, leaving an operator to do the date math by
+    hand on the one page purpose-built for per-source health, while the
+    Home page already surfaced the same signal as a sorted "days since"
+    number. `now` is injectable for tests; defaults to the real current time.
+    """
+    if timestamp is None:
+        return None
+    if now is None:
+        now = datetime.now(timezone.utc)
+    return (now - timestamp).total_seconds() / 86400.0

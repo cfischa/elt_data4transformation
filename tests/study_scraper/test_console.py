@@ -16,6 +16,7 @@ import importlib.util
 import inspect
 import pkgutil
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -133,6 +134,20 @@ def test_pending_reference_rows_shapes_ids_for_display() -> None:
         {"openalex_id": "W123", "url": "https://openalex.org/W123"},
         {"openalex_id": "W456", "url": "https://openalex.org/W456"},
     ]
+
+
+def test_days_since_computes_elapsed_days() -> None:
+    from study_scraper.console._sources import days_since
+
+    now = datetime(2026, 9, 21, tzinfo=timezone.utc)
+    then = now - timedelta(days=3, hours=12)
+    assert days_since(then, now=now) == pytest.approx(3.5)
+
+
+def test_days_since_returns_none_for_never_run() -> None:
+    from study_scraper.console._sources import days_since
+
+    assert days_since(None) is None
 
 
 def test_pending_reference_rows_handles_empty() -> None:
