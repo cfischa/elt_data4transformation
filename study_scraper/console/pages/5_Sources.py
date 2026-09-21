@@ -15,7 +15,7 @@ from __future__ import annotations
 import streamlit as st
 
 from study_scraper.console._shared import storage_or_error
-from study_scraper.console._sources import source_kind
+from study_scraper.console._sources import days_since, source_kind
 from study_scraper.status import build_status
 
 
@@ -69,6 +69,7 @@ for sid in all_sources:
         report.studies_per_source.get(sid, 0)
         + report.source_records_per_source.get(sid, 0)
     )
+    stale_days = days_since(last_ok)
     rows.append({
         "source": sid,
         "kind": source_kind(sid),
@@ -77,6 +78,9 @@ for sid in all_sources:
         "errors": int(stats.get("total_errors") or 0),
         "last successful run": (
             last_ok.isoformat(timespec="seconds") if last_ok else "— never"
+        ),
+        "days since last success": (
+            "never" if stale_days is None else round(stale_days, 1)
         ),
     })
 
