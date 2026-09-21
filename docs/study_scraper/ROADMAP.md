@@ -12,69 +12,60 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Updated 2026-09-14: Studies: **7,406** (+102 since 09-07, +1.4% — growth
-ticked back up after four weeks of deceleration). `bundestag_dip` is now
-35.3 days stale, still 401ing (#113); `openalex` (5,372) + `ssoar` (919)
-are the only sources still growing. **Root-caused #145 (attribution
-pipeline hard-broken since 09-01) and it's agent-buildable, not
-needs-human**: `cli.py` imports `BMASSource` unconditionally at module
-load, and `sources/bmas.py`'s `bs4` import has no guard — unlike
-`sources/gesis.py`'s `SPARQLWrapper`, which already uses a
-try/except-optional-import pattern. So *any* CLI command dies wherever
-`beautifulsoup4` isn't installed, which is exactly `attribute.yml`'s
-install list (never needed to list it before BMAS shipped 09-01). Filed
-**#163** (priority:high) with a verified fix (lazy/optional import,
-mirroring the GESIS precedent) — confirmed locally that `python -m
-study_scraper --help` runs clean with `bs4` uninstalled once the import
-is deferred. This resolves #145 **without** a `.github/workflows/
-attribute.yml` edit. Also newly visible: reference-follower (#136,
-shipped 08-31) has **153,932 pending candidates and 0 ever fetched** —
-`follow --fetch` was never added to `scrape.yml`'s crawl step, a
-genuine (different) needs-human gap. Closed two dead-end scouted issues
-from last week after investigation: #150 (Eurobarometer has no topline
-percentages anywhere in its catalog harvest, only login-gated microdata
-does) and #151 (BMF Datenportal is bot-gated and redundant with the
-existing `govdata` source's BMF coverage).
+Updated 2026-09-21: Studies: **7,467** (+61 since 09-14, +0.8% — growth
+still nearly flat, entirely from `openalex` (5,381) + `ssoar` (971);
+`bundestag_dip` now 42.3 days stale, still 401ing (#113)). **#145
+confirmed fixed and closed**: PR #165 (lazy `bs4` import) merged 09-14,
+`scheduled-attribute` has run successfully several times since,
+attribution queue backlog is draining (233 → 204), last run yield 8/40
+(20%). The answering half of the goal is dark no longer, just slow.
+**Filed #172** (priority:med, needs-human): reference-follower's
+`follow --fetch` (#136, shipped 08-31) still isn't in `scrape.yml`'s
+crawl step — 154,375 pending candidates, 0 ever fetched, flagged as
+"will file next round" on 08-31 and 09-14, now an actual issue.
+Source-coverage math worth stating plainly: **7 of the 8
+`GOAL.md`-required production sources have run** (`openalex`, `ssoar`,
+`bundestag_dip`, `dawum`, `gesis`, `eurostat`, `bmas`); `core`,
+`eurobarometer`, `govdata` are built and tested but stuck at 0 live
+records purely because `scrape.yml` never got the 3 lines (#65,
+6+ weeks open) — the single closest the project has been to clearing
+this primary bar without any new engineering. Scouted Russia/Ukraine
+and Wohnen/Miete opinion data this round (8th straight round, nothing
+new buildable — see the Product Direction issue for detail).
 
-1. **Developer: build #163** (lazy/optional `bs4` import) — now the
-   single highest-leverage action available, fully in-scope, no
-   maintainer action needed. Unblocks the whole answering half of the
-   goal that's been dark for two weeks.
-2. **Wire core + eurobarometer + govdata into the scheduled crawl**
-   (issue #65, priority:high, needs-human) — three ready-to-run
-   sources, zero live records, one `scrape.yml` edit each (exact lines
-   in the issue). Still the cheapest, most durable fix on the board for
-   `GOAL.md`'s ≥8-production-sources bar.
-3. **Attribution throughput + dark-pipeline stall** (issue #49)
-   **[needs-human]** — moot until #163 lands and a scheduled run
-   actually completes; once it does, the fixed `--limit 40` cadence in
-   `.github/workflows/attribute.yml` becomes the binding constraint
-   again.
+1. **You: paste #65's 3 lines into `scrape.yml`.** Cheapest, highest-
+   leverage action on the board — closes `GOAL.md`'s ≥8-production-
+   sources bar outright (7/8 → 10/8), no secrets, no design call.
+2. **Wire `follow --fetch` into `scrape.yml`** (issue #172, new,
+   priority:med, needs-human) — code is done (#136), just needs a
+   crawl-step addition; 154k-candidate backlog otherwise sits idle
+   indefinitely.
+3. **Attribution throughput** (issue #49) **[needs-human]** — no
+   longer fully dark, but still the starkest number in the project
+   (0.9% of claims ever attributed); the fixed `--limit 40` cadence in
+   `.github/workflows/attribute.yml` is the next binding constraint
+   once the post-outage backlog finishes draining.
 4. **Topic-content gap** (issue #50, priority:high, open since
-   2026-06-26 — 12+ weeks) **[needs-human]** — maintainer's ask
+   2026-06-26 — 13+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
    topic) needs `config/topics/topics.csv` + `questions.yml`, both
    outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
    neither agent can build it as scoped.
 5. **`bundestag_dip`** (issue #48, reopened in spirit as #106/#113/A40)
-   — still 401ing as of 2026-09-14 (35.3 days stale). No further code
+   — still 401ing as of 2026-09-21 (42.3 days stale). No further code
    fix available; converges back to needing a real `DIP_API_KEY`
    (`infoline.id3@bundestag.de`). Deprioritized below #65 per
    maintainer's 08-24 silent-default.
-6. **Wire `follow --fetch` into `scrape.yml`** (new, not yet its own
-   issue) — 153,932-candidate backlog sitting idle since 08-31; will
-   file as its own issue next round if still unaddressed. Lower urgency
-   than the items above.
-7. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
+6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
    labels + value); `eurostat-table --code <code>` is the queryable
    surface. Python, not a SQL view — see DECISIONS.md A34 for why.
-8. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
+7. **OpenAlex 429s structurally starving `rente`/`verteidigung`**
    (issue #71) **[done 2026-07-30]** — topic-crawl order now rotates by
    `GITHUB_RUN_NUMBER` (A32). Confirmed working live 2026-08-03: both
    topics' openalex counts roughly doubled/tripled week over week.
-9. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
+8. ~~SSOAR outage, 8/8 topics failed 2026-08-10~~ **[done/closed, issue
    #100]** — confirmed transient upstream outage: `ssoar` ran clean on
    both the 2026-08-13 and 2026-08-17 scheduled runs (`errors=0` across
    all 8 topics each time; live `status` on 2026-08-18 shows 625 total
@@ -124,19 +115,20 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-08-24 live DB): **catalog** OpenAlex (5,340) +
-SSOAR (729), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
-again, #113/A40)** — academic + government, three sources have fed the
-`studies` table (GOAL.md's topic-coverage bar is met and stays met, see
-P1 intro); **lake** DAWUM (vote intention, ~3,911 rows), GESIS KG
-(survey catalog, 500), Eurostat (official stats, 3 — thin by design).
-**CORE, Eurobarometer, GovData.de are all built and fixture-tested but
-have 0 live records** — none was ever added to `scrape.yml`'s crawl step
-(issue #65, consolidated, priority:high). The remaining representativeness
-gap is *source-count* (6 of 8 sources ever actually run; #65 closes it in
-one PR) — topic coverage is no longer the binding constraint, and
-government-category coverage now depends on a fresh `DIP_API_KEY` rather
-than code. Ranked by yield per effort:
+Current coverage (2026-09-21 live DB): **catalog** OpenAlex (5,381) +
+SSOAR (971), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
+again, #113/A40, now 42.3 days stale)** — academic + government, three
+sources have fed the `studies` table (GOAL.md's topic-coverage bar is
+met and stays met, see P1 intro); **lake** DAWUM (vote intention, 3,956
+rows), GESIS KG (survey catalog, 500), Eurostat (official stats, 3 —
+thin by design), BMAS (pension statistics, 2). **CORE, Eurobarometer,
+GovData.de are all built and fixture-tested but have 0 live records** —
+none was ever added to `scrape.yml`'s crawl step (issue #65,
+consolidated, priority:high). The remaining representativeness gap is
+*source-count* (7 of 8 sources ever actually run; #65 closes it in one
+PR, taking it to 10) — topic coverage is no longer the binding
+constraint, and government-category coverage now depends on a fresh
+`DIP_API_KEY` rather than code. Ranked by yield per effort:
 
 5. **CORE** (issue #94, shipped 2026-08-07, A38) **[done, code — see
    #65]** — third `studies`-table catalog source (`api.core.ac.uk`,
@@ -158,6 +150,25 @@ than code. Ranked by yield per effort:
    free, no-auth `package_search` REST API, "Data License Germany 2.0"
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
+
+### Scouted this round (2026-09-21)
+
+- Searched Russia/Ukraine-war opinion data (ties to the maintainer's own
+  06-26 `russland_ukraine` topic ask, #50, still open) and Wohnen/Miete
+  opinion data (housing satisfaction / rent-level sentiment). Both
+  dead ends: Ukraine-war polling is Statista (paywalled) or bpb.de's
+  Ukraine-Analysen digest (HTML summary of others' polls, no API —
+  already tracked as a tier-3 `SitemapSource` candidate). Housing
+  opinion data is the same shape: Statista paywalled, Destatis publishes
+  official rent statistics (indicators) not opinion percentages.
+- Net: **8th consecutive scouting round with no new free/no-auth
+  opinion source** across the full 8-topic list (every topic has now
+  had at least one dedicated pass since 07-20). The frontier for the
+  current topic set looks exhausted; further scouting will likely need
+  to look beyond these 8 topics, or revisit the tier-3 `SitemapSource`
+  work (bpb.de, eupinions, polling-firm press releases) as the next
+  real lever for topics like Russia/Ukraine and climate that keep
+  surfacing HTML-only candidates.
 
 ### Scouted this round (2026-09-14)
 
