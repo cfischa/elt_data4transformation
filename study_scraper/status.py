@@ -591,6 +591,15 @@ def format_text(report: StatusReport) -> str:
     else:
         lines.append("    (none)")
     lines.append("")
+    lines.append("  studies per (topic x source):")
+    if report.studies_per_topic_source:
+        for row in report.studies_per_topic_source:
+            lines.append(
+                f"    {row['topic_id']:<20} {row['source_id']:<15} {row['count']}"
+            )
+    else:
+        lines.append("    (none)")
+    lines.append("")
     lines.append("  crawl staleness per source (days since last clean run):")
     if report.source_days_since_last_success:
         for source_id, days in sorted(
