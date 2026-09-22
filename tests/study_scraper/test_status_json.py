@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from study_scraper.status import StatusReport, report_to_dict
+from study_scraper.status import StatusReport, format_text, report_to_dict
 
 
 def _report(**overrides) -> StatusReport:
@@ -66,6 +66,31 @@ def test_report_to_dict_includes_computed_rates() -> None:
     assert payload["attribution_queue_per_topic"] == {"klima": 9, "steuern": 3}
     assert payload["never_run_sources"] == []
     assert payload["reference_follower_pending_total"] == 0
+
+
+def test_format_text_includes_topic_source_breakdown() -> None:
+    report = _report(
+        studies_per_topic_source=[
+            {"topic_id": "klima", "source_id": "ssoar", "count": 6},
+            {"topic_id": "klima", "source_id": "openalex", "count": 2},
+        ]
+    )
+    text = format_text(report)
+
+    assert "studies per (topic x source)" in text
+    assert "klima" in text and "ssoar" in text and "openalex" in text
+    klima_ssoar_line = next(
+        line for line in text.splitlines() if "ssoar" in line and "klima" in line
+    )
+    assert "6" in klima_ssoar_line
+
+
+def test_format_text_topic_source_breakdown_empty() -> None:
+    report = _report(studies_per_topic_source=[])
+    text = format_text(report)
+
+    section = text.split("studies per (topic x source):")[1]
+    assert "(none)" in section.splitlines()[1]
 
 
 def test_report_to_dict_handles_none_rates() -> None:
