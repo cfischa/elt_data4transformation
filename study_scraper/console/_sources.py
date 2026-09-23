@@ -1,16 +1,18 @@
-"""Source kind classification used by `pages/5_Sources.py`.
+"""Source kind classification + per-source run stats used by
+`pages/5_Sources.py`.
 
-Extracted so unit tests can exercise it without importing the Streamlit
-page or `_shared.py` (which imports streamlit -- see `_csv.py` for the
-same pattern).
+Extracted so unit/integration tests can exercise this logic without
+importing the Streamlit page or `_shared.py` (which imports streamlit --
+see `_csv.py` for the same pattern).
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
-from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS
+from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS, SCHEMA
+from study_scraper.storage import PostgresStorage
 
 # Known source kinds: "catalog" sources (study_scraper/discovery/*.py) write
 # topic-filtered candidates to `studies`; "lake" sources
@@ -53,3 +55,35 @@ def days_since(timestamp: Optional[datetime], *, now: Optional[datetime] = None)
     if now is None:
         now = datetime.now(timezone.utc)
     return (now - timestamp).total_seconds() / 86400.0
+
+
+def per_source_run_stats(storage: PostgresStorage) -> Dict[str, Dict[str, Any]]:
+    """Per-source last-clean-run timestamp, last-attempted-run timestamp,
+    and cumulative error count.
+
+    Uses the same "clean run" definition as `status.py::build_status`'s
+    `source_days_since_last_success` (errors = 0 AND not aborted) --
+    a bare `errors = 0` filter (this page's query before #178) misreads a
+    run that raised out of `iter_candidates` (e.g. an unhandled 401,
+    `finished_at` NULL, `notes` starting `aborted:`, per #48/#106) as
+    successful, showing a stale/aborted run's timestamp as the source's
+    "last successful run" instead of the actual last clean run (or
+    "never").
+    """
+    with storage.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT source_id,
+                       MAX(started_at) FILTER (
+                           WHERE errors = 0
+                             AND NOT (finished_at IS NULL
+                                       AND COALESCE(notes, '') LIKE 'aborted:%')
+                       )                         AS last_ok,
+                       MAX(started_at)            AS last_run,
+                       COALESCE(SUM(errors), 0)   AS total_errors
+                FROM   {SCHEMA}.crawl_runs
+                GROUP  BY source_id
+                """
+            )
+            return {row["source_id"]: dict(row) for row in cur.fetchall()}
