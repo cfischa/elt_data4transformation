@@ -4,8 +4,8 @@ One row per source (catalog: ssoar/openalex/bundestag_dip/core →
 `studies`; lake: dawum/gesis/eurostat/govdata/eurobarometer →
 `source_records`, see `_sources.source_kind`) with record count, run
 count, errors, and last successful run. Plus the recent-run table.
-Reuses `build_status()`; one small inline query for per-source
-last-success.
+Reuses `build_status()`; per-source last-success comes from
+`_sources.per_source_run_stats()`.
 
 Read-only.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 import streamlit as st
 
 from study_scraper.console._shared import storage_or_error
-from study_scraper.console._sources import days_since, source_kind
+from study_scraper.console._sources import days_since, per_source_run_stats, source_kind
 from study_scraper.status import build_status
 
 
@@ -40,18 +40,9 @@ c4.metric("runs with errors", report.failed_runs)
 
 st.divider()
 
-# Per-source last-successful run + cumulative errors (inline, like 3_Lake.py).
-with storage.connection() as conn:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT source_id, "
-            "       MAX(started_at) FILTER (WHERE errors = 0) AS last_ok, "
-            "       MAX(started_at)                           AS last_run, "
-            "       COALESCE(SUM(errors), 0)                  AS total_errors "
-            "FROM   study_scraper.crawl_runs "
-            "GROUP  BY source_id"
-        )
-        run_stats = {r["source_id"]: r for r in cur.fetchall()}
+# Per-source last-successful run + cumulative errors -- same "clean run"
+# definition as status.py::build_status (#178).
+run_stats = per_source_run_stats(storage)
 
 all_sources = sorted(
     set(report.studies_per_source)
