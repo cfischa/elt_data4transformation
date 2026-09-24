@@ -38,6 +38,23 @@ LAKE_SOURCE_IDS = frozenset(
 KNOWN_SOURCE_IDS = CATALOG_SOURCE_IDS | LAKE_SOURCE_IDS
 
 
+def run_is_clean(run: Dict[str, Any]) -> bool:
+    """True if a `crawl_runs` row (as a dict, e.g. from `StatusReport.
+    recent_runs`) represents a successful run: `errors == 0` and not
+    aborted out of `iter_candidates` (the #48/#106 401 shape --
+    `finished_at` NULL with `notes` starting `aborted:`). Single source
+    of truth for "clean run" shared by `format_text`'s recent-runs
+    section and `console/pages/5_Sources.py`'s recent-runs table (#178
+    fixed this same check for the Sources page's per-source summary
+    table via `_sources.py::per_source_run_stats`'s SQL; the page's
+    separate recent-runs table still used a bare `errors > 0` check
+    until #180)."""
+    aborted = run.get("finished_at") is None and (run.get("notes") or "").startswith(
+        "aborted:"
+    )
+    return (run.get("errors") or 0) == 0 and not aborted
+
+
 @dataclass
 class StatusReport:
     generated_at: datetime
@@ -630,7 +647,7 @@ def format_text(report: StatusReport) -> str:
     if report.recent_runs:
         for r in report.recent_runs:
             aborted = r.get("finished_at") is None and (r.get("notes") or "").startswith("aborted:")
-            err_flag = "ERR" if (r.get("errors") or 0) > 0 or aborted else "ok "
+            err_flag = "ok " if run_is_clean(r) else "ERR"
             note = f"  ({r['notes']})" if aborted and r.get("notes") else ""
             lines.append(
                 f"    {err_flag}  {r['source_id']:<10} {r['topic_id']:<22}  "

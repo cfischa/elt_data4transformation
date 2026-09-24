@@ -15,7 +15,12 @@ from __future__ import annotations
 import streamlit as st
 
 from study_scraper.console._shared import storage_or_error
-from study_scraper.console._sources import days_since, per_source_run_stats, source_kind
+from study_scraper.console._sources import (
+    days_since,
+    per_source_run_stats,
+    recent_run_rows,
+    source_kind,
+)
 from study_scraper.status import build_status
 
 
@@ -79,21 +84,7 @@ st.subheader("per source")
 st.dataframe(rows, use_container_width=True, hide_index=True)
 
 st.subheader("recent runs")
-recent = [
-    {
-        "ok": "ERR" if (r.get("errors") or 0) > 0 else "ok",
-        "source": r.get("source_id"),
-        "topic": r.get("topic_id"),
-        "seen": r.get("candidates_seen"),
-        "kept": r.get("candidates_kept"),
-        "errors": r.get("errors"),
-        "started": (
-            r["started_at"].isoformat(timespec="seconds")
-            if r.get("started_at") else ""
-        ),
-    }
-    for r in report.recent_runs
-]
+recent = recent_run_rows(report.recent_runs)
 if recent:
     st.dataframe(recent, use_container_width=True, hide_index=True)
 else:
