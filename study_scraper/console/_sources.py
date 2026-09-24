@@ -9,9 +9,9 @@ see `_csv.py` for the same pattern).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS, SCHEMA
+from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS, SCHEMA, run_is_clean
 from study_scraper.storage import PostgresStorage
 
 # Known source kinds: "catalog" sources (study_scraper/discovery/*.py) write
@@ -87,3 +87,30 @@ def per_source_run_stats(storage: PostgresStorage) -> Dict[str, Dict[str, Any]]:
                 """
             )
             return {row["source_id"]: dict(row) for row in cur.fetchall()}
+
+
+def recent_run_rows(recent_runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Shape `StatusReport.recent_runs` for `pages/5_Sources.py`'s
+    "recent runs" table, using `status.run_is_clean` for the `ok`/`ERR`
+    flag -- that table previously computed it with a bare `errors > 0`
+    check, so a run that aborted out of `iter_candidates` (errors=0,
+    finished_at NULL, notes starting `aborted:`, the #48/#106 401 shape)
+    rendered as `ok` here even after #178 fixed the identical bug in this
+    same page's per-source summary table above it (see #180).
+    """
+    return [
+        {
+            "ok": "ok" if run_is_clean(r) else "ERR",
+            "source": r.get("source_id"),
+            "topic": r.get("topic_id"),
+            "seen": r.get("candidates_seen"),
+            "kept": r.get("candidates_kept"),
+            "errors": r.get("errors"),
+            "started": (
+                r["started_at"].isoformat(timespec="seconds")
+                if r.get("started_at")
+                else ""
+            ),
+        }
+        for r in recent_runs
+    ]

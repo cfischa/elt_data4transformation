@@ -154,6 +154,90 @@ def test_days_since_returns_none_for_never_run() -> None:
     assert days_since(None) is None
 
 
+def test_run_is_clean_flags_aborted_run_as_not_clean() -> None:
+    from study_scraper.status import run_is_clean
+
+    assert run_is_clean(
+        {"errors": 0, "finished_at": None, "notes": "aborted: 401 Unauthorized"}
+    ) is False
+
+
+def test_run_is_clean_flags_errored_run_as_not_clean() -> None:
+    from study_scraper.status import run_is_clean
+
+    assert run_is_clean({"errors": 2, "finished_at": datetime.now(timezone.utc)}) is False
+
+
+def test_run_is_clean_flags_successful_run_as_clean() -> None:
+    from study_scraper.status import run_is_clean
+
+    assert run_is_clean({"errors": 0, "finished_at": datetime.now(timezone.utc)}) is True
+
+
+def test_run_is_clean_flags_in_progress_lake_run_as_clean() -> None:
+    """`finished_at=None` with no `notes` (an in-progress lake ingest,
+    see `test_status_does_not_flag_in_progress_lake_run_as_failed`) is
+    not an abort -- only `notes` starting `aborted:` means failure."""
+    from study_scraper.status import run_is_clean
+
+    assert run_is_clean({"errors": 0, "finished_at": None, "notes": None}) is True
+
+
+def test_recent_run_rows_flags_aborted_run_as_err() -> None:
+    """An aborted run (errors=0, finished_at None, notes starting
+    `aborted:` -- the #48/#106 401 shape) must render `ERR`, not `ok`,
+    matching the per-source summary table's fix (#178) -- see #180."""
+    from study_scraper.console._sources import recent_run_rows
+
+    started = datetime(2026, 9, 21, tzinfo=timezone.utc)
+    rows = recent_run_rows(
+        [
+            {
+                "source_id": "bundestag_dip",
+                "topic_id": "klima",
+                "started_at": started,
+                "finished_at": None,
+                "candidates_seen": 0,
+                "candidates_kept": 0,
+                "errors": 0,
+                "notes": "aborted: 401 Unauthorized",
+            }
+        ]
+    )
+    assert rows == [
+        {
+            "ok": "ERR",
+            "source": "bundestag_dip",
+            "topic": "klima",
+            "seen": 0,
+            "kept": 0,
+            "errors": 0,
+            "started": started.isoformat(timespec="seconds"),
+        }
+    ]
+
+
+def test_recent_run_rows_flags_clean_run_as_ok() -> None:
+    from study_scraper.console._sources import recent_run_rows
+
+    started = datetime(2026, 9, 21, tzinfo=timezone.utc)
+    rows = recent_run_rows(
+        [
+            {
+                "source_id": "ssoar",
+                "topic_id": "klima",
+                "started_at": started,
+                "finished_at": started,
+                "candidates_seen": 10,
+                "candidates_kept": 3,
+                "errors": 0,
+                "notes": None,
+            }
+        ]
+    )
+    assert rows[0]["ok"] == "ok"
+
+
 def test_pending_reference_rows_handles_empty() -> None:
     from study_scraper.console._candidates import pending_reference_rows
 
