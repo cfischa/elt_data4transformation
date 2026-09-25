@@ -84,6 +84,19 @@ def pending_references(
     alone) keeps `--topic X`'s fetch budget spent on candidates that
     actually have a shot at matching X, instead of being diluted by
     every other topic's citation graph.
+
+    Ordered by `random()`, not `work_id` — a fetched candidate that
+    scores 0 against the topic filter is dropped by `pipeline.run_one`
+    without being stored anywhere (per Q12: "excludes hit OR score==0
+    => not stored at all"), so it stays "pending" forever. A
+    deterministic order therefore re-fetches the exact same
+    never-matching head of the queue on every single scheduled run,
+    stuck indefinitely if those particular IDs never happen to score
+    above 0 for that topic (issue #182 — reproduced live: 154k pending
+    references, 0 ever ingested, because `--limit 40`'s fetch budget
+    was spent on the same dead batch every run). Random order spends
+    each run's budget on a different slice instead, so the backlog
+    actually gets worked through over time.
     """
     topic_clause = "AND %s = ANY(topic_ids)" if topic_id is not None else ""
     topic_params = [topic_id] if topic_id is not None else []
@@ -91,7 +104,7 @@ def pending_references(
         with conn.cursor() as cur:
             cur.execute(
                 _PENDING_REFERENCES_CTE.format(topic_clause=topic_clause)
-                + "ORDER BY c.work_id LIMIT %s",
+                + "ORDER BY random() LIMIT %s",
                 (*topic_params, *topic_params, limit),
             )
             return [row["work_id"] for row in cur.fetchall()]
