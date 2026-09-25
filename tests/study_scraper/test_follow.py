@@ -118,6 +118,32 @@ class TestPendingReferences:
 
         assert len(pending_references(storage, limit=3)) == 3
 
+    def test_repeated_calls_sample_different_subsets(
+        self, storage: PostgresStorage
+    ) -> None:
+        # #182: a deterministic `ORDER BY work_id LIMIT n` returns the
+        # exact same head of the queue on every call. Any candidate the
+        # fetch side drops without storing (score==0, see pipeline.
+        # run_one) never leaves "pending" -- so a fixed order gets
+        # permanently stuck re-fetching the same never-matching batch
+        # forever (reproduced live: 154k pending references, 0 ever
+        # ingested). Random order must not have this failure mode.
+        total = 50
+        cited = _seed_study(
+            "https://doi.org/10.1/random-order-seed",
+            referenced_works=[f"https://openalex.org/W{i:04d}" for i in range(total)],
+        )
+        storage.upsert_study(cited, status="kept")
+
+        seen: set = set()
+        for _ in range(20):
+            seen.update(pending_references(storage, limit=5))
+
+        # With the old deterministic order every one of these 20 calls
+        # returns the identical 5 IDs (len(seen) == 5). Astronomically
+        # unlikely with true random sampling out of 50 candidates.
+        assert len(seen) > 5
+
     def test_topic_id_scopes_to_citing_studies_own_topic(
         self, storage: PostgresStorage
     ) -> None:
