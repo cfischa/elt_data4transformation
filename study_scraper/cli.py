@@ -163,6 +163,7 @@ def run(
         ctx = OpenAlexSource(
             from_file=from_file,
             politeness_delay=settings.http_politeness_delay_seconds,
+            mailto=settings.openalex_mailto,
         )
     elif source == "bundestag_dip":
         from study_scraper.discovery.bundestag_dip import BundestagDIPSource

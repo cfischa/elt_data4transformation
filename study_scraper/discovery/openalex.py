@@ -41,7 +41,13 @@ from study_scraper.topics import Topic
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://api.openalex.org/works"
-DEFAULT_PER_PAGE = 25
+# OpenAlex's per-page ceiling. A `--limit 400` topic crawl at the old
+# default of 25/page cost 16 paginated requests; across 8 topics that's
+# ~128 requests per scheduled run for this source alone, which lined up
+# with the sustained (not just tail-topic) 429 pressure seen in issue
+# #184. Requesting the max page size cuts that to 2 requests/topic (16
+# total) without changing what gets fetched.
+DEFAULT_PER_PAGE = 200
 MAX_PER_PAGE = 200
 # Search-term cap: 24 quoted OR-joined terms is ~500 URL chars, and with
 # the round-robin locale interleave both languages' core terms fit.
