@@ -84,6 +84,18 @@ class Settings(BaseSettings):
     http_politeness_delay_seconds: float = Field(default=0.5)
     respect_robots_txt: bool = Field(default=True)
 
+    # OpenAlex requests without a contact email are served from the
+    # stricter, unauthenticated "common pool"; adding `mailto` moves them
+    # into OpenAlex's "polite pool" (faster, more consistent, documented by
+    # OpenAlex as less likely to be throttled under load). Defaults to the
+    # maintainer's public GitHub noreply address -- already the visible
+    # git-commit contact on every commit in this repo, so it's a safe,
+    # non-secret default that benefits every scheduled run without a
+    # workflow/secret change (issue #184).
+    openalex_mailto: Optional[str] = Field(
+        default="96009533+cfischa@users.noreply.github.com"
+    )
+
     @property
     def has_supabase(self) -> bool:
         return bool(self.supabase_url) and bool(self.supabase_service_key)

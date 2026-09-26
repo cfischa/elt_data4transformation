@@ -1323,6 +1323,44 @@ project URL + service-role key (placed in `.env`, not committed), or
   and pass; none went from "skipped" to "erroring for lack of a real
   DB").
 
+### A47. OpenAlex 429s across a whole run: max page size + polite-pool `mailto` (#184)
+
+- **Date:** 2026-09-26
+- **Context:** #184 reported 46-51 `429 Too Many Requests` per scheduled
+  run, hitting a different topic each time (klima, steuern) rather than
+  always the same tail topics — unlike #71/#81's structural last-in-loop
+  starvation, which A32's topic-rotation already addresses. That pointed
+  at overall request *volume* rather than ordering: at the old
+  `DEFAULT_PER_PAGE=25`, a per-topic `--limit 400` crawl cost 16 paginated
+  requests, and `scrape.yml` runs that for all 8 topics every run — ~128
+  OpenAlex requests per run for this source alone, before `bundestag_dip`
+  or the reference-follower step. Also, no call site ever passed OpenAlex
+  a `mailto`, so every request landed in OpenAlex's stricter,
+  unauthenticated "common pool" rather than the "polite pool" contact
+  emails unlock.
+- **Decision:** two independent, additive levers, both entirely inside
+  `study_scraper/**` (no workflow/secret change, so they take effect on
+  the very next scheduled run):
+  1. Raise `OpenAlexSource`'s `DEFAULT_PER_PAGE` to OpenAlex's own
+     ceiling (200, `MAX_PER_PAGE`) — same data, 8x fewer requests per
+     topic (16 -> 2 pages for a 400-row crawl).
+  2. Add `Settings.openalex_mailto`, defaulted to the maintainer's public
+     GitHub noreply address (already the visible git-commit contact on
+     every commit in this repo, so not a secret), and wire it through
+     both OpenAlex call sites (`cli.py`'s `run --source openalex` and
+     `follow.py`'s reference-follower). `Settings` env-override still
+     works for anyone who wants a different contact.
+  Not fixed here: whether these two are *sufficient* to reach the
+  issue's 0-429 acceptance bar depends on live-run evidence the sandbox
+  can't produce; if 429s persist after this ships, the next lever is
+  probably lowering `--limit`/topic or adding a cross-topic shared rate
+  budget in `scrape.yml` (workflow edit, human-owned).
+- **Verified:** `python -m pytest tests/study_scraper -o addopts="" -q`
+  — 519 passed, 138 skipped (0 failed). New tests assert the live-request
+  path sends `per-page=200` by default, sends `mailto` when configured,
+  and omits it when not; a config test asserts the default contact is
+  non-empty and env-overridable.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

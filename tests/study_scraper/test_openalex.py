@@ -208,6 +208,58 @@ class TestOpenAlexLiveRateLimiting:
         assert calls["n"] == 6
 
 
+class TestOpenAlexRequestVolume:
+    """Issue #184: sustained (not just tail-topic) 429s across a whole
+    scheduled run. Two levers: fewer requests per topic (bigger page size)
+    and joining OpenAlex's "polite pool" (a contact `mailto`)."""
+
+    def test_default_per_page_is_the_openalex_maximum(self, klima) -> None:
+        # Fewer, bigger pages means fewer requests per topic per run.
+        seen_params = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_params.update(request.url.params)
+            return httpx.Response(
+                200, json={"results": [], "meta": {"next_cursor": None}}
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with OpenAlexSource(client=client) as src:
+            list(src.iter_candidates(klima))
+
+        assert seen_params["per-page"] == "200"
+
+    def test_mailto_included_in_request_when_configured(self, klima) -> None:
+        seen_params = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_params.update(request.url.params)
+            return httpx.Response(
+                200, json={"results": [], "meta": {"next_cursor": None}}
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with OpenAlexSource(client=client, mailto="ops@example.com") as src:
+            list(src.iter_candidates(klima))
+
+        assert seen_params["mailto"] == "ops@example.com"
+
+    def test_mailto_omitted_when_not_configured(self, klima) -> None:
+        seen_params = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_params.update(request.url.params)
+            return httpx.Response(
+                200, json={"results": [], "meta": {"next_cursor": None}}
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with OpenAlexSource(client=client) as src:
+            list(src.iter_candidates(klima))
+
+        assert "mailto" not in seen_params
+
+
 class TestHelpers:
     def test_build_search_query_uses_topic_keywords(self, klima) -> None:
         q = _build_search_query(klima)
