@@ -161,6 +161,7 @@ def fetch_references(
         with OpenAlexSource(
             work_ids=batch,
             politeness_delay=settings.http_politeness_delay_seconds,
+            mailto=settings.openalex_mailto,
         ) as src:
             run = run_one(
                 source=src, topic=topic, storage=storage,
