@@ -130,25 +130,69 @@ def apply_responses(
     return results
 
 
+def _round_robin_by_source(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Interleave `rows` by `source_id`, preserving each source's internal
+    (recency) order, instead of concatenating one source's studies before
+    the next.
+
+    Reproduced live 2026-09-27: a single fresh `bundestag_dip` crawl burst
+    (up to 200 studies/topic on 2026-09-24, all sharing a near-identical
+    `fetched_at`) filled the front of `attribution_queue`'s plain recency
+    order, so two consecutive scheduled runs pulled 40/40 `bundestag_dip`
+    studies each and found 0 attributions both times — `bundestag_dip`
+    Drucksachen are government policy documents, essentially never
+    containing a `(question, position, percentage)` opinion triple, while
+    `ssoar`/`openalex` studies pending in the same queue (which do yield
+    attributions historically) sat untouched further back. Same shape as
+    #182/#183 (reference-follower's deterministic order starving the
+    fetch budget on one dead slice) and A32 (crawl topic-rotation) —
+    round-robin instead of a straight sort keeps one source's burst from
+    monopolizing a run's fixed batch.
+    """
+    groups: "Dict[Any, List[Dict[str, Any]]]" = {}
+    order: List[Any] = []
+    for row in rows:
+        key = row.get("source_id")
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+
+    result: List[Dict[str, Any]] = []
+    while len(result) < len(rows):
+        for key in order:
+            bucket = groups[key]
+            if bucket:
+                result.append(bucket.pop(0))
+    return result
+
+
 def prioritize_queue(
     rows: List[Dict[str, Any]], registry_topic_ids: Set[str]
 ) -> List[Dict[str, Any]]:
-    """Stable-sort `attribution_queue` rows so studies whose `topic_ids`
+    """Reorder `attribution_queue` rows so studies whose `topic_ids`
     intersect the question registry come first; question-less topics
-    fill the remainder in their existing (recency) order.
+    fill the remainder. Within each of those two groups, rows are
+    round-robined by `source_id` (see `_round_robin_by_source`) rather
+    than left in plain recency order.
 
     A scheduled run only ever attributes a fixed-size batch, so without
-    this a topic nobody has a registered question for (e.g. steuern,
-    bildung) competes for the same LLM budget as a topic someone is
-    actually waiting on an answer for (issue #59).
+    the registry split a topic nobody has a registered question for
+    (e.g. steuern, bildung) competes for the same LLM budget as a topic
+    someone is actually waiting on an answer for (issue #59); without
+    the round-robin, one source's fresh crawl burst can crowd out every
+    other source for several consecutive runs (issue found 2026-09-27,
+    see `_round_robin_by_source`).
     """
     if not registry_topic_ids:
-        return rows
+        return _round_robin_by_source(rows)
 
     def _has_registry_topic(row: Dict[str, Any]) -> bool:
         return not registry_topic_ids.isdisjoint(row.get("topic_ids") or [])
 
-    return sorted(rows, key=lambda r: 0 if _has_registry_topic(r) else 1)
+    registry_rows = [r for r in rows if _has_registry_topic(r)]
+    other_rows = [r for r in rows if not _has_registry_topic(r)]
+    return _round_robin_by_source(registry_rows) + _round_robin_by_source(other_rows)
 
 
 def _registry_topic_ids() -> Set[str]:

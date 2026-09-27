@@ -1361,6 +1361,53 @@ project URL + service-role key (placed in `.env`, not committed), or
   and omits it when not; a config test asserts the default contact is
   non-empty and env-overridable.
 
+### A48. Attribution queue: round-robin by source within each priority group
+
+- **Date:** 2026-09-27
+- **Context:** reproduced live against the real (Supabase) Postgres:
+  `attribution_attempts` showed 40/40 studies found 0 attributions on
+  both 2026-09-23 and 2026-09-25, and every one of those 80 attempts was
+  a `bundestag_dip` study. Root cause: `bundestag_dip`'s 2026-09-24 crawl
+  landed a huge, near-simultaneously-`fetched_at` burst (up to 200
+  studies/topic) across `klima`/`atomkraft`/`migration_einwanderung`/
+  `rente`/`wohnen`/`verteidigung` — exactly the topics that have
+  registered questions, so A26's registry-topic-first split (#59) put
+  the entire burst at the very front of the queue, ahead of the
+  `ssoar`/`openalex` backlog sitting in `steuern`/`bildung` (no
+  registered question there). Within the registry-priority group the
+  queue was still plain recency order, so a single source's burst could
+  fill an entire run's fixed batch. Checking whether that's actually
+  wasted spend: across all attribution history, `bundestag_dip` has
+  yielded 1 attribution from ~94 attempts vs. `ssoar` 36 from 13 studies
+  and `openalex` 79 from 25 — Drucksachen are government policy
+  documents, essentially never containing a `(question, position,
+  percentage)` opinion triple, so a `bundestag_dip`-only batch is
+  close to a guaranteed zero-yield run.
+- **Decision:** `attribute.py::prioritize_queue` now round-robins by
+  `source_id` within each of its two groups (registry-topic-first,
+  then the rest) instead of leaving each group in plain recency order —
+  same shape as A32 (crawl topic-rotation) and #182/#183 (reference-
+  follower's deterministic order starving the fetch budget on one dead
+  slice). This doesn't exclude or deprioritize `bundestag_dip` (no
+  policy call about its long-term value, which stays a maintainer/
+  product-lead judgement) — it just guarantees a fresh burst from one
+  source can't push every other source's queued study behind the
+  entire burst on every subsequent run.
+- **Known limitation:** round-robin gives turn-based fairness, not
+  proportional fairness — verified live, the registry-priority group
+  right now is 44 `bundestag_dip` vs. 1 `ssoar` + 1 `openalex`, so the
+  next batch is still ~38 `bundestag_dip`. The fix's value is mostly
+  forward-looking: every future `bundestag_dip` crawl burst (the
+  source runs on the normal biweekly schedule) will be diluted the
+  same way instead of repeating this exact starvation pattern.
+- **Verified:** `python -m pytest tests/study_scraper -o addopts="" -q`
+  — 521 passed, 138 skipped (0 failed, 2 new). New tests cover
+  `_round_robin_by_source`'s interleaving and `prioritize_queue`'s
+  round-robin-within-each-group behavior; all pre-existing
+  `prioritize_queue`/`_target_ids` tests pass unchanged (their fixture
+  rows share one implicit `source_id=None` group, so round-robin is a
+  no-op for them).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
