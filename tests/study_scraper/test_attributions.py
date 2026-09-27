@@ -237,6 +237,46 @@ def test_prioritize_queue_handles_missing_topic_ids() -> None:
     assert [r["id"] for r in out] == ["b", "a"]
 
 
+def test_round_robin_by_source_interleaves_sources() -> None:
+    """One source's fresh crawl burst must not fill a whole batch on its
+    own — see `_round_robin_by_source`'s docstring (2026-09-27, reproduced
+    live: two consecutive scheduled runs pulled 40/40 `bundestag_dip`
+    studies, found 0 attributions both times, while `ssoar`/`openalex`
+    studies sat untouched in the same queue)."""
+    from study_scraper.attribute import _round_robin_by_source
+
+    rows = (
+        [{"id": f"bt{i}", "source_id": "bundestag_dip"} for i in range(6)]
+        + [{"id": f"ss{i}", "source_id": "ssoar"} for i in range(2)]
+        + [{"id": f"oa{i}", "source_id": "openalex"} for i in range(2)]
+    )
+    out = [r["id"] for r in _round_robin_by_source(rows)]
+    assert out == [
+        "bt0", "ss0", "oa0",
+        "bt1", "ss1", "oa1",
+        "bt2", "bt3", "bt4", "bt5",
+    ]
+    # No study is dropped or duplicated -- everything still gets processed
+    # eventually, just not all from one source first.
+    assert sorted(out) == sorted(r["id"] for r in rows)
+
+
+def test_prioritize_queue_round_robins_within_each_registry_group() -> None:
+    from study_scraper.attribute import prioritize_queue
+
+    rows = [
+        {"id": "bt0", "source_id": "bundestag_dip", "topic_ids": ["klima"]},
+        {"id": "bt1", "source_id": "bundestag_dip", "topic_ids": ["klima"]},
+        {"id": "bt2", "source_id": "bundestag_dip", "topic_ids": ["klima"]},
+        {"id": "ss0", "source_id": "ssoar", "topic_ids": ["klima"]},
+        {"id": "off0", "source_id": "bundestag_dip", "topic_ids": ["steuern"]},
+    ]
+    out = [r["id"] for r in prioritize_queue(rows, {"klima"})]
+    # klima (registry topic) studies come first, but bundestag_dip's 3
+    # studies no longer bury ssoar's single study at the back of that group.
+    assert out == ["bt0", "ss0", "bt1", "bt2", "off0"]
+
+
 def test_target_ids_scans_beyond_limit_to_surface_priority_studies(monkeypatch) -> None:
     """A plain `LIMIT limit` would cut the registry-topic study out before
     it could ever be prioritized — `_target_ids` must scan a wider window
