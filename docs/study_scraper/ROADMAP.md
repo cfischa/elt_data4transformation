@@ -12,50 +12,54 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
-Updated 2026-09-21: Studies: **7,467** (+61 since 09-14, +0.8% — growth
-still nearly flat, entirely from `openalex` (5,381) + `ssoar` (971);
-`bundestag_dip` now 42.3 days stale, still 401ing (#113)). **#145
-confirmed fixed and closed**: PR #165 (lazy `bs4` import) merged 09-14,
-`scheduled-attribute` has run successfully several times since,
-attribution queue backlog is draining (233 → 204), last run yield 8/40
-(20%). The answering half of the goal is dark no longer, just slow.
-**Filed #172** (priority:med, needs-human): reference-follower's
-`follow --fetch` (#136, shipped 08-31) still isn't in `scrape.yml`'s
-crawl step — 154,375 pending candidates, 0 ever fetched, flagged as
-"will file next round" on 08-31 and 09-14, now an actual issue.
-Source-coverage math worth stating plainly: **7 of the 8
-`GOAL.md`-required production sources have run** (`openalex`, `ssoar`,
-`bundestag_dip`, `dawum`, `gesis`, `eurostat`, `bmas`); `core`,
-`eurobarometer`, `govdata` are built and tested but stuck at 0 live
-records purely because `scrape.yml` never got the 3 lines (#65,
-6+ weeks open) — the single closest the project has been to clearing
-this primary bar without any new engineering. Scouted Russia/Ukraine
-and Wohnen/Miete opinion data this round (8th straight round, nothing
-new buildable — see the Product Direction issue for detail).
+Updated 2026-09-28: Studies: **7,733** (7,695 kept / 38 pending, +266
+since 09-21, +3.6% — growth reaccelerated after four flat weeks).
+**Two punch-list items resolved this week, both landed with no comment
+on the Product Direction issue** — worth noting since "no reply" no
+longer reliably means "not done":
+- **#113 (`bundestag_dip` 401) — fixed, closed 09-24.** All 8 topics
+  crawling clean, 0 errors, real `kept` counts again (1,134+ studies).
+- **#172 (`follow --fetch` never scheduled) — resolved, closed.**
+  `scrape.yml` now runs a "Follow citation graph" step per topic;
+  `reference-follower studies` went 0 → 98 live (160k still pending —
+  expected, drains over weeks by design).
+Attribution is recovering but bumpy: two consecutive
+`scheduled-attribute` runs (09-22, 09-25) yielded 0/40, traced by the
+monitor to a `bundestag_dip` crawl burst dominating the queue (Drucksachen
+essentially never contain opinion triples) — same root cause as #186,
+fixed by **PR #187 (round-robin queue by source)**, merged 2026-09-27.
+Next scheduled run is the real test. Source-coverage bar is still 7/8,
+and **#65 just grew from 3 lines to 4**: `bmas` (one of the current 7
+sources) turns out to have never been wired into `scrape.yml`'s
+lake-ingest step either — 27 days stale, last run 2026-09-01. Scouted
+`verteidigung` + `migration_einwanderung` this round: AZR (migration
+register) is headcount data, not opinion — dead end. Real find: ZMSBw's
+annual "Bevölkerungsbefragung zur Bundeswehr" (representative
+defense-opinion survey since 1996) deposits its microdata at **GESIS**
+(ZA-numbered) — already reachable via the existing `gesis` source, just
+needs a `verteidigung` keyword addition (`ZMSBw`/`Bevölkerungsbefragung`)
+— folded into #50 rather than filed separately.
 
-1. **You: paste #65's 3 lines into `scrape.yml`.** Cheapest, highest-
+1. **You: paste #65's 4 lines into `scrape.yml`** (`core`,
+   `eurobarometer`, `govdata`, now also `bmas`). Cheapest, highest-
    leverage action on the board — closes `GOAL.md`'s ≥8-production-
-   sources bar outright (7/8 → 10/8), no secrets, no design call.
-2. **Wire `follow --fetch` into `scrape.yml`** (issue #172, new,
-   priority:med, needs-human) — code is done (#136), just needs a
-   crawl-step addition; 154k-candidate backlog otherwise sits idle
-   indefinitely.
-3. **Attribution throughput** (issue #49) **[needs-human]** — no
-   longer fully dark, but still the starkest number in the project
-   (0.9% of claims ever attributed); the fixed `--limit 40` cadence in
+   sources bar outright, no secrets, no design call.
+2. **Watch the next `scheduled-attribute` run** — if still 0/40 after
+   PR #187, escalate as a real bug (possible schema/prompt drift), not
+   a queue-composition artifact.
+3. **Attribution throughput** (issue #49) **[needs-human]** — 0.7% of
+   claims ever attributed; the fixed `--limit 40` cadence in
    `.github/workflows/attribute.yml` is the next binding constraint
-   once the post-outage backlog finishes draining.
+   once yield stabilizes post-#187.
 4. **Topic-content gap** (issue #50, priority:high, open since
    2026-06-26 — 13+ weeks) **[needs-human]** — maintainer's ask
    (Erbschaftssteuer keywords on `steuern`, new `russland_ukraine`
-   topic) needs `config/topics/topics.csv` + `questions.yml`, both
-   outside `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so
-   neither agent can build it as scoped.
-5. **`bundestag_dip`** (issue #48, reopened in spirit as #106/#113/A40)
-   — still 401ing as of 2026-09-21 (42.3 days stale). No further code
-   fix available; converges back to needing a real `DIP_API_KEY`
-   (`infoline.id3@bundestag.de`). Deprioritized below #65 per
-   maintainer's 08-24 silent-default.
+   topic, now also the ZMSBw keywords for `verteidigung` above) needs
+   `config/topics/topics.csv` + `questions.yml`, both outside
+   `study_scraper/**`/`tests/**`/`docs/study_scraper/**`, so neither
+   agent can build it as scoped.
+5. **`bundestag_dip`** (issue #48/#106/#113/A40) — **fixed 09-24**,
+   closed. All 8 topics crawling clean again.
 6. **Eurostat typed projection** (issue #86) **[done 2026-08-02]** —
    `study_scraper/jsonstat.py::flatten_jsonstat` decodes the JSON-stat
    `id`/`size`/`dimension`/`value` encoding into typed rows (dimension
@@ -115,20 +119,22 @@ E. **Semantic question clustering** **[done 2026-07-05, v1 offline]** —
 
 ## Source-coverage plan — toward a representative platform
 
-Current coverage (2026-09-21 live DB): **catalog** OpenAlex (5,381) +
-SSOAR (971), and **Bundestag DIP (1,115, stalled since 08-10 — 401ing
-again, #113/A40, now 42.3 days stale)** — academic + government, three
-sources have fed the `studies` table (GOAL.md's topic-coverage bar is
-met and stays met, see P1 intro); **lake** DAWUM (vote intention, 3,956
-rows), GESIS KG (survey catalog, 500), Eurostat (official stats, 3 —
-thin by design), BMAS (pension statistics, 2). **CORE, Eurobarometer,
+Current coverage (2026-09-28 live DB): **catalog** OpenAlex (5,555) +
+SSOAR (1,006), and **Bundestag DIP (1,134, fixed 09-24 — see #113,
+crawling clean across all 8 topics again)** — academic + government,
+three sources have fed the `studies` table (GOAL.md's topic-coverage bar
+is met and stays met, see P1 intro); **lake** DAWUM (vote intention,
+3,963 rows), GESIS KG (survey catalog, 500), Eurostat (official stats, 3
+— thin by design), BMAS (pension statistics, 2 — stale 27 days, never
+wired into `scrape.yml`'s lake-ingest step). **CORE, Eurobarometer,
 GovData.de are all built and fixture-tested but have 0 live records** —
 none was ever added to `scrape.yml`'s crawl step (issue #65,
-consolidated, priority:high). The remaining representativeness gap is
-*source-count* (7 of 8 sources ever actually run; #65 closes it in one
-PR, taking it to 10) — topic coverage is no longer the binding
-constraint, and government-category coverage now depends on a fresh
-`DIP_API_KEY` rather than code. Ranked by yield per effort:
+consolidated, priority:high, now a 4-line ask including `bmas`). The
+remaining representativeness gap is *source-count* (7 of 8 sources ever
+actually run; #65 closes it in one PR, taking it to 10) — topic coverage
+is no longer the binding constraint, and government-category coverage no
+longer depends on a fresh `DIP_API_KEY` (that landed 09-24). Ranked by
+yield per effort:
 
 5. **CORE** (issue #94, shipped 2026-08-07, A38) **[done, code — see
    #65]** — third `studies`-table catalog source (`api.core.ac.uk`,
@@ -150,6 +156,30 @@ constraint, and government-category coverage now depends on a fresh
    free, no-auth `package_search` REST API, "Data License Germany 2.0"
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
+
+### Scouted this round (2026-09-28)
+
+- Searched `verteidigung` (defense) and `migration_einwanderung`
+  (migration), both under-scouted vs. the rest of the topic list in
+  recent rounds. **AZR** (Ausländerzentralregister, the federal foreigner
+  register) is real and free-ish (research extracts available via BAMF's
+  Forschungsdatenzentrum) but is administrative headcount data — arrivals/
+  departures/status counts, not opinion — same indicator-vs-opinion dead
+  end as Destatis/Eurostat.
+- **Real find, not a new source but a topic-keyword gap**: ZMSBw's annual
+  **"Bevölkerungsbefragung zur Bundeswehr"** — a representative
+  defense-opinion survey running since 1996 (2026 wave: 87% trust the
+  Bundeswehr, 58% support higher defense spending, 59% back the new
+  Wehrdienst) — deposits its microdata at **GESIS** under ZA study
+  numbers, i.e. it's already reachable through the existing `gesis`
+  source. `verteidigung`'s `topics.csv` `include_keywords` likely don't
+  catch `ZMSBw`/`Bevölkerungsbefragung`/`Wehrbereitschaft` — folded into
+  issue #50 (maintainer's own topics.csv ask) rather than filed
+  separately, since it's the same file/edit.
+- Net: 9th consecutive scouting round with no new *source* to build, but
+  the first in several rounds with a concrete, low-cost content win
+  (a keyword addition, not a source) — worth tracking separately from
+  the "frontier exhausted" streak, since it's a different kind of gap.
 
 ### Scouted this round (2026-09-21)
 
@@ -489,3 +519,38 @@ for our verification layers). All items below have shipped:
   agent-buildable, no `.github/**` edit needed — see P1 intro). Closed
   #150 and #151 as investigated dead ends. Scouted `klima`/`atomkraft`
   (PACE-Studie, Innofact/Verivox press polls) — no new buildable source.
+- #163 shipped (PR #165, 2026-09-14) — attribution pipeline resumed on
+  its own next scheduled run, confirming the root-cause diagnosis. Follow-
+  up pytestmark DB-skip-marker sweep (#166/#167, #168/#169) found and fixed
+  the same silent-skip bug (A45/A46) across five more test files — ~58
+  previously-silent pure-unit tests now actually run in CI. Dock/status
+  self-propose chain continued: digest staleness (#170/#171), Sources page
+  days-since-last-success (#174/#175), topic×source breakdown in CLI text
+  (#176/#177), two Sources-page "aborted run counted as clean" bugs
+  (#178/#179, #180/#181) — all landed 2026-09-16 through 09-24.
+- **2026-09-21 (Product Direction):** filed #172 (reference-follower never
+  scheduled, 154k pending/0 fetched). Scouted Russia/Ukraine + Wohnen
+  opinion data — 8th consecutive round with no new buildable source.
+- OpenAlex 429 fix (#184/A47, PR #185, 2026-09-26) — raised page size to
+  200 + added a polite-pool `mailto`, addressing the 46-51 429s/run #184
+  reported. Attribution round-robin-by-source fix (#186/A48, PR #187,
+  2026-09-27) — the monitor traced two consecutive 0/40
+  `scheduled-attribute` runs to a `bundestag_dip` crawl burst dominating
+  the queue; round-robin interleaving now prevents one source's burst
+  from starving the rest, same shape as A32's topic-rotation fix.
+  Reference-follower fixed a deterministic-order stall (#182/#183,
+  2026-09-25) — randomized `pending_references` sampling so repeat runs
+  don't get stuck re-fetching the same head-of-queue candidates.
+- **2026-09-24 (out of band):** maintainer resolved #113 (`bundestag_dip`
+  401, fresh `DIP_API_KEY`) and #172 (`follow --fetch` wired into
+  `scrape.yml`), both without a comment on the Product Direction issue —
+  confirmed live by the 09-28 product-lead pass (`bundestag_dip` crawling
+  clean across all 8 topics; `reference-follower studies` 0 → 98).
+- **2026-09-28 (Product Direction):** closed #172 (confirmed resolved).
+  Grew #65 from 3 lines to 4 (`bmas` also never wired into `scrape.yml`'s
+  lake-ingest step, 27 days stale). Scouted `verteidigung` +
+  `migration_einwanderung`: AZR is headcount data (dead end); ZMSBw's
+  "Bevölkerungsbefragung zur Bundeswehr" is a real defense-opinion survey
+  already reachable via the existing `gesis` source, just needs a
+  `verteidigung` keyword addition — folded into #50 rather than filed
+  separately.
