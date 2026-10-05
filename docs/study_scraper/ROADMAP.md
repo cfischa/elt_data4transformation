@@ -12,6 +12,16 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-10-05: Studies **10,554** (10,520 kept). Source coverage still
+7/8: #65 (4-line `scrape.yml` paste: `core`, `eurobarometer`, `govdata`,
+`bmas`) unchanged; #189 (`bmas` 34 days stale) has the same root cause.
+Attribution is the weakest metric: 117 attributions / 18,566 claims
+(0.6%), last yield 1/40 even after #187, backlog 476 (#49) — raising the
+`--limit 40` cadence is the next lever. Scouting (Politbarometer / ALLBUS
+via GESIS, GovData, Destatis): nothing new to build; Politbarometer
+catalog metadata is reachable via the `gesis` source, keywords bundled
+into #50. Topic coverage is saturated; next breadth gain = new topics.
+
 Updated 2026-09-28: Studies: **7,733** (7,695 kept / 38 pending, +266
 since 09-21, +3.6% — growth reaccelerated after four flat weeks).
 **Two punch-list items resolved this week, both landed with no comment
