@@ -277,6 +277,35 @@ def test_prioritize_queue_round_robins_within_each_registry_group() -> None:
     assert out == ["bt0", "ss0", "bt1", "bt2", "off0"]
 
 
+def test_demote_low_yield_sources_moves_them_last_without_dropping() -> None:
+    from study_scraper.attribute import demote_low_yield_sources
+
+    rows = [
+        {"id": "bt0", "source_id": "bundestag_dip"},
+        {"id": "ss0", "source_id": "ssoar"},
+        {"id": "bt1", "source_id": "bundestag_dip"},
+        {"id": "oa0", "source_id": "openalex"},
+        {"id": "none0"},
+    ]
+    out = [r["id"] for r in demote_low_yield_sources(rows)]
+    assert out == ["ss0", "oa0", "none0", "bt0", "bt1"]
+
+
+def test_target_ids_fills_batch_with_other_sources_before_low_yield(monkeypatch) -> None:
+    from study_scraper import attribute
+
+    monkeypatch.setattr(attribute, "_registry_topic_ids", lambda: set())
+    rows = [{"id": f"bt{i}", "source_id": "bundestag_dip"} for i in range(5)]
+    rows += [{"id": "ss0", "source_id": "ssoar"}, {"id": "oa0", "source_id": "openalex"}]
+
+    class _FakeStorage:
+        def query_view(self, name, limit):
+            return rows
+
+    ids = attribute._target_ids(_FakeStorage(), limit=4, study_id=None)
+    assert ids == ["ss0", "oa0", "bt0", "bt1"]
+
+
 def test_target_ids_scans_beyond_limit_to_surface_priority_studies(monkeypatch) -> None:
     """A plain `LIMIT limit` would cut the registry-topic study out before
     it could ever be prioritized — `_target_ids` must scan a wider window

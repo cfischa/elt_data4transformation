@@ -1408,6 +1408,22 @@ project URL + service-role key (placed in `.env`, not committed), or
   rows share one implicit `source_id=None` group, so round-robin is a
   no-op for them).
 
+### A49. Attribution queue: demote near-zero-yield sources behind all others (#191)
+
+- **Context:** A48's round-robin left a known limitation — with 44
+  `bundestag_dip` vs. 1 `ssoar` + 1 `openalex` queued, a batch of 40 was
+  still ~38 `bundestag_dip`. Live 2026-10-05: 1/40 yield, backlog 476
+  (#49). History: `bundestag_dip` 1 attribution from ~94 attempts.
+- **Decision:** `attribute.py::demote_low_yield_sources` stable-partitions
+  the final ordering in `_target_ids` so sources in `_LOW_YIELD_SOURCES`
+  (`{"bundestag_dip"}`) only fill slots left after every other source.
+  Nothing is excluded or dropped; the source still drains when the rest
+  of the queue is empty. Applied after `prioritize_queue`, so yield
+  outranks registry-topic priority for these sources; `prioritize_queue`
+  itself and its tests are unchanged.
+- **Not decided:** whether `bundestag_dip` should be attributed at all
+  stays a maintainer/product call (as in A48).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

@@ -32,6 +32,12 @@ LOGGER = logging.getLogger(__name__)
 # out before prioritize_queue ever sees them.
 _QUEUE_SCAN_FLOOR = 500
 
+# Sources whose documents essentially never hold a (question, position,
+# percentage) triple. Historically `bundestag_dip` yielded 1 attribution
+# from ~94 attempts (DECISIONS A48). They are demoted behind every other
+# source, not excluded: they still fill whatever slots are left.
+_LOW_YIELD_SOURCES = frozenset({"bundestag_dip"})
+
 
 def build_prompt_for_study(study: Dict[str, Any]) -> str:
     """The exact user prompt llm-v1 would send for this study.
@@ -195,6 +201,17 @@ def prioritize_queue(
     return _round_robin_by_source(registry_rows) + _round_robin_by_source(other_rows)
 
 
+def demote_low_yield_sources(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Stable partition: rows from `_LOW_YIELD_SOURCES` go after all others.
+
+    Round-robin alone still hands a dominant low-yield source most of a
+    fixed batch (live 2026-10-05: ~38/40 `bundestag_dip`, 1/40 yield).
+    Nothing is dropped, so the source drains once other sources run dry."""
+    keep = [r for r in rows if r.get("source_id") not in _LOW_YIELD_SOURCES]
+    low = [r for r in rows if r.get("source_id") in _LOW_YIELD_SOURCES]
+    return keep + low
+
+
 def _registry_topic_ids() -> Set[str]:
     """Topic ids with at least one registered question. Best-effort: an
     unset or malformed registry just disables prioritization rather than
@@ -221,5 +238,7 @@ def _target_ids(
     rows = storage.query_view(
         "attribution_queue", limit=max(limit, _QUEUE_SCAN_FLOOR)
     )
-    rows = prioritize_queue(rows, _registry_topic_ids())
+    rows = demote_low_yield_sources(
+        prioritize_queue(rows, _registry_topic_ids())
+    )
     return [r["id"] for r in rows[:limit]]
