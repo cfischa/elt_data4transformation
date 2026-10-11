@@ -326,6 +326,23 @@ def test_target_ids_scans_beyond_limit_to_surface_priority_studies(monkeypatch) 
     assert len(ids) == 3
 
 
+def test_target_ids_scan_window_covers_backlog_beyond_500(monkeypatch) -> None:
+    """Backlog hit ~500 rows (#49); a priority study past row 500 must
+    still be seen by the prioritizer."""
+    from study_scraper import attribute
+
+    monkeypatch.setattr(attribute, "_registry_topic_ids", lambda: {"klima"})
+    rows = [{"id": f"s{i}", "topic_ids": ["bildung"]} for i in range(700)]
+    rows.append({"id": "priority", "topic_ids": ["klima"]})
+
+    class _FakeStorage:
+        def query_view(self, view_name, *, limit=50):
+            return rows[:limit]
+
+    ids = attribute._target_ids(_FakeStorage(), limit=5, study_id=None)
+    assert ids[0] == "priority"
+
+
 # --------------------------------------------------------------------------
 # Integration: storage + queue + search + offline apply
 # --------------------------------------------------------------------------

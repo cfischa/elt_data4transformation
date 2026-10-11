@@ -1424,6 +1424,15 @@ project URL + service-role key (placed in `.env`, not committed), or
 - **Not decided:** whether `bundestag_dip` should be attributed at all
   stays a maintainer/product call (as in A48).
 
+### A50. Attribution queue scan window raised 500 → 5000
+
+- **Context:** `_target_ids` reads `max(limit, _QUEUE_SCAN_FLOOR)` rows
+  from `attribution_queue` before reordering. The live backlog grew past
+  ~500 (issue #49), so registry-topic studies beyond row 500 were invisible
+  to `prioritize_queue` / `demote_low_yield_sources`.
+- **Decision:** floor is now 5000 (rows are small; one query per run).
+  No ordering logic changed.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

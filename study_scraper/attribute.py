@@ -29,8 +29,9 @@ LOGGER = logging.getLogger(__name__)
 # The queue view has no LIMIT-independent notion of priority, so we scan
 # well beyond the requested batch size before reordering — otherwise a
 # plain `LIMIT limit` would already have cut the registry-topic studies
-# out before prioritize_queue ever sees them.
-_QUEUE_SCAN_FLOOR = 500
+# out before prioritize_queue ever sees them. The live backlog reached
+# ~500 rows (issue #49), so the floor sits well above it.
+_QUEUE_SCAN_FLOOR = 5000
 
 # Sources whose documents essentially never hold a (question, position,
 # percentage) triple. Historically `bundestag_dip` yielded 1 attribution
