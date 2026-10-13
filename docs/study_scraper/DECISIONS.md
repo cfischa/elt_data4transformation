@@ -1433,6 +1433,18 @@ project URL + service-role key (placed in `.env`, not committed), or
 - **Decision:** floor is now 5000 (rows are small; one query per run).
   No ordering logic changed.
 
+### A51. Attribution queue: try studies with '%' claims first (#196)
+
+- **Context:** 2026-10-13 yield 1/40 with backlog 497. A triple needs a
+  percentage; studies whose regex claims hold no `%` unit claim rarely
+  produce one but still consume batch slots.
+- **Decision:** migration 0012 appends `pct_claims` to `attribution_queue`;
+  `attribute.py::demote_no_percent_studies` stable-partitions
+  `pct_claims == 0` rows behind the rest in `_target_ids` (inside the
+  A49 low-yield-source demotion). Nothing is excluded.
+- **Not done:** the workflow's `--limit 40` / cadence lives in
+  `.github/` and stays a maintainer change (see ROADMAP).
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".

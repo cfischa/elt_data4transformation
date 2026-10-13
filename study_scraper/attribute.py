@@ -213,6 +213,17 @@ def demote_low_yield_sources(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return keep + low
 
 
+def demote_no_percent_studies(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Stable partition: rows with `pct_claims == 0` go after the rest.
+
+    A triple needs a percentage, so studies with no '%' regex claim
+    rarely yield one (issue #196). Rows lacking the `pct_claims` key
+    (older view) are left in place; nothing is dropped."""
+    has = [r for r in rows if r.get("pct_claims", 1) != 0]
+    none = [r for r in rows if r.get("pct_claims", 1) == 0]
+    return has + none
+
+
 def _registry_topic_ids() -> Set[str]:
     """Topic ids with at least one registered question. Best-effort: an
     unset or malformed registry just disables prioritization rather than
@@ -240,6 +251,6 @@ def _target_ids(
         "attribution_queue", limit=max(limit, _QUEUE_SCAN_FLOOR)
     )
     rows = demote_low_yield_sources(
-        prioritize_queue(rows, _registry_topic_ids())
+        demote_no_percent_studies(prioritize_queue(rows, _registry_topic_ids()))
     )
     return [r["id"] for r in rows[:limit]]
