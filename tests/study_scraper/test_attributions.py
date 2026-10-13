@@ -566,3 +566,17 @@ def test_dump_prompts_emits_queue(storage) -> None:
     items = dump_prompts(storage=storage, limit=10)
     assert any(it["study_id"] == s.id for it in items)
     assert any("62%" in it["prompt"] for it in items)
+
+
+def test_demote_no_percent_studies_moves_them_last_without_dropping() -> None:
+    from study_scraper.attribute import demote_no_percent_studies
+
+    rows = [
+        {"id": "a", "pct_claims": 0},
+        {"id": "b", "pct_claims": 3},
+        {"id": "c"},  # older view without the column: left in place
+        {"id": "d", "pct_claims": 0},
+        {"id": "e", "pct_claims": 1},
+    ]
+    out = [r["id"] for r in demote_no_percent_studies(rows)]
+    assert out == ["b", "c", "e", "a", "d"]
