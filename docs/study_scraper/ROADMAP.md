@@ -12,6 +12,18 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-10-12: Studies **10,845** (1,669 with quantitative data).
+Source coverage still 7/8 (#65 unchanged; `bmas` 41 days stale, #189).
+Attribution: 135 / 23,289 claims (0.6%); last yield 8/40 (20%, up from
+1/40) after #187 + #194; backlog 537 and still growing — `--limit 40`
+in `attribute.yml` is the binding constraint (#49 was closed, but the
+cadence question is not resolved; maintainer-only edit). Still no
+maintainer reply since 09-28; defaults govern. Scouting (Gesundheit/
+Pflege, Energiepreise/Digitalisierung): no free structured opinion
+source — RKI/Destatis/NRW CKAN are administrative statistics, Statista
+is paywalled, NFDI4Health is microdata/registration-gated. Dead end;
+breadth gain remains new topics (#50).
+
 Updated 2026-10-05: Studies **10,554** (10,520 kept). Source coverage still
 7/8: #65 (4-line `scrape.yml` paste: `core`, `eurobarometer`, `govdata`,
 `bmas`) unchanged; #189 (`bmas` 34 days stale) has the same root cause.
