@@ -138,9 +138,9 @@ before they start.
       with the legacy Airflow Postgres on 5432).
 - [x] 12 storage integration tests against real Postgres
       (run via `STUDY_SCRAPER_TEST_DSN`); skipped if env var absent.
-- [ ] Deduplication beyond canonical-URL hash (DOI fallback + title
-      near-duplicate via rapidfuzz). Deferred into Phase 4 — easier to
-      decide thresholds once we see real SSOAR candidates.
+- [x] Deduplication beyond canonical-URL hash (DOI fallback + title
+      near-duplicate). Shipped: DOI dedup (migration 0004) and pg_trgm
+      title dedup (DECISIONS A16) — not rapidfuzz.
 
 ## Phase 4 — One source end-to-end (DONE)
 
@@ -191,8 +191,8 @@ before they start.
       (status overview) + Topics page (editor with live "what would
       match" preview against current DB). Scope-limited by A11. 3
       tests (page compile + CSV writer round-trip).
-- [ ] **Cross-source dedup** (Phase 5b) — DOI fallback +
-      title-near-duplicate (rapidfuzz). Made concrete by the multi-
+- [x] **Cross-source dedup** (Phase 5b) — DOI fallback +
+      title-near-duplicate (pg_trgm, DECISIONS A16); shipped. Made concrete by the multi-
       topic run: the same Erdgas study appeared as 2 rows under SSOAR
       and OpenAlex. Pre-req for fair source-coverage counts.
 
