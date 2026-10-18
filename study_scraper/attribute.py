@@ -224,6 +224,17 @@ def demote_no_percent_studies(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return has + none
 
 
+def sort_by_pct_density(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Stable sort: studies with more '%' claims come first.
+
+    More percentage claims means more chances for a (question, position,
+    percentage) triple per LLM call. Applied before `prioritize_queue`,
+    whose round-robin keeps each source's rows in the order given, so the
+    densest studies of every source lead its bucket. Rows lacking
+    `pct_claims` sort as 0 and keep their relative order."""
+    return sorted(rows, key=lambda r: -(r.get("pct_claims") or 0))
+
+
 def _registry_topic_ids() -> Set[str]:
     """Topic ids with at least one registered question. Best-effort: an
     unset or malformed registry just disables prioritization rather than
@@ -251,6 +262,8 @@ def _target_ids(
         "attribution_queue", limit=max(limit, _QUEUE_SCAN_FLOOR)
     )
     rows = demote_low_yield_sources(
-        demote_no_percent_studies(prioritize_queue(rows, _registry_topic_ids()))
+        demote_no_percent_studies(
+            prioritize_queue(sort_by_pct_density(rows), _registry_topic_ids())
+        )
     )
     return [r["id"] for r in rows[:limit]]

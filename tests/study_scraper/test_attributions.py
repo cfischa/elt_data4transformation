@@ -580,3 +580,20 @@ def test_demote_no_percent_studies_moves_them_last_without_dropping() -> None:
     ]
     out = [r["id"] for r in demote_no_percent_studies(rows)]
     assert out == ["b", "c", "e", "a", "d"]
+
+
+def test_sort_by_pct_density_leads_each_source_with_densest_studies() -> None:
+    from study_scraper.attribute import prioritize_queue, sort_by_pct_density
+
+    rows = [
+        {"id": "a1", "source_id": "a", "pct_claims": 1},
+        {"id": "a2", "source_id": "a", "pct_claims": 9},
+        {"id": "b1", "source_id": "b", "pct_claims": 3},
+        {"id": "b2", "source_id": "b"},  # older view: no key, sorts as 0
+        {"id": "b3", "source_id": "b", "pct_claims": 0},
+    ]
+    ordered = sort_by_pct_density(rows)
+    assert [r["id"] for r in ordered] == ["a2", "b1", "a1", "b2", "b3"]
+    out = [r["id"] for r in prioritize_queue(ordered, set())]
+    assert out == ["a2", "b1", "a1", "b2", "b3"]
+    assert len(out) == len(rows)
