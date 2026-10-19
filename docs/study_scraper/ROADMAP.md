@@ -12,6 +12,16 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-10-19: Studies **11,106** (1,718 with quantitative data).
+Source coverage still 7/8 (#65 unchanged; `bmas` 48 days stale, #189).
+Attribution: 139 / 25,346 claims (0.5%); last yield 3/40 (7.5%), backlog
+542 (#196); #200/#201 density ordering just merged, next run is the test.
+No maintainer reply since 09-28; defaults govern. Scouting (general open
+survey data): ALLBUS/GESIS data files are registration-gated (only
+metadata is CC0, already reachable via `gesis`); AUSSDA (Austria) out of
+scope; Statista paywalled. Rejected. New topics (#50) remain the only
+breadth lever.
+
 Updated 2026-10-12: Studies **10,845** (1,669 with quantitative data).
 Source coverage still 7/8 (#65 unchanged; `bmas` 41 days stale, #189).
 Attribution: 135 / 23,289 claims (0.6%); last yield 8/40 (20%, up from
