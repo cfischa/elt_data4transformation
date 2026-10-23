@@ -238,6 +238,7 @@ def test_status_attribution_queue_size_counts_and_excludes(
 
     report = build_status(storage)
     assert report.attribution_queue_size == 1
+    assert 0 <= report.attribution_queue_with_pct <= 1
 
     text = format_text(report)
     assert "attribution queue backlog" in text
