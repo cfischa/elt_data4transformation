@@ -104,6 +104,9 @@ class StatusReport:
     # not yet attributed, excluding no-signal attempts per migration 0011)
     # -- #49's monitor updates repeatedly hand-computed this from Postgres.
     attribution_queue_size: int = 0
+    # Subset of the backlog with at least one '%' claim -- the actionable
+    # part, since a triple needs a percentage (#196).
+    attribution_queue_with_pct: int = 0
     # How many of the most recent attribution runs (by calendar day,
     # newest first) found zero attributions in a row -- a single
     # zero-yield run (e.g. 2026-08-25, per #49) can be a normal
@@ -421,6 +424,12 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
             attribution_queue_size = int(cur.fetchone()["c"])
 
             cur.execute(
+                f"SELECT COUNT(*) AS c FROM {SCHEMA}.attribution_queue "
+                "WHERE pct_claims > 0"
+            )
+            attribution_queue_with_pct = int(cur.fetchone()["c"])
+
+            cur.execute(
                 f"""
                 SELECT unnest(topic_ids) AS topic_id, COUNT(*) AS c
                 FROM   {SCHEMA}.attribution_queue
@@ -512,6 +521,7 @@ def build_status(storage: PostgresStorage, *, recent_n: int = 10) -> StatusRepor
         attribution_last_run_attempts=attribution_last_run_attempts,
         attribution_last_run_found=attribution_last_run_found,
         attribution_queue_size=attribution_queue_size,
+        attribution_queue_with_pct=attribution_queue_with_pct,
         attribution_queue_per_topic=attribution_queue_per_topic,
         attribution_consecutive_zero_yield_runs=attribution_consecutive_zero_yield_runs,
         total_claims=total_claims,
@@ -556,6 +566,9 @@ def format_text(report: StatusReport) -> str:
             f"  ({report.attribution_last_run_yield_rate:.1%})"
         )
     lines.append(f"  attribution queue backlog  : {report.attribution_queue_size} studies")
+    lines.append(
+        f"  attribution queue with %   : {report.attribution_queue_with_pct} studies"
+    )
     if report.attribution_queue_per_topic:
         per_topic = ", ".join(
             f"{topic_id}={n}"
