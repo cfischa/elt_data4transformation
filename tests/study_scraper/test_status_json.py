@@ -37,6 +37,7 @@ def _report(**overrides) -> StatusReport:
         attribution_last_run_attempts=40,
         attribution_last_run_found=4,
         attribution_queue_size=12,
+        attribution_queue_with_pct=7,
         attribution_queue_per_topic={"klima": 9, "steuern": 3},
         total_claims=100,
         total_attributions=10,
@@ -63,6 +64,7 @@ def test_report_to_dict_includes_computed_rates() -> None:
     # Plain dataclass fields still come through as before.
     assert payload["total_studies"] == 10
     assert payload["attribution_queue_size"] == 12
+    assert payload["attribution_queue_with_pct"] == 7
     assert payload["attribution_queue_per_topic"] == {"klima": 9, "steuern": 3}
     assert payload["never_run_sources"] == []
     assert payload["reference_follower_pending_total"] == 0
@@ -109,3 +111,8 @@ def test_report_to_dict_handles_none_rates() -> None:
     assert payload["duplicate_rate"] is None
     assert payload["attribution_coverage_rate"] is None
     assert payload["attribution_last_run_yield_rate"] is None
+
+
+def test_format_text_includes_queue_with_pct() -> None:
+    text = format_text(_report())
+    assert "attribution queue with %   : 7 studies" in text
