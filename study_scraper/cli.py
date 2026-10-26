@@ -143,7 +143,7 @@ def run(
     ),
     full: bool = typer.Option(
         False, "--full",
-        help="SSOAR only: ignore the incremental OAI from= window derived "
+        help="SSOAR/EconStor only: ignore the incremental OAI from= window derived "
              "from the last successful run and harvest the full feed.",
     ),
 ) -> None:
@@ -158,6 +158,15 @@ def run(
                 source_id="ssoar", topic_id=topic_obj.id
             )
         ctx = SSOARSource(from_file=from_file, since=since)
+    elif source == "econstor":
+        from study_scraper.discovery.econstor import EconStorSource
+
+        since = None
+        if from_file is None and not full:
+            since = storage.last_crawl_finished_at(
+                source_id="econstor", topic_id=topic_obj.id
+            )
+        ctx = EconStorSource(from_file=from_file, since=since)
     elif source == "openalex":
         settings = get_settings()
         ctx = OpenAlexSource(
@@ -179,8 +188,8 @@ def run(
         )
     else:
         raise typer.BadParameter(
-            f"unknown source {source!r}; supported: ssoar, openalex, "
-            f"bundestag_dip, core"
+            f"unknown source {source!r}; supported: ssoar, econstor, "
+            f"openalex, bundestag_dip, core"
         )
 
     with ctx as src:

@@ -31,7 +31,9 @@ SCHEMA = "study_scraper"
 # hadn't run, as opposed to not existing). `console/_sources.py`'s
 # `source_kind()` re-exports these two sets rather than hand-maintaining a
 # second copy.
-CATALOG_SOURCE_IDS = frozenset({"ssoar", "openalex", "bundestag_dip", "core"})
+CATALOG_SOURCE_IDS = frozenset(
+    {"ssoar", "openalex", "bundestag_dip", "core", "econstor"}
+)
 LAKE_SOURCE_IDS = frozenset(
     {"dawum", "gesis", "eurostat", "govdata", "eurobarometer", "bmas"}
 )
