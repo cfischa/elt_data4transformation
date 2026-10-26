@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture: hand-built EconStor oai_dc ListRecords page (steuern + one off-topic + one deleted). -->
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+  <responseDate>2026-10-26T12:00:00Z</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">https://www.econstor.eu/oai/request</request>
+  <ListRecords>
+    <record>
+      <header>
+        <identifier>oai:econstor.eu:10419/100001</identifier>
+        <datestamp>2024-03-01T10:00:00Z</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Reform der Einkommensteuer und Steuerlast der Haushalte</dc:title>
+          <dc:creator>Beispiel, Anna</dc:creator>
+          <dc:description>Die Studie untersucht die Steuerreform und die Steuerlast mittlerer Einkommen.</dc:description>
+          <dc:publisher>ZEW - Leibniz-Zentrum für Europäische Wirtschaftsforschung</dc:publisher>
+          <dc:date>2024-03</dc:date>
+          <dc:identifier>https://hdl.handle.net/10419/100001</dc:identifier>
+          <dc:language>ger</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+    <record>
+      <header>
+        <identifier>oai:econstor.eu:10419/100002</identifier>
+        <datestamp>2024-04-01T10:00:00Z</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Machine learning for container shipping</dc:title>
+          <dc:creator>Sample, Bob</dc:creator>
+          <dc:description>An off-topic paper on logistics.</dc:description>
+          <dc:date>2024</dc:date>
+          <dc:identifier>https://hdl.handle.net/10419/100002</dc:identifier>
+          <dc:language>eng</dc:language>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+    <record>
+      <header status="deleted">
+        <identifier>oai:econstor.eu:10419/100003</identifier>
+        <datestamp>2024-05-01T10:00:00Z</datestamp>
+      </header>
+    </record>
+    <resumptionToken>tok123</resumptionToken>
+  </ListRecords>
+</OAI-PMH>

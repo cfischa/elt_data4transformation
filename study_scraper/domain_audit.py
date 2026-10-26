@@ -24,6 +24,7 @@ from study_scraper.storage import PostgresStorage
 KNOWN_DOMAINS = {
     "openalex.org",
     "ssoar.info",
+    "econstor.eu",
     "bundestag.de",
     "dawum.de",
     "gesis.org",

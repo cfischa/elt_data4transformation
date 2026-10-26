@@ -1445,6 +1445,20 @@ project URL + service-role key (placed in `.env`, not committed), or
 - **Not done:** the workflow's `--limit 40` / cadence lives in
   `.github/` and stays a maintainer change (see ROADMAP).
 
+### A52. EconStor (ZBW) OAI-PMH source (#205)
+
+- **Context:** EconStor hosts open-access economics working papers
+  (steuern, rente, wohnen). Its OAI endpoint serves `oai_dc` like SSOAR.
+- **Licence check:** `Identify` at https://www.econstor.eu/oai/request
+  (2026-10-26) declares metadata under CC0 1.0, so metadata reuse is
+  permitted and the connector stays.
+- **Decision:** `discovery/econstor.py::EconStorSource` subclasses
+  `SSOARSource` (only `source_id` and base URL differ); `run --source
+  econstor` uses the same incremental `from=` window. Added to
+  `CATALOG_SOURCE_IDS` so `status` lists it (never-run until crawled).
+- **Not done:** adding it to the scheduled crawl lives in `.github/` and
+  needs a maintainer change.
+
 ## Decisions log conventions
 
 - New decisions get the next `A<N>` id and append at the bottom of "Accepted".
