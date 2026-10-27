@@ -238,6 +238,7 @@ def test_status_attribution_queue_size_counts_and_excludes(
 
     report = build_status(storage)
     assert report.attribution_queue_size == 1
+    assert 0 <= report.attribution_queue_with_pct <= 1
 
     text = format_text(report)
     assert "attribution queue backlog" in text
@@ -748,3 +749,29 @@ def test_status_counts_lake_records(
     text = format_text(report)
     assert "lake per format" in text
     assert "gesis_kg_sparql_json" in text
+
+
+def test_status_attribution_queue_with_pct_counts_only_pct_studies(
+    storage: PostgresStorage,
+) -> None:
+    """#203: of two queued studies, only the one holding a '%' claim counts
+    toward `attribution_queue_with_pct`."""
+    from study_scraper.claims import ExtractedClaim
+
+    with_pct = _seed_study(storage, title="Has Percent")
+    storage.upsert_claims(with_pct.id, [ExtractedClaim(
+        study_id=with_pct.id, claim_text="50% support the policy.",
+        numeric_value=50.0, unit="%", source_field="abstract",
+    )])
+    without_pct = _seed_study(storage, title="Sample Size Only")
+    storage.upsert_claims(without_pct.id, [ExtractedClaim(
+        study_id=without_pct.id, claim_text="n=1200 respondents.",
+        numeric_value=1200.0, unit="n", source_field="abstract",
+    )])
+
+    report = build_status(storage)
+    assert report.attribution_queue_size == 2
+    assert report.attribution_queue_with_pct == 1
+
+    text = format_text(report)
+    assert "attribution queue with %" in text
