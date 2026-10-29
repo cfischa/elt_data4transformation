@@ -124,9 +124,16 @@ def migrate() -> None:
         typer.echo(f"applied {len(applied)} migration(s): {applied}")
 
 
+RUN_SOURCES = ("ssoar", "econstor", "openalex", "bundestag_dip", "core")
+
+
 @app.command()
 def run(
-    source: str = typer.Option(..., "--source", help="Discovery source id."),
+    source: str = typer.Option(
+        ...,
+        "--source",
+        help=f"Discovery source id: {', '.join(RUN_SOURCES)}.",
+    ),
     topic: str = typer.Option(..., "--topic", help="Topic id from topics.csv."),
     limit: Optional[int] = typer.Option(
         None, "--limit", help="Max candidates to process."
@@ -188,8 +195,7 @@ def run(
         )
     else:
         raise typer.BadParameter(
-            f"unknown source {source!r}; supported: ssoar, econstor, "
-            f"openalex, bundestag_dip, core"
+            f"unknown source {source!r}; supported: {', '.join(RUN_SOURCES)}"
         )
 
     with ctx as src:

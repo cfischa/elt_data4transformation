@@ -56,6 +56,19 @@ def test_run_rejects_unknown_source(runner: CliRunner) -> None:
     assert "unknown source" in (result.output or "").lower()
 
 
+def test_run_sources_listed_in_help_and_error(runner: CliRunner) -> None:
+    from study_scraper.cli import RUN_SOURCES
+
+    assert "econstor" in RUN_SOURCES and "core" in RUN_SOURCES
+    bad = runner.invoke(app, ["run", "--source", "nope", "--topic", "klima"])
+    assert bad.exit_code != 0
+    for src in RUN_SOURCES:
+        assert src in bad.output
+    helped = runner.invoke(app, ["run", "--help"])
+    for src in RUN_SOURCES:
+        assert src in helped.output
+
+
 def test_python_dash_m_entrypoint_resolves() -> None:
     # The __main__.py module must import without side effects.
     import study_scraper.__main__  # noqa: F401

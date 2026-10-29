@@ -24,6 +24,7 @@ python -m study_scraper topics
 python -m study_scraper migrate                                  # apply SQL
 python -m study_scraper run --source ssoar    --topic klima --limit 50
 python -m study_scraper run --source openalex --topic klima --limit 50
+# other --source values: econstor, bundestag_dip, core (see `run --help`)
 python -m study_scraper list --topic klima
 python -m study_scraper status                                   # coverage overview
 streamlit run study_scraper/console/Home.py                       # control dock
