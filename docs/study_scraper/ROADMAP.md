@@ -391,7 +391,7 @@ yield per effort:
     publication, no API found. Lower priority than #15 — Bertelsmann is
     already on the think-tank list and the data feed feels less durable.
 17. **BMAS Rentenbestandsstatistik / social-policy statistics** (scouted
-    2026-08-31, issue #137) **[now, low priority]** — free, no-auth
+    2026-08-31, issue #137) **[done, A43]** — free, no-auth
     CSV/XLSX downloads on `bmas.de` (yearly since 2014, per-date CSVs
     since 2021-07-01). Official pension-statistics indicators, not
     opinion data; license unstated on the page (capture per-record,
