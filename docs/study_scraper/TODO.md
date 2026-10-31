@@ -102,21 +102,22 @@ before they start.
       for offline dev.
 - [x] Decisions A4–A10 added to `DECISIONS.md`.
 
-## Phase 2 — Project skeleton (in progress)
+## Phase 2 — Project skeleton (done — except `make scrape-eval`)
 
-- [ ] Create `study_scraper/` package: `__init__.py`, `cli.py`, `config.py`,
+- [x] Create `study_scraper/` package: `__init__.py`, `cli.py`, `config.py`,
       `models.py`, `topics.py`, `storage/`, `discovery/`, `extraction/`,
       `pipeline.py`. Include a `study_scraper/README.md` that points back
       to this knowledge base.
-- [ ] Add `study_scraper` to `pyproject.toml` packages and pin the minimal
+- [x] Add `study_scraper` to `pyproject.toml` packages and pin the minimal
       dependency set (httpx, pydantic, pydantic-settings, pyyaml, typer,
       beautifulsoup4, pypdf, structlog, tenacity, asyncpg, supabase-py).
       Embeddings dependency (sentence-transformers) added when Phase 6
       lands.
-- [ ] Seed `config/topics/topics.csv` from the 4 topics in `taxonomy.yml`.
-- [ ] Add a `Makefile` target: `make scrape TOPIC=<id>` and `make
+- [x] Seed `config/topics/topics.csv` from the 4 topics in `taxonomy.yml`.
+- [~] Add a `Makefile` target (`make scrape SOURCE=.. TOPIC=..` shipped;
+      `scrape-eval` not yet): `make scrape TOPIC=<id>` and `make
       scrape-eval`.
-- [ ] Smoke test: `python -m study_scraper --help` and a unit test that
+- [x] Smoke test: `python -m study_scraper --help` and a unit test that
       loads the CSV.
 
 ## Phase 3 — Data model + storage layer (done — except dedup tail)
