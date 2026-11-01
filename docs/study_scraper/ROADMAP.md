@@ -18,9 +18,9 @@ Attribution: 140 / 25,757 claims (0.5%); last yield 1/40 (2.5%) even
 after #200/#201; backlog 509 (#196). No maintainer reply since 09-28;
 defaults govern. Scouting: dawum already covered; Destatis/GENESIS is
 indicator statistics; DeutschlandTREND/ALLBUS are GESIS
-request/registration-only. New candidate: **EconStor (ZBW) OAI-PMH**
-(free, structured; metadata licence to be confirmed) filed as a
-low-priority `agent:task`.
+request/registration-only. **EconStor (ZBW) OAI-PMH** **[done, #205/A52]** —
+`run --source econstor` is shipped (see DECISIONS.md A52); it is not
+yet in `scrape.yml` (maintainer-only edit, same class as #65).
 
 Updated 2026-10-19: Studies **11,106** (1,718 with quantitative data).
 Source coverage still 7/8 (#65 unchanged; `bmas` 48 days stale, #189).
