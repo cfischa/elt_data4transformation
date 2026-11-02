@@ -69,6 +69,17 @@ def test_run_sources_listed_in_help_and_error(runner: CliRunner) -> None:
         assert src in helped.output
 
 
+def test_run_sources_match_status_catalog_registry() -> None:
+    """`run --source` choices and status' catalog registry must not drift:
+    a source runnable but absent from the registry would never show in
+    `never_run_sources`, and vice versa."""
+    from study_scraper.cli import RUN_SOURCES
+    from study_scraper.status import CATALOG_SOURCE_IDS
+
+    assert set(RUN_SOURCES) == set(CATALOG_SOURCE_IDS)
+    assert len(RUN_SOURCES) == len(set(RUN_SOURCES))
+
+
 def test_python_dash_m_entrypoint_resolves() -> None:
     # The __main__.py module must import without side effects.
     import study_scraper.__main__  # noqa: F401
