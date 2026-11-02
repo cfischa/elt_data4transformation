@@ -199,6 +199,14 @@ yield per effort:
    with per-dataset overrides captured explicitly. **Never actually
    run**: same gap as CORE/Eurobarometer.
 
+### Scouted this round (2026-11-02)
+
+- Searched open survey / Bürgerbefragung data. No new buildable source:
+  GENESIS (administrative statistics), GERDA (election results, not
+  opinion), Statista (paywalled), ALLBUS (registration-gated). 13th
+  round with no new free opinion source. `econstor` is built but, like
+  `core`/`eurobarometer`/`govdata`, never run (#65).
+
 ### Scouted this round (2026-09-28)
 
 - Searched `verteidigung` (defense) and `migration_einwanderung`
