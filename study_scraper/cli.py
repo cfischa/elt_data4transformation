@@ -124,6 +124,7 @@ def migrate() -> None:
         typer.echo(f"applied {len(applied)} migration(s): {applied}")
 
 
+LAKE_SOURCES = ("dawum", "gesis", "eurobarometer", "eurostat", "govdata", "bmas")
 RUN_SOURCES = ("ssoar", "econstor", "openalex", "bundestag_dip", "core")
 
 
@@ -695,7 +696,7 @@ def ingest(
     else:
         raise typer.BadParameter(
             f"unknown lake source {source!r}; "
-            f"supported: dawum, gesis, eurobarometer, eurostat, govdata, bmas"
+            f"supported: {', '.join(LAKE_SOURCES)}"
         )
     storage = _storage_from_settings()
     topic_ids = [topic] if topic else None

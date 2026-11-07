@@ -126,3 +126,24 @@ class TestResolveEurostatCodes:
         )
         with pytest.raises(Exception, match="eurostat requires"):
             _resolve_eurostat_codes([], None)
+
+
+def test_lake_sources_match_status_lake_registry() -> None:
+    """`ingest` source choices and status' lake registry must not drift
+    (same guard as RUN_SOURCES vs CATALOG_SOURCE_IDS)."""
+    from study_scraper.cli import LAKE_SOURCES
+    from study_scraper.status import LAKE_SOURCE_IDS
+
+    assert set(LAKE_SOURCES) == set(LAKE_SOURCE_IDS)
+    assert len(LAKE_SOURCES) == len(set(LAKE_SOURCES))
+
+
+def test_ingest_unknown_source_error_lists_every_lake_source(
+    runner: CliRunner,
+) -> None:
+    from study_scraper.cli import LAKE_SOURCES
+
+    bad = runner.invoke(app, ["ingest", "--source", "nope"])
+    assert bad.exit_code != 0
+    for src in LAKE_SOURCES:
+        assert src in bad.output
