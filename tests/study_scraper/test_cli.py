@@ -147,3 +147,32 @@ def test_ingest_unknown_source_error_lists_every_lake_source(
     assert bad.exit_code != 0
     for src in LAKE_SOURCES:
         assert src in bad.output
+
+
+def test_status_registries_match_source_classes() -> None:
+    """status' CATALOG/LAKE registries must equal the `source_id` of the
+    real source classes -- a new source class not registered there would
+    never surface in `never_run_sources`."""
+    from study_scraper.discovery.bundestag_dip import BundestagDIPSource
+    from study_scraper.discovery.core_search import CoreSearchSource
+    from study_scraper.discovery.econstor import EconStorSource
+    from study_scraper.discovery.openalex import OpenAlexSource
+    from study_scraper.discovery.ssoar import SSOARSource
+    from study_scraper.sources.bmas import BMASSource
+    from study_scraper.sources.dawum import DAWUMSource
+    from study_scraper.sources.eurobarometer import EurobarometerSource
+    from study_scraper.sources.eurostat import EurostatSource
+    from study_scraper.sources.gesis import GESISSource
+    from study_scraper.sources.govdata import GovDataSource
+    from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS
+
+    catalog = [
+        BundestagDIPSource, CoreSearchSource, EconStorSource,
+        OpenAlexSource, SSOARSource,
+    ]
+    lake = [
+        BMASSource, DAWUMSource, EurobarometerSource, EurostatSource,
+        GESISSource, GovDataSource,
+    ]
+    assert {c.source_id for c in catalog} == set(CATALOG_SOURCE_IDS)
+    assert {c.source_id for c in lake} == set(LAKE_SOURCE_IDS)
