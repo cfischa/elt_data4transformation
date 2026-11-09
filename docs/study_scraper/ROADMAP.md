@@ -12,6 +12,16 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-11-09: Studies **12,038** (1,913 with quantitative data, +311 vs 11-02).
+Source coverage still 7/8 (#65; `core`, `econstor`, `eurobarometer`, `govdata`
+never run; `bmas` 69 days stale, #189). Attribution: 155 / 28,374 claims
+(0.5%); last yield 3/40, backlog 485 (#196). No maintainer reply since 09-28;
+defaults govern. Scouting (Umfragedaten/Bürgerumfragen, Politbarometer):
+nothing new. Politbarometer data are GESIS login-gated (free registration,
+scientific use); only metadata is CC0 and already reachable via `gesis`.
+YouGov public data is CC BY-NC with AI-training limits — rejected. 14th round
+without a new free opinion source.
+
 Updated 2026-10-26: Studies **11,352** (1,766 with quantitative data).
 Source coverage still 7/8 (#65 unchanged; `bmas` 55 days stale, #189).
 Attribution: 140 / 25,757 claims (0.5%); last yield 1/40 (2.5%) even
