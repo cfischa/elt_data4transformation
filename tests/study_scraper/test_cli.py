@@ -149,30 +149,36 @@ def test_ingest_unknown_source_error_lists_every_lake_source(
         assert src in bad.output
 
 
+def _discovered_source_ids(package_name: str) -> set:
+    """`source_id` of every class *defined* in a module of `package_name`
+    that carries a string `source_id` class attribute (the Protocol-style
+    source classes; `Candidate` only has a pydantic field, so it's skipped)."""
+    import importlib
+    import inspect
+    import pkgutil
+
+    pkg = importlib.import_module(package_name)
+    ids = set()
+    for info in pkgutil.iter_modules(pkg.__path__):
+        mod = importlib.import_module(f"{package_name}.{info.name}")
+        for _, cls in inspect.getmembers(mod, inspect.isclass):
+            if cls.__module__ != mod.__name__:
+                continue
+            sid = getattr(cls, "source_id", None)
+            if isinstance(sid, str):
+                ids.add(sid)
+    return ids
+
+
 def test_status_registries_match_source_classes() -> None:
     """status' CATALOG/LAKE registries must equal the `source_id` of the
-    real source classes -- a new source class not registered there would
-    never surface in `never_run_sources`."""
-    from study_scraper.discovery.bundestag_dip import BundestagDIPSource
-    from study_scraper.discovery.core_search import CoreSearchSource
-    from study_scraper.discovery.econstor import EconStorSource
-    from study_scraper.discovery.openalex import OpenAlexSource
-    from study_scraper.discovery.ssoar import SSOARSource
-    from study_scraper.sources.bmas import BMASSource
-    from study_scraper.sources.dawum import DAWUMSource
-    from study_scraper.sources.eurobarometer import EurobarometerSource
-    from study_scraper.sources.eurostat import EurostatSource
-    from study_scraper.sources.gesis import GESISSource
-    from study_scraper.sources.govdata import GovDataSource
+    source classes found by scanning the packages -- a new source class
+    not registered there would never surface in `never_run_sources`."""
     from study_scraper.status import CATALOG_SOURCE_IDS, LAKE_SOURCE_IDS
 
-    catalog = [
-        BundestagDIPSource, CoreSearchSource, EconStorSource,
-        OpenAlexSource, SSOARSource,
-    ]
-    lake = [
-        BMASSource, DAWUMSource, EurobarometerSource, EurostatSource,
-        GESISSource, GovDataSource,
-    ]
-    assert {c.source_id for c in catalog} == set(CATALOG_SOURCE_IDS)
-    assert {c.source_id for c in lake} == set(LAKE_SOURCE_IDS)
+    catalog = _discovered_source_ids("study_scraper.discovery")
+    lake = _discovered_source_ids("study_scraper.sources")
+    # Non-vacuous: discovery must actually find sources.
+    assert catalog and lake
+    assert catalog == set(CATALOG_SOURCE_IDS)
+    assert lake == set(LAKE_SOURCE_IDS)
