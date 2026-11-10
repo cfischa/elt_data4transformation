@@ -322,13 +322,11 @@ weren't enough, so claim extraction lands.
       unit, snippet, study_id, extractor='regex-v1')`. Pipeline calls
       `extract_claims` after every upsert. Search CLI:
       `python -m study_scraper search <keyword>`.
-- [ ] **Phase 6-full** — extend claim extraction over full-text PDF.
-      **DEFERRED to future work per A13.** Reorders behind Phase 5c
-      (structured sources). The 2026-05-28 example-question
-      measurement showed the mechanism works against abstracts; the
-      next volume win is structured data, not better extraction from
-      prose.
-- [ ] **LLM-based extractor** — replace / supplement `regex-v1` with
+- [x] **Phase 6-full** — extend claim extraction over full-text PDF.
+      Shipped after the A13 deferral as `fulltext.py` (extractor
+      `regex-v2`, coexists with `regex-v1` per study); see the
+      production pass (A20) above.
+- [x] **LLM-based extractor** (shipped A21 as `llm-v1`) — replace / supplement `regex-v1` with
       an LLM pass that disambiguates the *referent* of each %. New
       extractor id `llm-v1`. Cost considered; only fire on studies
       that pass the topic threshold.
