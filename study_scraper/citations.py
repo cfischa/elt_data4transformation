@@ -35,3 +35,21 @@ def extract_urls(text: str) -> List[str]:
             continue  # already covered by extract_dois
         seen.setdefault(url, None)
     return list(seen)
+
+
+_REF_HEADING_RE = re.compile(
+    r"^\s*(?:\d+\.?\s*)?(?:literatur(?:verzeichnis)?|quellen(?:verzeichnis)?|references|bibliography)\s*:?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def references_section(text: str) -> str:
+    """Return the text after the last references-style heading, else ''.
+
+    Headings recognised (own line): Literatur(verzeichnis), Quellen(verzeichnis),
+    References, Bibliography. Using the last match skips table-of-contents hits.
+    """
+    matches = list(_REF_HEADING_RE.finditer(text or ""))
+    if not matches:
+        return ""
+    return text[matches[-1].end():].strip()
