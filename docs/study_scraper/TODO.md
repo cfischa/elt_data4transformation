@@ -301,7 +301,7 @@ Three mechanisms, ranked by yield / effort:
 - [ ] **Citation-context mining (Phase 6+)** — when we have the full
       text of a study (PDF extracted), find URLs and DOIs in the
       references section, normalize them to candidate studies. Defer
-      until PDF extraction lands.
+      until PDF extraction lands. *(Progress: pure `extract_dois`/`extract_urls`/`references_section` in `citations.py`; pipeline wiring still open.)*
 
 Control-dock surface: a third page **"Sources"** with
   - the table of known sources (id, kind, last successful run, study
