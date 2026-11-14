@@ -27,3 +27,14 @@ def test_references_section_absent():
     from study_scraper.citations import references_section
     assert references_section("kein Verzeichnis hier") == ""
     assert references_section(None) == ""
+
+
+def test_mine_citations_only_reads_references_section():
+    from study_scraper.citations import mine_citations
+    text = "Body https://body.example/x doi:10.1001/body\nReferences\nA (2020) 10.1002/ref https://ref.example/s.pdf.\n"
+    assert mine_citations(text) == {"dois": ["10.1002/ref"], "urls": ["https://ref.example/s.pdf"]}
+
+
+def test_mine_citations_no_section():
+    from study_scraper.citations import mine_citations
+    assert mine_citations("doi:10.1001/x") == {"dois": [], "urls": []}
