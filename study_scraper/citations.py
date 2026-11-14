@@ -53,3 +53,13 @@ def references_section(text: str) -> str:
     if not matches:
         return ""
     return text[matches[-1].end():].strip()
+
+
+def mine_citations(text: str) -> dict:
+    """Return {'dois': [...], 'urls': [...]} found in the references section.
+
+    Only the references section is searched, so body-text links are ignored.
+    Both lists are empty when no references heading is found.
+    """
+    section = references_section(text)
+    return {"dois": extract_dois(section), "urls": extract_urls(section)}
