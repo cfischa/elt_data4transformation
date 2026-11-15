@@ -38,3 +38,24 @@ def test_mine_citations_only_reads_references_section():
 def test_mine_citations_no_section():
     from study_scraper.citations import mine_citations
     assert mine_citations("doi:10.1001/x") == {"dois": [], "urls": []}
+
+
+def test_citation_candidates_normalizes_and_dedupes():
+    from study_scraper.citations import citation_candidates
+
+    text = (
+        "Body see https://ignored.example/x\n"
+        "Literatur\n"
+        "A. doi:10.1000/ABC.1. B. https://doi.org/10.1000/abc.1\n"
+        "C. https://example.org/study.pdf, D. https://example.org/study.pdf\n"
+    )
+    assert citation_candidates(text) == [
+        "https://doi.org/10.1000/abc.1",
+        "https://example.org/study.pdf",
+    ]
+
+
+def test_citation_candidates_no_references_heading():
+    from study_scraper.citations import citation_candidates
+
+    assert citation_candidates("see 10.1000/x https://a.org") == []

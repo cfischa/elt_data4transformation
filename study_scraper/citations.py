@@ -63,3 +63,14 @@ def mine_citations(text: str) -> dict:
     """
     section = references_section(text)
     return {"dois": extract_dois(section), "urls": extract_urls(section)}
+
+
+def citation_candidates(text: str) -> List[str]:
+    """Return unique candidate URLs mined from the references section.
+
+    DOIs are normalized to ``https://doi.org/<doi>`` and listed first, followed
+    by plain URLs, each in order of first appearance.
+    """
+    mined = mine_citations(text)
+    urls = [f"https://doi.org/{d}" for d in mined["dois"]] + mined["urls"]
+    return list(dict.fromkeys(urls))
