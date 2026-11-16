@@ -12,6 +12,15 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-11-16: Studies **12,389** (1,982 with quantitative data, +351 vs 11-09).
+Source coverage still 7/8 (#65; `core`, `econstor`, `eurobarometer`, `govdata`
+never run; #189). Attribution: 161 / 29,424 claims (0.5%); last yield 2/40,
+backlog 467 (#196). No maintainer reply since 09-28; defaults govern.
+Scouting (Bürgerbefragungen): **new candidate** — Leipzig Kommunale
+Bürgerumfrage 2024 on opendata.leipzig.de (CSV, DL-DE 2.0, free,
+structured); filed as a low-priority `agent:task`. Dresden KBU is PDF-only,
+licence unchecked.
+
 Updated 2026-11-09: Studies **12,038** (1,913 with quantitative data, +311 vs 11-02).
 Source coverage still 7/8 (#65; `core`, `econstor`, `eurobarometer`, `govdata`
 never run; `bmas` 69 days stale, #189). Attribution: 155 / 28,374 claims
