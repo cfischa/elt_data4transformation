@@ -35,7 +35,7 @@ CATALOG_SOURCE_IDS = frozenset(
     {"ssoar", "openalex", "bundestag_dip", "core", "econstor"}
 )
 LAKE_SOURCE_IDS = frozenset(
-    {"dawum", "gesis", "eurostat", "govdata", "eurobarometer", "bmas"}
+    {"dawum", "gesis", "eurostat", "govdata", "eurobarometer", "bmas", "leipzig_kbu"}
 )
 KNOWN_SOURCE_IDS = CATALOG_SOURCE_IDS | LAKE_SOURCE_IDS
 

@@ -1465,3 +1465,6 @@ project URL + service-role key (placed in `.env`, not committed), or
 - When superseding, link the old id and explain why.
 - Open questions get the next `Q<N>` id. When answered, move to "Accepted"
   with the resolution and date.
+
+## leipzig_kbu: subclass of GovDataSource with licence allowlist (#232)
+Leipzig's portal is plain CKAN, so `LeipzigKBUSource` subclasses `GovDataSource` (overriding only source_id, dataset URL base, fetch_source label) instead of duplicating the pager/parser. Datasets whose `license_id` is not on an open-licence allowlist are skipped with a warning (the "check the licence on each dataset" criterion). Only the resource listing is landed; respondent-level CSVs are never downloaded. Dresden is deferred (licence unchecked).

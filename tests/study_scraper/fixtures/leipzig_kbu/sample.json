@@ -1,0 +1,36 @@
+{
+  "_fixture_note": "Hand-crafted sample in the CKAN package_search response shape (opendata.leipzig.de). Ids/titles are illustrative, not recorded from a live call.",
+  "success": true,
+  "result": {
+    "count": 3,
+    "results": [
+      {
+        "id": "b1000000-0000-4000-8000-000000000001",
+        "name": "buergerumfrage-2024",
+        "title": "Bürgerumfrage 2024",
+        "license_id": "dl-de-by-2.0",
+        "license_title": "Datenlizenz Deutschland – Namensnennung – Version 2.0",
+        "organization": {"name": "stadt-leipzig", "title": "Stadt Leipzig"},
+        "resources": [{"url": "https://opendata.leipzig.de/dataset/buergerumfrage-2024/resource/r1/download/kbu_2024.csv", "format": "CSV"}]
+      },
+      {
+        "id": "b1000000-0000-4000-8000-000000000002",
+        "name": "buergerumfrage-2022",
+        "title": "Bürgerumfrage 2022",
+        "license_id": "dl-de-zero-2.0",
+        "license_title": "Datenlizenz Deutschland – Zero – Version 2.0",
+        "organization": {"name": "stadt-leipzig", "title": "Stadt Leipzig"},
+        "resources": []
+      },
+      {
+        "id": "b1000000-0000-4000-8000-000000000003",
+        "name": "buergerumfrage-restricted",
+        "title": "Bürgerumfrage (restricted licence)",
+        "license_id": "other-closed",
+        "license_title": "Andere (nicht offen)",
+        "organization": {"name": "stadt-leipzig", "title": "Stadt Leipzig"},
+        "resources": []
+      }
+    ]
+  }
+}

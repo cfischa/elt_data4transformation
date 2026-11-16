@@ -124,7 +124,7 @@ def migrate() -> None:
         typer.echo(f"applied {len(applied)} migration(s): {applied}")
 
 
-LAKE_SOURCES = ("dawum", "gesis", "eurobarometer", "eurostat", "govdata", "bmas")
+LAKE_SOURCES = ("dawum", "gesis", "eurobarometer", "eurostat", "govdata", "bmas", "leipzig_kbu")
 RUN_SOURCES = ("ssoar", "econstor", "openalex", "bundestag_dip", "core")
 
 
@@ -693,6 +693,10 @@ def ingest(
         from study_scraper.sources.bmas import BMASSource  # lazy: optional bs4 dep, see #163
 
         src = BMASSource(years=year or None, from_file=from_file)
+    elif source == "leipzig_kbu":
+        from study_scraper.sources.leipzig_kbu import LeipzigKBUSource
+
+        src = LeipzigKBUSource(from_file=from_file)
     else:
         raise typer.BadParameter(
             f"unknown lake source {source!r}; "
