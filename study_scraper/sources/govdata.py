@@ -63,6 +63,9 @@ class GovDataSource:
     """Lake source for the GovData.de CKAN `package_search` API."""
 
     source_id = "govdata"
+    # Overridable by CKAN-based subclasses (e.g. leipzig_kbu).
+    dataset_url_base = "https://www.govdata.de/dataset/"
+    fetch_source = "govdata_ckan_package_search"
 
     def __init__(
         self,
@@ -205,7 +208,7 @@ class GovDataSource:
         if not dataset_id:
             return None
 
-        canonical_url = f"https://www.govdata.de/dataset/{name or dataset_id}"
+        canonical_url = f"{self.dataset_url_base}{name or dataset_id}"
         license_ = (
             dataset.get("license_title")
             or dataset.get("license_id")
@@ -231,7 +234,7 @@ class GovDataSource:
             payload=dataset,
             license=license_,
             provenance={
-                "fetch_source": "govdata_ckan_package_search",
+                "fetch_source": self.fetch_source,
                 "endpoint": self._base_url,
                 "query": query,
                 "from_file": (
