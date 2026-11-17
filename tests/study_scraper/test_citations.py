@@ -1,4 +1,4 @@
-from study_scraper.citations import extract_dois, extract_urls
+from study_scraper.citations import extract_dois, extract_urls, references_section
 
 
 def test_extract_dois_normalizes_and_dedups():
@@ -59,3 +59,19 @@ def test_citation_candidates_no_references_heading():
     from study_scraper.citations import citation_candidates
 
     assert citation_candidates("see 10.1000/x https://a.org") == []
+
+
+def test_references_section_german_heading_variants():
+    for heading in (
+        "Referenzen",
+        "Literaturangaben",
+        "Quellen- und Literaturverzeichnis",
+        "Quellen und Literaturverzeichnis",
+        "Literatur und Quellen",
+        "6. Quellenangaben:",
+    ):
+        assert references_section(f"Text\n{heading}\nhttps://a.de/x") == "https://a.de/x"
+
+
+def test_references_section_ignores_heading_inside_sentence():
+    assert references_section("Siehe Referenzen im Anhang\nmehr") == ""
