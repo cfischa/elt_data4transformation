@@ -40,7 +40,7 @@ def extract_urls(text: str) -> List[str]:
 _REF_HEADING_RE = re.compile(
     r"^\s*(?:\d+\.?\s*)?(?:"
     r"quellen-?\s+und\s+literatur(?:verzeichnis)?|literatur-?\s+und\s+quellen(?:verzeichnis)?|"
-    r"literatur(?:verzeichnis|angaben|hinweise)?|quellen(?:verzeichnis|angaben)?|"
+    r"literatur(?:verzeichnis|angaben|hinweise|liste)?|quellen(?:verzeichnis|angaben|liste)?|"
     r"referenzen|references|bibliography"
     r")\s*:?\s*$",
     re.IGNORECASE | re.MULTILINE,
