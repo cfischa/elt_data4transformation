@@ -401,3 +401,31 @@ def test_pending_references_queue(storage: PostgresStorage) -> None:
     assert "https://openalex.org/W400" in pending
     assert "https://openalex.org/W300" not in pending
     assert "https://openalex.org/W100" not in pending
+
+
+class _StubStorage:
+    def upsert_claims(self, study_id, claims, extractor=None):
+        return len(claims)
+
+    def set_artifact_ref(self, study_id, ref):
+        pass
+
+
+def test_process_document_reports_citation_candidates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # HTML extraction flattens newlines (no heading detection), so feed
+    # multi-line text as the PDF path would produce it.
+    text = (
+        "Body text.\nLiteratur\nFoo 2020. doi:10.1234/abc.1\n"
+        "See https://example.org/report.\n"
+    )
+    monkeypatch.setattr(
+        "study_scraper.fulltext.extract_text", lambda c, t: ("pdf", text)
+    )
+    summary = process_document(
+        storage=_StubStorage(), study_id="s1", content=b"x",
+        content_type="application/pdf", artifact_dir=tmp_path,
+    )
+    assert summary["status"] == "ok"
+    assert summary["citation_candidates"] == 2

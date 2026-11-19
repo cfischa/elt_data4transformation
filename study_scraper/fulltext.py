@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
+from study_scraper.citations import citation_candidates
 from study_scraper.claims import extract_claims_from_text
 from study_scraper.config import get_settings
 from study_scraper.http import (
@@ -183,6 +184,7 @@ def process_document(
         "bytes": len(content),
         "text_chars": len(text),
         "claims": n,
+        "citation_candidates": len(citation_candidates(text)),
         "artifact": ref,
     }
 
