@@ -410,6 +410,10 @@ class _StubStorage:
     def set_artifact_ref(self, study_id, ref):
         pass
 
+    def set_citation_candidates(self, study_id, candidates):
+        self.candidates = list(candidates)
+        return bool(candidates)
+
 
 def test_process_document_reports_citation_candidates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -423,9 +427,29 @@ def test_process_document_reports_citation_candidates(
     monkeypatch.setattr(
         "study_scraper.fulltext.extract_text", lambda c, t: ("pdf", text)
     )
+    stub = _StubStorage()
     summary = process_document(
-        storage=_StubStorage(), study_id="s1", content=b"x",
+        storage=stub, study_id="s1", content=b"x",
         content_type="application/pdf", artifact_dir=tmp_path,
     )
     assert summary["status"] == "ok"
     assert summary["citation_candidates"] == 2
+    assert stub.candidates == [
+        "https://doi.org/10.1234/abc.1", "https://example.org/report",
+    ]
+
+
+@_needs_db
+@pytest.mark.usefixtures("_clean")
+def test_set_citation_candidates_merges_into_provenance(
+    storage: PostgresStorage,
+) -> None:
+    study = _mk_study("https://example.org/cc.pdf", "Citation candidates")
+    storage.upsert_study(study)
+    assert storage.set_citation_candidates(study.id, []) is False
+    assert storage.set_citation_candidates(
+        study.id, ["https://doi.org/10.1/x"]
+    ) is True
+    row = storage.get_study(study.id)
+    assert row["provenance"]["citation_candidates"] == ["https://doi.org/10.1/x"]
+    assert row["provenance"]["discovery_source"] == "ssoar"
