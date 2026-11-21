@@ -176,6 +176,8 @@ def process_document(
     claims = extract_claims_from_text(study_id=study_id, text=text)
     n = storage.upsert_claims(study_id, claims, extractor=FULLTEXT_EXTRACTOR)
     storage.set_artifact_ref(study_id, ref)
+    candidates = citation_candidates(text)
+    storage.set_citation_candidates(study_id, candidates)
 
     return {
         "study_id": study_id,
@@ -184,7 +186,7 @@ def process_document(
         "bytes": len(content),
         "text_chars": len(text),
         "claims": n,
-        "citation_candidates": len(citation_candidates(text)),
+        "citation_candidates": len(candidates),
         "artifact": ref,
     }
 

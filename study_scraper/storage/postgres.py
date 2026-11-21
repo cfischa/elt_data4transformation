@@ -559,6 +559,30 @@ class PostgresStorage:
             conn.commit()
         return changed
 
+    def set_citation_candidates(
+        self, study_id: str, candidates: List[str]
+    ) -> bool:
+        """Merge mined citation candidate URLs (see `citations.
+        citation_candidates`) into provenance jsonb under
+        `citation_candidates` (no schema change). No-op (returns False)
+        when the list is empty so a re-run never clobbers an earlier
+        result. True if updated."""
+        if not candidates:
+            return False
+        with self.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.studies "
+                    f"   SET provenance = COALESCE(provenance, '{{}}'::jsonb) "
+                    f"       || %s::jsonb, "
+                    f"       updated_at = now() "
+                    f" WHERE id = %s",
+                    (json.dumps({"citation_candidates": candidates}), study_id),
+                )
+                changed = cur.rowcount > 0
+            conn.commit()
+        return changed
+
     def set_fetch_conditional(
         self,
         study_id: str,
