@@ -12,6 +12,14 @@ installs/curation · **[done]** shipped.
 
 ## P1 — do these first (high value, clearly scoped, [now])
 
+Updated 2026-11-23: Studies **13,012** (2,093 with quantitative data, +623 vs 11-16).
+Source coverage still 7/8 (#65; `core`, `econstor`, `eurobarometer`, `govdata`,
+`leipzig_kbu` never run; #189). Attribution: 163 / 33,454 claims (0.5%); last
+yield 0/40, backlog 459 (#196, #246). No maintainer reply since 09-28; defaults
+govern. Scouting (Bürgerumfragen): nothing new. Augsburg Bürgerumfrage 2025 is
+PDF-only, no raw-data licence found — rejected. 15th round without a new free
+opinion source.
+
 Updated 2026-11-16: Studies **12,389** (1,982 with quantitative data, +351 vs 11-09).
 Source coverage still 7/8 (#65; `core`, `econstor`, `eurobarometer`, `govdata`
 never run; #189). Attribution: 161 / 29,424 claims (0.5%); last yield 2/40,
