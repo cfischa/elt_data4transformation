@@ -76,6 +76,11 @@ def test_references_section_german_heading_variants():
         "Quellennachweise",
         "Works Cited",
         "Bibliografie",
+        "Reference List",
+        "Literature Cited",
+        "Literature",
+        "Sources",
+        "Reference",
     ):
         assert references_section(f"Text\n{heading}\nhttps://a.de/x") == "https://a.de/x"
 

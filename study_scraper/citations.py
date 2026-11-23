@@ -42,7 +42,7 @@ _REF_HEADING_RE = re.compile(
     r"quellen-?\s+und\s+literatur(?:verzeichnis)?|literatur-?\s+und\s+quellen(?:verzeichnis)?|"
     r"literatur(?:verzeichnis|angaben|hinweise|liste|nachweise?)?|"
     r"quellen(?:verzeichnis|angaben|liste|nachweise?)?|"
-    r"referenzen|references|works\s+cited|biblio(?:graph(?:y|ie)|grafie)"
+    r"referenzen|references?(?:\s+list)?|works\s+cited|literature(?:\s+cited)?|sources|biblio(?:graph(?:y|ie)|grafie)"
     r")\s*:?\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
@@ -51,7 +51,7 @@ _REF_HEADING_RE = re.compile(
 def references_section(text: str) -> str:
     """Return the text after the last references-style heading, else ''.
 
-    Headings recognised (own line): Literatur(verzeichnis), Quellen(verzeichnis),
+    Headings recognised (own line): Literatur(verzeichnis), Quellen(verzeichnis), Literature (cited), Sources,
     References, Bibliography. Using the last match skips table-of-contents hits.
     """
     matches = list(_REF_HEADING_RE.finditer(text or ""))
