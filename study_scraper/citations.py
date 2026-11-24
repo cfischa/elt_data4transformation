@@ -42,7 +42,8 @@ _REF_HEADING_RE = re.compile(
     r"quellen-?\s+und\s+literatur(?:verzeichnis)?|literatur-?\s+und\s+quellen(?:verzeichnis)?|"
     r"literatur(?:verzeichnis|angaben|hinweise|liste|nachweise?)?|"
     r"quellen(?:verzeichnis|angaben|liste|nachweise?)?|"
-    r"referenzen|references?(?:\s+list)?|works\s+cited|literature(?:\s+cited)?|sources|biblio(?:graph(?:y|ie)|grafie)"
+    r"(?:zitierte|verwendete)\s+(?:literatur|quellen)|"
+    r"referenzen|references?(?:\s+(?:list|cited))?|works\s+cited|literature(?:\s+cited)?|sources|biblio(?:graph(?:y|ie)|grafie)"
     r")\s*:?\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
