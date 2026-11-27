@@ -88,6 +88,8 @@ def test_references_section_german_heading_variants():
         "Weiterführende Literatur",
         "Weiterfuehrende Literatur",
         "Further Reading",
+        "Weitere Literatur",
+        "Weitere Quellen",
     ):
         assert references_section(f"Text\n{heading}\nhttps://a.de/x") == "https://a.de/x"
 
