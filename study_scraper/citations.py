@@ -43,8 +43,8 @@ _REF_HEADING_RE = re.compile(
     r"literatur(?:verzeichnis|angaben|hinweise|liste|nachweise?)?|"
     r"quellen(?:verzeichnis|angaben|liste|nachweise?)?|"
     r"(?:zitierte|verwendete)\s+(?:literatur|quellen)|"
-    r"weiterf(?:ü|ue)hrende\s+literatur|weitere\s+(?:literatur|quellen)|further\s+reading|"
-    r"referenzen|references?(?:\s+(?:list|cited))?|works\s+cited|literature(?:\s+cited)?|sources|biblio(?:graph(?:y|ie)|grafie)"
+    r"weiterf(?:ü|ue)hrende\s+(?:literatur|quellen)|weitere\s+(?:literatur|quellen)|further\s+reading|"
+    r"referenzen|references?(?:\s+(?:list|cited))?|works\s+cited|literature(?:\s+cited)?|sources(?:\s+cited)?|biblio(?:graph(?:y|ie)|grafie)"
     r")\s*:?\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
